@@ -1,0 +1,9 @@
+﻿USB PREDAJA CHECKLIST
+=====================
+
+[ ] USB je formatiran kao exFAT ako ima fajlova vecih od 4 GB.
+[ ] Ako musterija koristi FAT32 USB, ukljucen je Split output na oko 3.8 GB.
+[ ] Gotovi MP4 fajlovi su kopirani na USB.
+[ ] IZVESTAJ.txt je kopiran uz video fajlove.
+[ ] Bar prvi minut svakog MP4 fajla je pusten i proveren.
+[ ] Originalni veliki fajlovi ostaju kod tebe kao arhiva.
