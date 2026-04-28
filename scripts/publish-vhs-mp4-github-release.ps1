@@ -19,6 +19,24 @@ $ErrorActionPreference = "Stop"
 # - gh release create
 # - gh release upload
 
+function ConvertTo-ProcessArgumentString {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $quoted = foreach ($argument in $Arguments) {
+        if ($argument -match '[\s"]') {
+            '"' + $argument.Replace('"', '\"') + '"'
+        }
+        else {
+            $argument
+        }
+    }
+
+    return ($quoted -join " ")
+}
+
 function Invoke-Gh {
     param(
         [Parameter(Mandatory = $true)]
@@ -30,7 +48,8 @@ function Invoke-Gh {
     $stderrPath = [System.IO.Path]::GetTempFileName()
 
     try {
-        $process = Start-Process -FilePath "gh" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $argumentString = ConvertTo-ProcessArgumentString -Arguments $Arguments
+        $process = Start-Process -FilePath "gh" -ArgumentList $argumentString -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
         $exitCode = $process.ExitCode
         $outputLines = @()
         if (Test-Path -LiteralPath $stdoutPath) {
@@ -66,7 +85,8 @@ function Invoke-Git {
     $stderrPath = [System.IO.Path]::GetTempFileName()
 
     try {
-        $process = Start-Process -FilePath "git" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $argumentString = ConvertTo-ProcessArgumentString -Arguments $Arguments
+        $process = Start-Process -FilePath "git" -ArgumentList $argumentString -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
         $exitCode = $process.ExitCode
         $outputLines = @()
         if (Test-Path -LiteralPath $stdoutPath) {
