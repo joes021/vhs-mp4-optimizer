@@ -30,8 +30,8 @@ function Invoke-Gh {
     $stderrPath = [System.IO.Path]::GetTempFileName()
 
     try {
-        & gh @Arguments 1>$stdoutPath 2>$stderrPath
-        $exitCode = $LASTEXITCODE
+        $process = Start-Process -FilePath "gh" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $exitCode = $process.ExitCode
         $outputLines = @()
         if (Test-Path -LiteralPath $stdoutPath) {
             $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
@@ -66,8 +66,8 @@ function Invoke-Git {
     $stderrPath = [System.IO.Path]::GetTempFileName()
 
     try {
-        & git @Arguments 1>$stdoutPath 2>$stderrPath
-        $exitCode = $LASTEXITCODE
+        $process = Start-Process -FilePath "git" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $exitCode = $process.ExitCode
         $outputLines = @()
         if (Test-Path -LiteralPath $stdoutPath) {
             $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)

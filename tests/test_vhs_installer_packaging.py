@@ -44,6 +44,8 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
         "show-ref",
         "GetTempFileName",
         "Remove-Item -LiteralPath $stdoutPath, $stderrPath",
+        "Start-Process -FilePath \"gh\"",
+        "Start-Process -FilePath \"git\"",
     ]:
         assert token in release_publisher, f"missing release publisher token: {token}"
 
