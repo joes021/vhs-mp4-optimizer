@@ -26,6 +26,28 @@ Windows alat za konverziju, pregled, trim i pripremu video fajlova iz VHS, DVD, 
 
 Ako izadje noviji release, idi na [Releases](https://github.com/joes021/vhs-mp4-optimizer/releases/latest) stranu i preuzmi najnovije artefakte.
 
+## Kako izgleda
+
+![Kratak workflow kroz batch, player i batch kontrolu](docs/media/readme-workflow.gif)
+
+<p align="center">
+  <img src="docs/media/readme-main-overview.png" alt="Glavni batch pregled sa queue tabelom i preview tabom" width="100%">
+</p>
+
+Glavni batch pogled: scan, queue, media info kolone, USB procena i preview radni tab u istom prozoru.
+
+<p align="center">
+  <img src="docs/media/readme-player-trim.png" alt="Player Trim prozor sa timeline, multi-cut i crop kontrolama" width="100%">
+</p>
+
+`Player / Trim` prozor: preview mode, timeline, multi-cut segmenti, crop/overscan i aspect korekcija po fajlu.
+
+<p align="center">
+  <img src="docs/media/readme-batch-controls.png" alt="Batch kontrola sa trim tabom i pause resume tokom" width="100%">
+</p>
+
+Batch dorade: trim tab, workflow preset, `Pause / Resume` tok i uredjivanje queued fajlova bez izlaska iz glavnog ekrana.
+
 ## Sta ovaj alat radi
 
 VHS MP4 Optimizer je lokalni Windows program za situacije kada dobijes:
@@ -202,6 +224,12 @@ Objava GitHub release-a:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-vhs-mp4-github-release.ps1
+```
+
+Osvezavanje README screenshot-a i GIF-a:
+
+```powershell
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File scripts/build-readme-media.ps1
 ```
 
 ## Testiranje
