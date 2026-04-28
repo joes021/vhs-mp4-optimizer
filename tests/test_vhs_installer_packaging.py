@@ -42,6 +42,8 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
         "refs/tags/",
         "git push",
         "show-ref",
+        "GetTempFileName",
+        "Remove-Item -LiteralPath $stdoutPath, $stderrPath",
     ]:
         assert token in release_publisher, f"missing release publisher token: {token}"
 

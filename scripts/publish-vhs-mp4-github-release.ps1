@@ -26,15 +26,33 @@ function Invoke-Gh {
         [switch]$Quiet
     )
 
-    $output = & gh @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
-    if (-not $Quiet -and $null -ne $output) {
-        foreach ($line in @($output)) {
-            Write-Host $line
-        }
-    }
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
 
-    return [int]$exitCode
+    try {
+        & gh @Arguments 1>$stdoutPath 2>$stderrPath
+        $exitCode = $LASTEXITCODE
+        $outputLines = @()
+        if (Test-Path -LiteralPath $stdoutPath) {
+            $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+        }
+        if (Test-Path -LiteralPath $stderrPath) {
+            $outputLines += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+        }
+
+        if (-not $Quiet -and $null -ne $outputLines) {
+            foreach ($line in @($outputLines)) {
+                if (-not [string]::IsNullOrWhiteSpace([string]$line)) {
+                    Write-Host $line
+                }
+            }
+        }
+
+        return [int]$exitCode
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-Git {
@@ -44,15 +62,33 @@ function Invoke-Git {
         [switch]$Quiet
     )
 
-    $output = & git @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
-    if (-not $Quiet -and $null -ne $output) {
-        foreach ($line in @($output)) {
-            Write-Host $line
-        }
-    }
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
 
-    return [int]$exitCode
+    try {
+        & git @Arguments 1>$stdoutPath 2>$stderrPath
+        $exitCode = $LASTEXITCODE
+        $outputLines = @()
+        if (Test-Path -LiteralPath $stdoutPath) {
+            $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+        }
+        if (Test-Path -LiteralPath $stderrPath) {
+            $outputLines += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+        }
+
+        if (-not $Quiet -and $null -ne $outputLines) {
+            foreach ($line in @($outputLines)) {
+                if (-not [string]::IsNullOrWhiteSpace([string]$line)) {
+                    Write-Host $line
+                }
+            }
+        }
+
+        return [int]$exitCode
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Test-GhReleaseExists {
