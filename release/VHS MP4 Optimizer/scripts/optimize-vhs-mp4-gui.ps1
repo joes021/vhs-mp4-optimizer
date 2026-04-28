@@ -27,7 +27,7 @@ $script:CurrentDurationSeconds = $null
 $script:CurrentFileStartedAt = $null
 $script:PollTimer = New-Object System.Windows.Forms.Timer
 $script:PollTimer.Interval = 250
-$script:RightPanelTargetWidth = 430
+$script:RightPanelTargetWidth = 500
 $script:PreviewTimelineScale = 100
 $script:PreviewAutoPending = $false
 $script:PreviewAutoDelayMs = 250
@@ -6073,7 +6073,7 @@ $rootLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $rootLayout.Dock = "Fill"
 $rootLayout.ColumnCount = 1
 $rootLayout.RowCount = 4
-$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 330)))
+$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 300)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 60)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 90)))
@@ -6557,12 +6557,9 @@ $mainSplit.Panel1.Controls.Add($grid)
 $rightPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $rightPanel.Dock = "Fill"
 $rightPanel.ColumnCount = 1
-$rightPanel.RowCount = 5
+$rightPanel.RowCount = 2
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
-$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 96)))
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 50)))
 $mainSplit.Panel2.Controls.Add($rightPanel)
 
 $previewStatusLabel = New-Object System.Windows.Forms.Label
@@ -6572,10 +6569,29 @@ $previewStatusLabel.TextAlign = "MiddleLeft"
 $previewStatusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $rightPanel.Controls.Add($previewStatusLabel, 0, 0)
 
+$rightTabControl = New-Object System.Windows.Forms.TabControl
+$rightTabControl.Dock = "Fill"
+$rightPanel.Controls.Add($rightTabControl, 0, 1)
+
+$previewTabPage = New-Object System.Windows.Forms.TabPage
+$previewTabPage.Text = "Preview"
+$previewTabPage.Padding = New-Object System.Windows.Forms.Padding(6)
+$rightTabControl.TabPages.Add($previewTabPage)
+
+$trimTabPage = New-Object System.Windows.Forms.TabPage
+$trimTabPage.Text = "Trim"
+$trimTabPage.Padding = New-Object System.Windows.Forms.Padding(6)
+$rightTabControl.TabPages.Add($trimTabPage)
+
+$propertiesTabPage = New-Object System.Windows.Forms.TabPage
+$propertiesTabPage.Text = "Properties"
+$propertiesTabPage.Padding = New-Object System.Windows.Forms.Padding(6)
+$rightTabControl.TabPages.Add($propertiesTabPage)
+
 $trimGroupBox = New-Object System.Windows.Forms.GroupBox
 $trimGroupBox.Text = "Trim selected file"
 $trimGroupBox.Dock = "Fill"
-$rightPanel.Controls.Add($trimGroupBox, 0, 1)
+$trimTabPage.Controls.Add($trimGroupBox)
 
 $trimLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $trimLayout.Dock = "Fill"
@@ -6679,7 +6695,14 @@ $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([S
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$rightPanel.Controls.Add($previewControlsPanel, 0, 2)
+
+$previewTabLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$previewTabLayout.Dock = "Fill"
+$previewTabLayout.ColumnCount = 1
+$previewTabLayout.RowCount = 2
+$previewTabLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$previewTabLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 96)))
+$previewTabPage.Controls.Add($previewTabLayout)
 
 $previewTimeLabel = New-Object System.Windows.Forms.Label
 $previewTimeLabel.Text = "Preview time"
@@ -6780,7 +6803,8 @@ $previewPictureBox.Add_Paint({
 
     Draw-PreviewCropOverlay -PictureBox $previewPictureBox -EventArgs $eventArgs -Item $item
 })
-$rightPanel.Controls.Add($previewPictureBox, 0, 3)
+$previewTabLayout.Controls.Add($previewPictureBox, 0, 0)
+$previewTabLayout.Controls.Add($previewControlsPanel, 0, 1)
 
 $script:DragDropVisualDefaults = [pscustomobject]@{
     StatusPanelBackColor = $statusPanel.BackColor
@@ -6802,10 +6826,10 @@ $infoBox = New-Object System.Windows.Forms.RichTextBox
 $infoBox.Dock = "Fill"
 $infoBox.ReadOnly = $true
 $infoBox.BorderStyle = "None"
-$infoBox.BackColor = [System.Drawing.SystemColors]::Control
+$infoBox.BackColor = [System.Drawing.SystemColors]::Window
 $infoBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $infoBox.Text = Get-MediaInfoIntroText
-$rightPanel.Controls.Add($infoBox, 0, 4)
+$propertiesTabPage.Controls.Add($infoBox)
 
 $grid.Add_SelectionChanged({
     Update-MediaInfoPanel

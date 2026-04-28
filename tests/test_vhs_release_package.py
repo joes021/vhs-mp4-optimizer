@@ -32,7 +32,7 @@ def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
 
     shortcut_launcher = read(RELEASE_ROOT / "Install Desktop Shortcut.bat")
     assert "scripts\\install-vhs-mp4-shortcut.ps1" in shortcut_launcher
-    assert "ExecutionPolicy Bypass" in shortcut_launcher
+    assert "ExecutionPolicy RemoteSigned" in shortcut_launcher
 
     readme = read(RELEASE_ROOT / "README - kako se koristi.txt")
     for token in [

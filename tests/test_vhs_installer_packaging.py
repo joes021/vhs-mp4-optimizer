@@ -36,6 +36,8 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
         "gh release upload",
         "gh release view",
         "VHS MP4 Optimizer",
+        "joes021/vhs-mp4-optimizer",
+        '[string]$Target = "main"',
         "--clobber",
         "refs/tags/",
         "git push",
@@ -45,8 +47,9 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
 
     for token in [
         "AppName=VHS MP4 Optimizer",
-        "DefaultDirName={autopf}\\VHS MP4 Optimizer",
+        "DefaultDirName={localappdata}\\Programs\\VHS MP4 Optimizer",
         "DefaultGroupName=VHS MP4 Optimizer",
+        "PrivilegesRequired=lowest",
         "OutputBaseFilename",
         "Compression=lzma",
         "CreateDesktopIcon",

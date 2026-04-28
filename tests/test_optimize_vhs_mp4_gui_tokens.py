@@ -182,28 +182,36 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
     assert "$configLayout.AutoScroll = $true" in script
 
 
-def test_vhs_gui_keeps_trim_controls_visible_near_top_of_right_panel() -> None:
+def test_vhs_gui_uses_tabbed_right_workspace_for_preview_trim_and_properties() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "Trim selected file",
-        "trimGroupBox",
-        "$rightPanel.Controls.Add($trimGroupBox, 0, 1)",
-        "$rightPanel.Controls.Add($previewControlsPanel, 0, 2)",
-        "$rightPanel.Controls.Add($previewPictureBox, 0, 3)",
-        "Start (HH:MM:SS)",
-        "End (HH:MM:SS)",
+        "$rightPanel.RowCount = 2",
+        "$rightTabControl = New-Object System.Windows.Forms.TabControl",
+        '$previewTabPage.Text = "Preview"',
+        '$trimTabPage.Text = "Trim"',
+        '$propertiesTabPage.Text = "Properties"',
+        "$rightTabControl.TabPages.Add($previewTabPage)",
+        "$rightTabControl.TabPages.Add($trimTabPage)",
+        "$rightTabControl.TabPages.Add($propertiesTabPage)",
+        "$rightPanel.Controls.Add($rightTabControl, 0, 1)",
+        "$previewTabPage.Controls.Add($previewTabLayout)",
+        "$trimTabPage.Controls.Add($trimGroupBox)",
+        "$propertiesTabPage.Controls.Add($infoBox)",
+        "$previewTabLayout.Controls.Add($previewPictureBox, 0, 0)",
+        "$previewTabLayout.Controls.Add($previewControlsPanel, 0, 1)",
     ]:
-        assert token in script, f"missing visible trim UI token: {token}"
+        assert token in script, f"missing tabbed right-workspace token: {token}"
 
-    assert script.index("$rightPanel.Controls.Add($trimGroupBox, 0, 1)") < script.index("$rightPanel.Controls.Add($previewPictureBox, 0, 3)")
+    assert "$rightPanel.Controls.Add($trimGroupBox, 0, 1)" not in script
+    assert "$rightPanel.Controls.Add($previewPictureBox, 0, 3)" not in script
 
 
 def test_vhs_gui_reserves_readable_right_panel_width_and_stable_trim_layout() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$script:RightPanelTargetWidth = 430",
+        "$script:RightPanelTargetWidth = 500",
         "$mainSplit.Panel2MinSize = $script:RightPanelTargetWidth",
         "$mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
         "function Set-MainSplitLayout",
@@ -240,19 +248,25 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
             script,
         )
     ]
-    assert root_fixed_rows == [330, 60, 90]
+    assert root_fixed_rows == [300, 60, 90]
     assert sum(root_fixed_rows) <= 480
 
     right_rows = re.findall(
         r"\$rightPanel\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
         script,
     )
-    assert right_rows[:5] == [
+    assert right_rows[:2] == [
         ("Absolute", "24"),
-        ("Absolute", "104"),
-        ("Absolute", "96"),
         ("Percent", "100"),
-        ("Absolute", "50"),
+    ]
+
+    preview_rows = re.findall(
+        r"\$previewTabLayout\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
+        script,
+    )
+    assert preview_rows[:2] == [
+        ("Percent", "100"),
+        ("Absolute", "96"),
     ]
 
 

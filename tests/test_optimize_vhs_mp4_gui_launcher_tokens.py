@@ -6,7 +6,7 @@ def test_vhs_gui_launcher_targets_gui_script() -> None:
 
     for token in [
         "powershell",
-        "ExecutionPolicy Bypass",
+        "ExecutionPolicy RemoteSigned",
         "optimize-vhs-mp4-gui.ps1",
     ]:
         assert token in launcher, f"missing launcher token: {token}"

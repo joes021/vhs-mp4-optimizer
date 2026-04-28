@@ -20,13 +20,13 @@
 [Setup]
 ; Token hints for packaging checks:
 ; AppName=VHS MP4 Optimizer
-; DefaultDirName={autopf}\VHS MP4 Optimizer
+; DefaultDirName={localappdata}\Programs\VHS MP4 Optimizer
 ; DefaultGroupName=VHS MP4 Optimizer
 AppId={{8C1E6E58-BB6F-4D67-84AF-3B70D7A1A0B6}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\VHS MP4 Optimizer
+DefaultDirName={localappdata}\Programs\VHS MP4 Optimizer
 DefaultGroupName=VHS MP4 Optimizer
 DisableProgramGroupPage=yes
 OutputDir={#MyOutputRoot}
@@ -36,7 +36,7 @@ SolidCompression=yes
 WizardStyle=modern
 SetupIconFile={#MyReleaseRoot}\assets\vhs-mp4-optimizer.ico
 UninstallDisplayIcon={app}\assets\vhs-mp4-optimizer.ico
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 
 [Languages]
