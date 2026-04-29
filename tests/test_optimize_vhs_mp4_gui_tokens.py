@@ -570,6 +570,53 @@ def test_vhs_gui_contains_pause_resume_batch_tokens() -> None:
         assert token in script, f"missing pause/resume batch token: {token}"
 
 
+def test_vhs_gui_contains_batch_finish_and_queue_tokens() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "Queue",
+        "Skip Selected",
+        "Retry Failed",
+        "Clear Completed",
+        "Save Queue",
+        "Load Queue",
+        "function Skip-SelectedQueuedItem",
+        "function Retry-FailedPlanItems",
+        "function Clear-CompletedPlanItems",
+        "function Export-QueuePlanToFile",
+        "function Import-QueuePlanFromFile",
+        "queueMenuItem",
+        "saveQueueMenuItem",
+        "loadQueueMenuItem",
+        "$skipSelectedButton = New-Object System.Windows.Forms.Button",
+        "$retryFailedButton = New-Object System.Windows.Forms.Button",
+        "$clearCompletedButton = New-Object System.Windows.Forms.Button",
+        "$skipSelectedButton.Add_Click({",
+        "$retryFailedButton.Add_Click({",
+        "$clearCompletedButton.Add_Click({",
+    ]:
+        assert token in script, f"missing batch finishing token: {token}"
+
+
+def test_vhs_gui_contains_hardware_encode_tokens() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "Encode engine",
+        "CPU (libx264/libx265)",
+        "NVIDIA NVENC",
+        "Intel QSV",
+        "AMD AMF",
+        "encoderModeComboBox",
+        "encoderStatusLabel",
+        "function Sync-EncoderModeState",
+        "Get-VhsMp4EncoderInventory",
+        "RuntimeReadyModes",
+        "EncoderMode",
+    ]:
+        assert token in script, f"missing hardware encode token: {token}"
+
+
 def test_vhs_gui_workflow_presets_persist_to_appdata_and_recover_from_corrupt_state(tmp_path: Path) -> None:
     storage_root = tmp_path / "appdata"
     export_path = tmp_path / "preset-export.json"
@@ -1038,6 +1085,208 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert "c-part%03d.mp4" in payload["SecondCallOutputPath"]
     assert payload["PauseEnabledAfterResume"] is True
     assert payload["ResumeEnabledAfterResume"] is False
+
+
+def test_vhs_gui_batch_finish_tools_and_queue_roundtrip_runtime_flow(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    output_dir.mkdir()
+    ffmpeg_stub = tmp_path / "ffmpeg-stub.ps1"
+    ffmpeg_stub.write_text(
+        "param([string[]]$Args)\nWrite-Output 'ffmpeg version stub'\nexit 0\n",
+        encoding="utf-8",
+    )
+    queue_path = tmp_path / "saved-queue.json"
+
+    source_done = input_dir / "done.avi"
+    source_retry = input_dir / "retry.avi"
+    source_skip = input_dir / "skip.avi"
+    for source in (source_done, source_retry, source_skip):
+        source.write_text("video", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+$inputTextBox.Text = '{ps_quote(input_dir)}'
+$outputTextBox.Text = '{ps_quote(output_dir)}'
+$ffmpegPathTextBox.Text = '{ps_quote(ffmpeg_stub)}'
+$script:ResolvedFfmpegPath = '{ps_quote(ffmpeg_stub)}'
+$qualityModeComboBox.SelectedItem = 'High Quality MP4 H.264'
+$crfTextBox.Text = '20'
+$presetComboBox.SelectedItem = 'slow'
+$audioTextBox.Text = '192k'
+$splitOutputCheckBox.Checked = $true
+$maxPartGbTextBox.Text = '3.8'
+$deinterlaceComboBox.SelectedItem = 'Off'
+$denoiseComboBox.SelectedItem = 'Light'
+$rotateFlipComboBox.SelectedItem = 'None'
+$scaleModeComboBox.SelectedItem = 'PAL 576p'
+$audioNormalizeCheckBox.Checked = $true
+$autoApplyCropCheckBox.Checked = $true
+$encoderModeComboBox.SelectedItem = 'Intel QSV'
+
+$mediaInfo = [pscustomobject]@{{
+    Container = 'avi'
+    ContainerLongName = 'AVI'
+    DurationSeconds = 120.0
+    DurationText = '00:02:00'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'dvvideo'
+    Width = 720
+    Height = 576
+    Resolution = '720x576'
+    DisplayAspectRatio = '4:3'
+    SampleAspectRatio = '1:1'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 3000
+    VideoBitrateText = '900 kbps'
+    VideoSummary = 'dvvideo | 720x576 | 4:3 | 25 fps'
+    AudioCodec = 'pcm_s16le'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '1536 kbps'
+    AudioSummary = 'pcm_s16le | 2 ch | 48000 Hz | 1536 kbps'
+}}
+
+$plan = @(
+    [pscustomobject]@{{
+        SourceName = 'done.avi'
+        SourceFileName = 'done.avi'
+        RelativeSourcePath = 'done.avi'
+        SourcePath = '{ps_quote(source_done)}'
+        OutputPath = '{ps_quote(output_dir / "done.mp4")}'
+        OutputPattern = '{ps_quote(output_dir / "done-part%03d.mp4")}'
+        DisplayOutputName = 'done.mp4'
+        Status = 'done'
+        MediaInfo = $mediaInfo
+    }},
+    [pscustomobject]@{{
+        SourceName = 'retry.avi'
+        SourceFileName = 'retry.avi'
+        RelativeSourcePath = 'retry.avi'
+        SourcePath = '{ps_quote(source_retry)}'
+        OutputPath = '{ps_quote(output_dir / "retry.mp4")}'
+        OutputPattern = '{ps_quote(output_dir / "retry-part%03d.mp4")}'
+        DisplayOutputName = 'retry.mp4'
+        Status = 'failed'
+        MediaInfo = $mediaInfo
+        TrimStartText = '00:00:05'
+        TrimEndText = '00:00:25'
+        TrimSummary = '00:00:05 - 00:00:25'
+        AspectMode = 'Force 4:3'
+    }},
+    [pscustomobject]@{{
+        SourceName = 'skip.avi'
+        SourceFileName = 'skip.avi'
+        RelativeSourcePath = 'skip.avi'
+        SourcePath = '{ps_quote(source_skip)}'
+        OutputPath = '{ps_quote(output_dir / "skip.mp4")}'
+        OutputPattern = '{ps_quote(output_dir / "skip-part%03d.mp4")}'
+        DisplayOutputName = 'skip.mp4'
+        Status = 'queued'
+        MediaInfo = $mediaInfo
+        CropMode = 'Manual'
+        CropLeft = 10
+        CropTop = 8
+        CropRight = 12
+        CropBottom = 6
+    }}
+)
+
+$plan = Add-PlanEstimates -Plan $plan
+Set-GridRows -Plan $plan
+[void](Select-PlanGridRowBySourceName -SourceName 'skip.avi')
+[void](Skip-SelectedQueuedItem)
+[void](Retry-FailedPlanItems)
+[void](Export-QueuePlanToFile -Path '{ps_quote(queue_path)}')
+$savedStatus = $statusValueLabel.Text
+
+$inputTextBox.Text = ''
+$outputTextBox.Text = ''
+$ffmpegPathTextBox.Text = ''
+$script:ResolvedFfmpegPath = $null
+Set-GridRows -Plan @()
+[void](Import-QueuePlanFromFile -Path '{ps_quote(queue_path)}')
+$loadedNames = @($script:PlanItems | ForEach-Object {{ [string]$_.SourceName }})
+$loadedStatuses = @($script:PlanItems | ForEach-Object {{ [string]$_.Status }})
+$loadedTrim = [string]$script:PlanItems[1].TrimSummary
+$loadedAspect = [string]$script:PlanItems[1].AspectMode
+$loadedCropMode = [string]$script:PlanItems[2].CropMode
+$loadedEncoder = [string]$encoderModeComboBox.SelectedItem
+$loadedQuality = [string]$qualityModeComboBox.SelectedItem
+$loadedAudio = [string]$audioTextBox.Text
+$loadedScale = [string]$scaleModeComboBox.SelectedItem
+$loadedAutoCrop = [bool]$autoApplyCropCheckBox.Checked
+$loadedSplit = [bool]$splitOutputCheckBox.Checked
+[void](Clear-CompletedPlanItems)
+$remainingAfterClear = @($script:PlanItems | ForEach-Object {{ [string]$_.SourceName }})
+
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    SavedStatus = $savedStatus
+    QueueFileExists = Test-Path -LiteralPath '{ps_quote(queue_path)}'
+    LoadedNames = $loadedNames
+    LoadedStatuses = $loadedStatuses
+    LoadedTrim = $loadedTrim
+    LoadedAspect = $loadedAspect
+    LoadedCropMode = $loadedCropMode
+    LoadedEncoder = $loadedEncoder
+    LoadedQuality = $loadedQuality
+    LoadedAudio = $loadedAudio
+    LoadedScale = $loadedScale
+    LoadedAutoCrop = $loadedAutoCrop
+    LoadedSplit = $loadedSplit
+    RemainingAfterClear = $remainingAfterClear
+}} | ConvertTo-Json -Depth 8
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-batch-tools-runtime-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["QueueFileExists"] is True
+    assert "Queue sacuvan" in payload["SavedStatus"]
+    assert payload["LoadedNames"] == ["done.avi", "retry.avi", "skip.avi"]
+    assert payload["LoadedStatuses"] == ["done", "queued", "skipped"]
+    assert payload["LoadedTrim"] == "00:00:05 - 00:00:25"
+    assert payload["LoadedAspect"] == "Force 4:3"
+    assert payload["LoadedCropMode"] == "Manual"
+    assert payload["LoadedEncoder"] == "Intel QSV"
+    assert payload["LoadedQuality"] == "High Quality MP4 H.264"
+    assert payload["LoadedAudio"] == "192k"
+    assert payload["LoadedScale"] == "PAL 576p"
+    assert payload["LoadedAutoCrop"] is True
+    assert payload["LoadedSplit"] is True
+    assert payload["RemainingAfterClear"] == ["retry.avi"]
 
 
 def test_vhs_gui_player_trim_crop_state_roundtrip_is_per_file(tmp_path: Path) -> None:

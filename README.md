@@ -19,8 +19,8 @@ Windows alat za konverziju, pregled, trim i pripremu video fajlova iz VHS, DVD, 
 | Treba ti | Link |
 | --- | --- |
 | Najnoviji release | [GitHub Releases](https://github.com/joes021/vhs-mp4-optimizer/releases/latest) |
-| Installer za Windows | [Setup.exe](https://github.com/joes021/vhs-mp4-optimizer/releases/download/vhs-mp4-optimizer-2026.04.29-fec9658/VHS-MP4-Optimizer-Setup-2026.04.29-fec9658.exe) |
-| Portable paket | [Portable ZIP](https://github.com/joes021/vhs-mp4-optimizer/releases/download/vhs-mp4-optimizer-2026.04.29-fec9658/VHS-MP4-Optimizer-portable-2026.04.29-fec9658.zip) |
+| Installer za Windows | [Latest release stranica](https://github.com/joes021/vhs-mp4-optimizer/releases/latest) |
+| Portable paket | [Latest release stranica](https://github.com/joes021/vhs-mp4-optimizer/releases/latest) |
 | Korisnicko uputstvo | [docs/VHS_MP4_OPTIMIZER_UPUTSTVO.md](docs/VHS_MP4_OPTIMIZER_UPUTSTVO.md) |
 | Source repo | [joes021/vhs-mp4-optimizer](https://github.com/joes021/vhs-mp4-optimizer) |
 
@@ -72,6 +72,8 @@ Umesto da se svaki fajl obradjuje rucno, alat pravi batch workflow sa pregledom,
 | Quick / Advanced raspored | Cist glavni ekran sa brzim batch tokom i odvojenim naprednim parametrima |
 | Split output | Deljenje dugackih fajlova na validne MP4 delove za FAT32/USB scenario |
 | Pause / Resume | Pauza posle trenutnog fajla, pa nastavak od sledeceg queued reda |
+| Queue alati | `Save Queue`, `Load Queue`, `Skip Selected`, `Retry Failed`, `Clear Completed`, `Move Up`, `Move Down` |
+| Encode engine | `Auto`, `CPU (libx264/libx265)`, `NVIDIA NVENC`, `Intel QSV`, `AMD AMF` sa sigurnim fallback-om |
 | Help / About / Updates | Vidljiva lokalna verzija, user guide i GitHub update provera sa potvrdom |
 | Installer i portable build | `Setup.exe`, portable ZIP i release builder za deljenje drugima |
 
@@ -111,9 +113,11 @@ Program ume da radi i sa modernijim i sa starijim fajlovima, a kada playback nij
 5. Po potrebi otvoris `Open Player` za trim, multi-cut, crop i aspect korekciju.
 6. Donji `Status / Progress / Log` tabovi daju pregled bez gutanja preview prostora.
 7. Ukljucis `Split output` ako isporuka ide na FAT32 ili zelis manje delove.
-8. Pokrenes `Start Conversion`.
-9. Dobijes gotove `mp4` fajlove i `IZVESTAJ.txt` u output folderu.
-10. Po potrebi otvaras `Help -> About VHS MP4 Optimizer` ili `Help -> Check for Updates`.
+8. Po potrebi biras `Encode engine`: `Auto`, `CPU (libx264/libx265)`, `NVIDIA NVENC`, `Intel QSV` ili `AMD AMF`.
+9. Po potrebi koristis `Queue` meni ili dugmad `Skip Selected`, `Retry Failed`, `Clear Completed`, `Save Queue` i `Load Queue`.
+10. Pokrenes `Start Conversion`.
+11. Dobijes gotove `mp4` fajlove i `IZVESTAJ.txt` u output folderu.
+12. Po potrebi otvaras `Help -> About VHS MP4 Optimizer` ili `Help -> Check for Updates`.
 
 ## Izdvojene funkcije koje olaksavaju posao
 
@@ -158,6 +162,17 @@ Plus:
 - `Pause` zavrsava trenutni fajl pa staje
 - `Resume` nastavlja od sledeceg queued reda
 - `Move Up` i `Move Down` preslazu preostali batch
+- `Skip Selected` odmah sklanja jedan queued fajl iz ove runde
+- `Retry Failed` vraca neuspele fajlove nazad u queue
+- `Clear Completed` cisti `done`, `skipped` i `stopped` stavke iz liste
+- `Save Queue` i `Load Queue` cuvaju ceo batch plan sa trim/crop/aspect stanjem
+
+### 6. Encode engine
+
+- `Auto` ostavlja provereni CPU tok kao podrazumevani izbor
+- `CPU (libx264/libx265)` daje najpredvidljiviji kvalitet i kompatibilnost
+- `NVIDIA NVENC`, `Intel QSV` i `AMD AMF` su dostupni kada ih FFmpeg i masina stvarno podrzavaju
+- ako hardware init ne uspe, alat bezbedno pada nazad na CPU umesto da prekine batch
 
 ## Preuzimanje i instalacija
 

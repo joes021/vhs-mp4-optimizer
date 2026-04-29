@@ -59,15 +59,21 @@ Brzi start:
    - "Scale" za izlaz na PAL 576p, 720p ili 1080p.
    - "Audio normalize" za tise ili neujednacene snimke.
    - "Auto apply crop if detected" automatski primenjuje detektovan crop pri Start Conversion ako fajl nema rucni crop.
-17. Klikni "Test Sample" za probni MP4 od 120 sekundi.
-18. Ako je USB FAT32 ili fajl moze biti veci od 4 GB, ukljuci "Split output" i ostavi 3.8 GB.
-19. Klikni "Start Conversion".
-20. Donji workspace ima tabove "Status", "Progress" i "Log", tako da pratnja batch-a ne smanjuje preview prostor.
-21. "Pause" zavrsava trenutni fajl i onda staje pre sledeceg.
-22. Kada batch udje u "Paused", mozes da kliknes "Resume", da menjas Workflow preset i ostala opsta batch podesavanja, kao i da koristis "Move Up" / "Move Down" za queued redosled.
-23. Posle obrade prebaci gotove MP4 fajlove, IZVESTAJ.txt i po potrebi USB PREDAJA CHECKLIST.txt.
-24. U meniju "Help" imas "About VHS MP4 Optimizer", "Check for Updates" i "Open User Guide".
-25. Ako je dostupan noviji GitHub release, program moze da te pita da li hoces update pre preuzimanja.
+17. U istom "Advanced Settings" delu imas i "Encode engine":
+   - "Auto" za provereni CPU tok.
+   - "CPU (libx264/libx265)" kada hoces najpredvidljiviji kvalitet i kompatibilnost.
+   - "NVIDIA NVENC", "Intel QSV" i "AMD AMF" kada ih FFmpeg i masina stvarno podrzavaju.
+   - Ako hardware init padne, alat bezbedno pada nazad na CPU umesto da prekine batch.
+18. Klikni "Test Sample" za probni MP4 od 120 sekundi.
+19. Ako je USB FAT32 ili fajl moze biti veci od 4 GB, ukljuci "Split output" i ostavi 3.8 GB.
+20. Klikni "Start Conversion".
+21. Donji workspace ima tabove "Status", "Progress" i "Log", tako da pratnja batch-a ne smanjuje preview prostor.
+22. "Pause" zavrsava trenutni fajl i onda staje pre sledeceg.
+23. Kada batch udje u "Paused", mozes da kliknes "Resume", da menjas Workflow preset i ostala opsta batch podesavanja, kao i da koristis "Move Up" / "Move Down" za queued redosled.
+24. "Queue" meni i batch dugmad dodaju "Skip Selected", "Retry Failed", "Clear Completed", "Save Queue" i "Load Queue" bez izlaska iz glavnog ekrana.
+25. Posle obrade prebaci gotove MP4 fajlove, IZVESTAJ.txt i po potrebi USB PREDAJA CHECKLIST.txt.
+26. U meniju "Help" imas "About VHS MP4 Optimizer", "Check for Updates" i "Open User Guide".
+27. Ako je dostupan noviji GitHub release, program moze da te pita da li hoces update pre preuzimanja.
 
 Desktop precica:
 - Pokreni "Install Desktop Shortcut.bat" ako zelis precicu "VHS MP4 Optimizer" na desktopu.
@@ -88,10 +94,13 @@ Napomene:
 - Pause / Resume radi samo nad preostalim queued fajlovima; vec gotovi fajlovi ostaju gotovi.
 - "Paused after current file" pokazuje da je zahtev za pauzu primljen, a "Paused" da batch ceka Resume.
 - "Move Up" i "Move Down" pomeraju samo queued stavke, da mozes da prepakujes ostatak reda.
+- "Queue" meni okuplja "Save Queue", "Load Queue", "Skip Selected", "Retry Failed" i "Clear Completed".
+- Batch dugmad "Skip Selected", "Retry Failed" i "Clear Completed" daju isti tok bez otvaranja menija.
 - Quick Setup cuva svakodnevni batch tok cistim, a Show Advanced otkriva dublja podesavanja samo kada ti zatrebaju.
 - Status, Progress i Log tabovi dole oslobadjaju vise vertikalnog prostora za grid i preview.
 - Aspect / Pixel shape koristi lokalni Aspect mode po fajlu; Auto, Keep Original, Force 4:3 i Force 16:9 pomazu kad PAL/DV ili NTSC/DV snimak izgleda stisnuto ili razvuceno.
 - Detected, DAR, SAR i Planned output aspect daju brz tehnicki pregled pre Save to Queue.
+- Encode engine daje "Auto", "CPU (libx264/libx265)", "NVIDIA NVENC", "Intel QSV" i "AMD AMF", uz siguran fallback na CPU ako hardware init ne prodje.
 - Video filters su podrazumevano iskljuceni; prvo probaj Test Sample za vazne snimke.
 - Help -> About pokazuje Current version, Release tag, Install type, Install path i GitHub repo.
 - Help -> Check for Updates proverava poslednji GitHub release i pita pre download/install toka.

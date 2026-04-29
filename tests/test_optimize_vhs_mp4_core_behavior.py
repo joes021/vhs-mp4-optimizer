@@ -885,6 +885,151 @@ Import-Module '{MODULE}' -Force
     assert payload["Null"] == "Unknown"
 
 
+def test_core_builds_hardware_encode_arguments_and_falls_back_to_cpu_when_needed() -> None:
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$inventory = Get-VhsMp4EncoderInventoryFromText -EncodersText @'
+ V....D libx264              libx264 H.264 / AVC
+ V....D libx265              libx265 H.265 / HEVC
+ V....D h264_nvenc           NVIDIA NVENC H.264 encoder
+ V....D hevc_nvenc           NVIDIA NVENC HEVC encoder
+ V..... h264_qsv             Intel Quick Sync H.264 encoder
+ V..... hevc_qsv             Intel Quick Sync HEVC encoder
+'@
+$nvenc = Get-VhsMp4FfmpegArguments -SourcePath 'input.avi' -OutputPath 'out.mp4' -QualityMode 'Universal MP4 H.264' -EncoderMode 'NVIDIA NVENC' -EncoderInventory $inventory
+$qsv = Get-VhsMp4FfmpegArguments -SourcePath 'input.avi' -OutputPath 'out.mp4' -QualityMode 'Universal MP4 H.264' -EncoderMode 'Intel QSV' -EncoderInventory $inventory
+$hevcNvenc = Get-VhsMp4FfmpegArguments -SourcePath 'input.avi' -OutputPath 'out.mp4' -QualityMode 'HEVC H.265 Smaller' -EncoderMode 'NVIDIA NVENC' -EncoderInventory $inventory
+$fallback = Get-VhsMp4FfmpegArguments -SourcePath 'input.avi' -OutputPath 'out.mp4' -QualityMode 'Universal MP4 H.264' -EncoderMode 'AMD AMF' -EncoderInventory $inventory
+[pscustomobject]@{{
+  NvencCodec = $nvenc[$nvenc.IndexOf('-c:v') + 1]
+  NvencPreset = $nvenc[$nvenc.IndexOf('-preset') + 1]
+  NvencRc = $nvenc[$nvenc.IndexOf('-rc') + 1]
+  NvencCq = $nvenc[$nvenc.IndexOf('-cq') + 1]
+  QsvCodec = $qsv[$qsv.IndexOf('-c:v') + 1]
+  QsvPreset = $qsv[$qsv.IndexOf('-preset') + 1]
+  QsvGlobalQuality = $qsv[$qsv.IndexOf('-global_quality') + 1]
+  HevcNvencCodec = $hevcNvenc[$hevcNvenc.IndexOf('-c:v') + 1]
+  HevcNvencTag = $hevcNvenc[$hevcNvenc.IndexOf('-tag:v') + 1]
+  FallbackCodec = $fallback[$fallback.IndexOf('-c:v') + 1]
+  FallbackCrf = $fallback[$fallback.IndexOf('-crf') + 1]
+  FallbackHasCq = ($fallback -contains '-cq')
+}} | ConvertTo-Json -Compress
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+
+    assert payload["NvencCodec"] == "h264_nvenc"
+    assert payload["NvencPreset"] == "p5"
+    assert payload["NvencRc"] == "vbr"
+    assert payload["NvencCq"] == "22"
+    assert payload["QsvCodec"] == "h264_qsv"
+    assert payload["QsvPreset"] == "slow"
+    assert payload["QsvGlobalQuality"] == "22"
+    assert payload["HevcNvencCodec"] == "hevc_nvenc"
+    assert payload["HevcNvencTag"] == "hvc1"
+    assert payload["FallbackCodec"] == "libx264"
+    assert payload["FallbackCrf"] == "22"
+    assert payload["FallbackHasCq"] is False
+
+
+def test_core_detects_runtime_ready_hardware_encoders_from_ffmpeg_outputs(tmp_path: Path) -> None:
+    fake_ffmpeg = tmp_path / "fake-ffmpeg.ps1"
+    fake_ffmpeg.write_text(
+        r"""
+param(
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$Args
+)
+
+if ($Args -contains '-encoders') {
+@'
+ V....D libx264              libx264 H.264 / AVC
+ V....D libx265              libx265 H.265 / HEVC
+ V....D h264_nvenc           NVIDIA NVENC H.264 encoder
+ V....D hevc_nvenc           NVIDIA NVENC HEVC encoder
+ V..... h264_qsv             Intel Quick Sync H.264 encoder
+ V..... hevc_qsv             Intel Quick Sync HEVC encoder
+ V....D h264_amf             AMD AMF H.264 encoder
+ V....D hevc_amf             AMD AMF HEVC encoder
+'@
+  exit 0
+}
+
+$argumentLine = $Args -join ' '
+if ($argumentLine -match 'h264_nvenc') {
+  exit 0
+}
+if ($argumentLine -match 'h264_qsv') {
+  exit 0
+}
+if ($argumentLine -match 'h264_amf') {
+  Write-Error 'DLL amfrt64.dll failed to open'
+  exit 1
+}
+exit 0
+""".strip(),
+        encoding="utf-8",
+    )
+
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$inventory = Get-VhsMp4EncoderInventory -FfmpegPath '{fake_ffmpeg}'
+[pscustomobject]@{{
+  AvailableModes = @($inventory.AvailableModes)
+  RuntimeReadyModes = @($inventory.RuntimeReadyModes)
+  HasAmfAdvertised = [bool]$inventory.AdvertisedModeMap['AMD AMF']
+  HasAmfRuntimeReady = [bool]$inventory.RuntimeReadyModeMap['AMD AMF']
+  Summary = [string]$inventory.Summary
+}} | ConvertTo-Json -Depth 6
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+
+    assert payload["AvailableModes"] == ["CPU", "NVIDIA NVENC", "Intel QSV", "AMD AMF"]
+    assert payload["RuntimeReadyModes"] == ["CPU", "NVIDIA NVENC", "Intel QSV"]
+    assert payload["HasAmfAdvertised"] is True
+    assert payload["HasAmfRuntimeReady"] is False
+    assert "AMD AMF: init failed" in payload["Summary"]
+
+
 def test_core_falls_back_to_keep_original_for_conflicting_aspect_dar_and_sar() -> None:
     command = f"""
 $ErrorActionPreference = 'Stop'

@@ -1947,6 +1947,397 @@ function Test-VhsMp4FfmpegPreflight {
     }
 }
 
+function Get-VhsMp4NormalizedEncoderMode {
+    param(
+        [string]$EncoderMode = "Auto"
+    )
+
+    $text = [string]$EncoderMode
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return "Auto"
+    }
+
+    $normalized = $text.Trim().ToLowerInvariant()
+    switch ($normalized) {
+        "auto" { return "Auto" }
+        "cpu" { return "CPU" }
+        "cpu (libx264/libx265)" { return "CPU" }
+        "nvidia" { return "NVIDIA NVENC" }
+        "nvidia nvenc" { return "NVIDIA NVENC" }
+        "intel" { return "Intel QSV" }
+        "intel qsv" { return "Intel QSV" }
+        "intel quick sync" { return "Intel QSV" }
+        "amd" { return "AMD AMF" }
+        "amd amf" { return "AMD AMF" }
+        default { return "Auto" }
+    }
+}
+
+function Get-VhsMp4EncoderInventoryFromText {
+    param(
+        [string]$EncodersText
+    )
+
+    $encoderMap = @{}
+    foreach ($line in (([string]$EncodersText) -split "\r?\n")) {
+        $match = [regex]::Match([string]$line, '^\s*\S{6}\s+([A-Za-z0-9_]+)\s+')
+        if ($match.Success) {
+            $encoderMap[$match.Groups[1].Value.ToLowerInvariant()] = $true
+        }
+    }
+
+    $advertisedModeMap = [ordered]@{
+        "CPU" = $true
+        "NVIDIA NVENC" = ($encoderMap.ContainsKey("h264_nvenc") -or $encoderMap.ContainsKey("hevc_nvenc"))
+        "Intel QSV" = ($encoderMap.ContainsKey("h264_qsv") -or $encoderMap.ContainsKey("hevc_qsv"))
+        "AMD AMF" = ($encoderMap.ContainsKey("h264_amf") -or $encoderMap.ContainsKey("hevc_amf"))
+    }
+    $runtimeReadyModeMap = [ordered]@{
+        "CPU" = $true
+        "NVIDIA NVENC" = [bool]$advertisedModeMap["NVIDIA NVENC"]
+        "Intel QSV" = [bool]$advertisedModeMap["Intel QSV"]
+        "AMD AMF" = [bool]$advertisedModeMap["AMD AMF"]
+    }
+
+    $availableModes = New-Object System.Collections.Generic.List[string]
+    $runtimeReadyModes = New-Object System.Collections.Generic.List[string]
+    foreach ($modeName in $advertisedModeMap.Keys) {
+        if ([bool]$advertisedModeMap[$modeName]) {
+            $availableModes.Add($modeName)
+        }
+        if ([bool]$runtimeReadyModeMap[$modeName]) {
+            $runtimeReadyModes.Add($modeName)
+        }
+    }
+
+    return [pscustomobject]@{
+        EncoderNames = @($encoderMap.Keys | Sort-Object)
+        HasLibx264 = $encoderMap.ContainsKey("libx264")
+        HasLibx265 = $encoderMap.ContainsKey("libx265")
+        HasH264Nvenc = $encoderMap.ContainsKey("h264_nvenc")
+        HasHevcNvenc = $encoderMap.ContainsKey("hevc_nvenc")
+        HasH264Qsv = $encoderMap.ContainsKey("h264_qsv")
+        HasHevcQsv = $encoderMap.ContainsKey("hevc_qsv")
+        HasH264Amf = $encoderMap.ContainsKey("h264_amf")
+        HasHevcAmf = $encoderMap.ContainsKey("hevc_amf")
+        AdvertisedModeMap = $advertisedModeMap
+        RuntimeReadyModeMap = $runtimeReadyModeMap
+        AvailableModes = @($availableModes.ToArray())
+        RuntimeReadyModes = @($runtimeReadyModes.ToArray())
+        RuntimeNotes = @()
+        Summary = (($runtimeReadyModes.ToArray()) -join " | ")
+    }
+}
+
+function Test-VhsMp4EncoderRuntime {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FfmpegPath,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("NVIDIA NVENC", "Intel QSV", "AMD AMF")]
+        [string]$ModeName
+    )
+
+    $encoderName = switch ($ModeName) {
+        "NVIDIA NVENC" { "h264_nvenc" }
+        "Intel QSV" { "h264_qsv" }
+        "AMD AMF" { "h264_amf" }
+    }
+
+    $probeArgs = @(
+        "-hide_banner",
+        "-f", "lavfi",
+        "-i", "color=c=black:s=640x480:d=0.12",
+        "-frames:v", "3",
+        "-c:v", $encoderName
+    )
+
+    switch ($ModeName) {
+        "NVIDIA NVENC" {
+            $probeArgs += @("-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "22", "-b:v", "0", "-multipass", "fullres")
+        }
+        "Intel QSV" {
+            $probeArgs += @("-preset", "slow", "-global_quality", "22", "-look_ahead", "0")
+        }
+        "AMD AMF" {
+            $probeArgs += @("-quality", "quality", "-rc", "qvbr", "-qvbr_quality_level", "22")
+        }
+    }
+
+    $probeArgs += @("-f", "null", "-")
+
+    try {
+        $startInfo = New-VhsMp4ProcessStartInfo -FfmpegPath $FfmpegPath -FfmpegArguments $probeArgs
+        $startInfo.WorkingDirectory = [System.IO.Path]::GetTempPath()
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+        $stdout = $process.StandardOutput.ReadToEnd()
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+
+        if ($process.ExitCode -eq 0) {
+            return [pscustomobject]@{
+                Ready = $true
+                ExitCode = 0
+                Message = "$ModeName ready"
+                StdOut = $stdout
+                StdErr = $stderr
+            }
+        }
+
+        $message = if (-not [string]::IsNullOrWhiteSpace($stderr)) { $stderr.Trim() } elseif (-not [string]::IsNullOrWhiteSpace($stdout)) { $stdout.Trim() } else { "$ModeName init failed" }
+        return [pscustomobject]@{
+            Ready = $false
+            ExitCode = $process.ExitCode
+            Message = $message
+            StdOut = $stdout
+            StdErr = $stderr
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Ready = $false
+            ExitCode = $null
+            Message = Get-VhsMp4ErrorMessage -ErrorObject $_
+            StdOut = ""
+            StdErr = ""
+        }
+    }
+}
+
+function Get-VhsMp4EncoderInventory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FfmpegPath
+    )
+
+    $startInfo = New-VhsMp4ProcessStartInfo -FfmpegPath $FfmpegPath -FfmpegArguments @("-hide_banner", "-encoders")
+    $startInfo.WorkingDirectory = [System.IO.Path]::GetTempPath()
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    if ($process.ExitCode -ne 0) {
+        throw "FFmpeg encoder inventory nije dostupan (exit code: $($process.ExitCode)) | $stderr"
+    }
+
+    $inventory = Get-VhsMp4EncoderInventoryFromText -EncodersText ($stdout + [Environment]::NewLine + $stderr)
+    $runtimeReadyModeMap = [ordered]@{
+        "CPU" = $true
+        "NVIDIA NVENC" = $false
+        "Intel QSV" = $false
+        "AMD AMF" = $false
+    }
+    $runtimeNotes = New-Object System.Collections.Generic.List[string]
+
+    foreach ($modeName in @("NVIDIA NVENC", "Intel QSV", "AMD AMF")) {
+        if (-not [bool]$inventory.AdvertisedModeMap[$modeName]) {
+            continue
+        }
+
+        $runtimeCheck = Test-VhsMp4EncoderRuntime -FfmpegPath $FfmpegPath -ModeName $modeName
+        $runtimeReadyModeMap[$modeName] = [bool]$runtimeCheck.Ready
+        if (-not $runtimeCheck.Ready) {
+            $runtimeNotes.Add(($modeName + ": init failed"))
+        }
+    }
+
+    $availableModes = New-Object System.Collections.Generic.List[string]
+    $runtimeReadyModes = New-Object System.Collections.Generic.List[string]
+    $summaryParts = New-Object System.Collections.Generic.List[string]
+
+    foreach ($modeName in @("CPU", "NVIDIA NVENC", "Intel QSV", "AMD AMF")) {
+        if ([bool]$inventory.AdvertisedModeMap[$modeName]) {
+            $availableModes.Add($modeName)
+        }
+        if ([bool]$runtimeReadyModeMap[$modeName]) {
+            $runtimeReadyModes.Add($modeName)
+            $summaryParts.Add($modeName)
+        }
+        elseif ([bool]$inventory.AdvertisedModeMap[$modeName]) {
+            $summaryParts.Add($modeName + ": init failed")
+        }
+    }
+
+    return [pscustomobject]@{
+        EncoderNames = $inventory.EncoderNames
+        HasLibx264 = [bool]$inventory.HasLibx264
+        HasLibx265 = [bool]$inventory.HasLibx265
+        HasH264Nvenc = [bool]$inventory.HasH264Nvenc
+        HasHevcNvenc = [bool]$inventory.HasHevcNvenc
+        HasH264Qsv = [bool]$inventory.HasH264Qsv
+        HasHevcQsv = [bool]$inventory.HasHevcQsv
+        HasH264Amf = [bool]$inventory.HasH264Amf
+        HasHevcAmf = [bool]$inventory.HasHevcAmf
+        AdvertisedModeMap = $inventory.AdvertisedModeMap
+        RuntimeReadyModeMap = $runtimeReadyModeMap
+        AvailableModes = @($availableModes.ToArray())
+        RuntimeReadyModes = @($runtimeReadyModes.ToArray())
+        RuntimeNotes = @($runtimeNotes.ToArray())
+        Summary = (($summaryParts.ToArray()) -join " | ")
+    }
+}
+
+function Get-VhsMp4NvencPreset {
+    param(
+        [string]$Preset = "slow"
+    )
+
+    switch ([string]$Preset) {
+        "ultrafast" { return "p1" }
+        "superfast" { return "p1" }
+        "veryfast" { return "p2" }
+        "faster" { return "p3" }
+        "fast" { return "p4" }
+        "medium" { return "p4" }
+        "slow" { return "p5" }
+        "slower" { return "p6" }
+        "veryslow" { return "p7" }
+        default { return "p5" }
+    }
+}
+
+function Get-VhsMp4QsvPreset {
+    param(
+        [string]$Preset = "slow"
+    )
+
+    switch ([string]$Preset) {
+        "ultrafast" { return "veryfast" }
+        "superfast" { return "veryfast" }
+        default { return $Preset }
+    }
+}
+
+function Get-VhsMp4AmfPreset {
+    param(
+        [string]$Preset = "slow"
+    )
+
+    switch ([string]$Preset) {
+        { $_ -in @("ultrafast", "superfast", "veryfast", "faster", "fast") } { return "speed" }
+        "medium" { return "balanced" }
+        default { return "quality" }
+    }
+}
+
+function Resolve-VhsMp4VideoEncoderPlan {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$QualityProfile,
+        [string]$EncoderMode = "Auto",
+        [object]$EncoderInventory
+    )
+
+    $normalizedMode = Get-VhsMp4NormalizedEncoderMode -EncoderMode $EncoderMode
+    $codecFamily = [string](Get-VhsMp4ObjectPropertyValue -Object $QualityProfile -Name "CodecFamily")
+    if ([string]::IsNullOrWhiteSpace($codecFamily)) {
+        $codecFamily = if ([string]$QualityProfile.VideoCodec -like "libx265") { "hevc" } else { "h264" }
+    }
+
+    $cpuPlan = [pscustomobject]@{
+        RequestedMode = $normalizedMode
+        ResolvedMode = "CPU"
+        VideoCodec = [string]$QualityProfile.VideoCodec
+        VideoTag = [string]$QualityProfile.VideoTag
+        VideoArguments = @("-preset", [string]$QualityProfile.Preset, "-crf", "$([int]$QualityProfile.Crf)", "-pix_fmt", "yuv420p")
+        Summary = "Encode engine: CPU"
+        FallbackUsed = ($normalizedMode -notin @("Auto", "CPU"))
+    }
+
+    if ($normalizedMode -in @("Auto", "CPU")) {
+        return $cpuPlan
+    }
+
+    $canUseRequestedMode = $false
+    $runtimeReady = $true
+    if ($null -ne $EncoderInventory) {
+        switch ($normalizedMode) {
+            "NVIDIA NVENC" {
+                $canUseRequestedMode = if ($codecFamily -eq "hevc") { [bool]$EncoderInventory.HasHevcNvenc } else { [bool]$EncoderInventory.HasH264Nvenc }
+            }
+            "Intel QSV" {
+                $canUseRequestedMode = if ($codecFamily -eq "hevc") { [bool]$EncoderInventory.HasHevcQsv } else { [bool]$EncoderInventory.HasH264Qsv }
+            }
+            "AMD AMF" {
+                $canUseRequestedMode = if ($codecFamily -eq "hevc") { [bool]$EncoderInventory.HasHevcAmf } else { [bool]$EncoderInventory.HasH264Amf }
+            }
+        }
+
+        $runtimeReadyMap = Get-VhsMp4ObjectPropertyValue -Object $EncoderInventory -Name "RuntimeReadyModeMap"
+        if ($null -ne $runtimeReadyMap -and $runtimeReadyMap.Contains($normalizedMode)) {
+            $runtimeReady = [bool]$runtimeReadyMap[$normalizedMode]
+        }
+    }
+
+    if (-not $canUseRequestedMode -or -not $runtimeReady) {
+        $cpuPlan.Summary = if ($runtimeReady) { "Encode engine: CPU | fallback sa $normalizedMode" } else { "Encode engine: CPU | $normalizedMode nije runtime spreman" }
+        return $cpuPlan
+    }
+
+    switch ($normalizedMode) {
+        "NVIDIA NVENC" {
+            return [pscustomobject]@{
+                RequestedMode = $normalizedMode
+                ResolvedMode = $normalizedMode
+                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_nvenc" } else { "h264_nvenc" }
+                VideoTag = [string]$QualityProfile.VideoTag
+                VideoArguments = @(
+                    "-preset", (Get-VhsMp4NvencPreset -Preset ([string]$QualityProfile.Preset)),
+                    "-tune", "hq",
+                    "-rc", "vbr",
+                    "-cq", "$([int]$QualityProfile.Crf)",
+                    "-b:v", "0",
+                    "-multipass", "fullres",
+                    "-pix_fmt", "yuv420p"
+                )
+                Summary = "Encode engine: NVIDIA NVENC"
+                FallbackUsed = $false
+            }
+        }
+        "Intel QSV" {
+            return [pscustomobject]@{
+                RequestedMode = $normalizedMode
+                ResolvedMode = $normalizedMode
+                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_qsv" } else { "h264_qsv" }
+                VideoTag = [string]$QualityProfile.VideoTag
+                VideoArguments = @(
+                    "-preset", (Get-VhsMp4QsvPreset -Preset ([string]$QualityProfile.Preset)),
+                    "-global_quality", "$([int]$QualityProfile.Crf)",
+                    "-look_ahead", "0",
+                    "-pix_fmt", "nv12"
+                )
+                Summary = "Encode engine: Intel QSV"
+                FallbackUsed = $false
+            }
+        }
+        "AMD AMF" {
+            return [pscustomobject]@{
+                RequestedMode = $normalizedMode
+                ResolvedMode = $normalizedMode
+                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_amf" } else { "h264_amf" }
+                VideoTag = [string]$QualityProfile.VideoTag
+                VideoArguments = @(
+                    "-quality", (Get-VhsMp4AmfPreset -Preset ([string]$QualityProfile.Preset)),
+                    "-rc", "qvbr",
+                    "-qvbr_quality_level", "$([int]$QualityProfile.Crf)",
+                    "-pix_fmt", "yuv420p"
+                )
+                Summary = "Encode engine: AMD AMF"
+                FallbackUsed = $false
+            }
+        }
+        default {
+            return $cpuPlan
+        }
+    }
+}
+
 function Get-VhsMp4QualityProfile {
     param(
         [ValidateSet("Universal MP4 H.264", "Small MP4 H.264", "High Quality MP4 H.264", "HEVC H.265 Smaller", "Standard VHS", "Smaller File", "Better Quality", "Custom")]
@@ -1966,6 +2357,7 @@ function Get-VhsMp4QualityProfile {
                 Crf = 24
                 Preset = "slow"
                 AudioBitrate = "128k"
+                CodecFamily = "h264"
                 VideoCodec = "libx264"
                 VideoTag = ""
             }
@@ -1976,6 +2368,7 @@ function Get-VhsMp4QualityProfile {
                 Crf = 20
                 Preset = "slow"
                 AudioBitrate = "192k"
+                CodecFamily = "h264"
                 VideoCodec = "libx264"
                 VideoTag = ""
             }
@@ -1986,6 +2379,7 @@ function Get-VhsMp4QualityProfile {
                 Crf = 26
                 Preset = "medium"
                 AudioBitrate = "128k"
+                CodecFamily = "hevc"
                 VideoCodec = "libx265"
                 VideoTag = "hvc1"
             }
@@ -1996,6 +2390,7 @@ function Get-VhsMp4QualityProfile {
                 Crf = 22
                 Preset = "slow"
                 AudioBitrate = "160k"
+                CodecFamily = "h264"
                 VideoCodec = "libx264"
                 VideoTag = ""
             }
@@ -2006,6 +2401,7 @@ function Get-VhsMp4QualityProfile {
                 Crf = $Crf
                 Preset = $Preset
                 AudioBitrate = $AudioBitrate
+                CodecFamily = "h264"
                 VideoCodec = "libx264"
                 VideoTag = ""
             }
@@ -2016,6 +2412,7 @@ function Get-VhsMp4QualityProfile {
                 Crf = 22
                 Preset = "slow"
                 AudioBitrate = "160k"
+                CodecFamily = "h264"
                 VideoCodec = "libx264"
                 VideoTag = ""
             }
@@ -2171,7 +2568,9 @@ function New-VhsMp4RunContext {
         [string]$RotateFlip = "None",
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
-        [switch]$AudioNormalize
+        [switch]$AudioNormalize,
+        [string]$EncoderMode = "Auto",
+        [object]$EncoderInventory
     )
 
     $resolvedInputDir = Resolve-VhsMp4InputDir -InputDir $InputDir
@@ -2183,6 +2582,17 @@ function New-VhsMp4RunContext {
     }
 
     $profile = Get-VhsMp4QualityProfile -QualityMode $QualityMode -Crf $Crf -Preset $Preset -AudioBitrate $AudioBitrate
+    $normalizedEncoderMode = Get-VhsMp4NormalizedEncoderMode -EncoderMode $EncoderMode
+    $resolvedEncoderInventory = $EncoderInventory
+    if ($null -eq $resolvedEncoderInventory) {
+        if ($normalizedEncoderMode -in @("Auto", "CPU")) {
+            $resolvedEncoderInventory = Get-VhsMp4EncoderInventoryFromText -EncodersText ""
+        }
+        else {
+            $resolvedEncoderInventory = Get-VhsMp4EncoderInventory -FfmpegPath $resolvedFfmpegPath
+        }
+    }
+    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $normalizedEncoderMode -EncoderInventory $resolvedEncoderInventory
     $trimWindow = Get-VhsMp4TrimWindow -TrimStart $TrimStart -TrimEnd $TrimEnd
     $filterSummary = Get-VhsMp4FilterSummary -Deinterlace $Deinterlace -Denoise $Denoise -RotateFlip $RotateFlip -ScaleMode $ScaleMode -AudioNormalize:$AudioNormalize
 
@@ -2211,6 +2621,10 @@ function New-VhsMp4RunContext {
         RotateFlip = $RotateFlip
         ScaleMode = $ScaleMode
         AudioNormalize = [bool]$AudioNormalize
+        EncoderMode = $normalizedEncoderMode
+        ResolvedEncoderMode = [string]$encoderPlan.ResolvedMode
+        EncoderSummary = [string]$encoderPlan.Summary
+        EncoderInventory = $resolvedEncoderInventory
         FilterSummary = $filterSummary
         LogDir = $logDir
         LogPath = $logPath
@@ -2859,10 +3273,13 @@ function Get-VhsMp4FfmpegArguments {
         [string]$RotateFlip = "None",
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
-        [switch]$AudioNormalize
+        [switch]$AudioNormalize,
+        [string]$EncoderMode = "Auto",
+        [object]$EncoderInventory
     )
 
     $profile = Get-VhsMp4QualityProfile -QualityMode $QualityMode -Crf $Crf -Preset $Preset -AudioBitrate $AudioBitrate
+    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $EncoderMode -EncoderInventory $EncoderInventory
     $videoMaxKbps = Get-VhsMp4SplitVideoMaxKbps -QualityMode $profile.QualityMode -Crf $profile.Crf
     $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments
     $videoFilterChain = Get-VhsMp4VideoFilterChain -InputObject $VideoInfo -CropState $CropState -AspectMode $AspectMode -Deinterlace $Deinterlace -Denoise $Denoise -RotateFlip $RotateFlip -ScaleMode $ScaleMode
@@ -2910,18 +3327,14 @@ function Get-VhsMp4FfmpegArguments {
     }
 
     $ffmpegArgs += @(
-        "-c:v", $profile.VideoCodec
+        "-c:v", $encoderPlan.VideoCodec
     )
 
-    if (-not [string]::IsNullOrWhiteSpace([string]$profile.VideoTag)) {
-        $ffmpegArgs += @("-tag:v", $profile.VideoTag)
+    if (-not [string]::IsNullOrWhiteSpace([string]$encoderPlan.VideoTag)) {
+        $ffmpegArgs += @("-tag:v", $encoderPlan.VideoTag)
     }
 
-    $ffmpegArgs += @(
-        "-preset", $profile.Preset,
-        "-crf", "$($profile.Crf)",
-        "-pix_fmt", "yuv420p"
-    )
+    $ffmpegArgs += @($encoderPlan.VideoArguments)
 
     if ($trimPlan.Mode -ne "multi" -and -not [string]::IsNullOrWhiteSpace($audioFilterChain)) {
         $ffmpegArgs += @("-af", $audioFilterChain)
@@ -3094,6 +3507,8 @@ function Start-VhsMp4FileProcess {
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
         [switch]$AudioNormalize,
+        [string]$EncoderMode = "Auto",
+        [object]$EncoderInventory,
         [hashtable]$SharedState
     )
 
@@ -3118,7 +3533,9 @@ function Start-VhsMp4FileProcess {
         -Denoise $Denoise `
         -RotateFlip $RotateFlip `
         -ScaleMode $ScaleMode `
-        -AudioNormalize:$AudioNormalize
+        -AudioNormalize:$AudioNormalize `
+        -EncoderMode $EncoderMode `
+        -EncoderInventory $EncoderInventory
 
     $startInfo = New-VhsMp4ProcessStartInfo -FfmpegPath $FfmpegPath -FfmpegArguments $ffmpegArguments
     $process = New-Object System.Diagnostics.Process
@@ -3227,6 +3644,8 @@ function Invoke-VhsMp4File {
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
         [switch]$AudioNormalize,
+        [string]$EncoderMode = "Auto",
+        [object]$EncoderInventory,
         [hashtable]$SharedState
     )
 
@@ -3250,6 +3669,8 @@ function Invoke-VhsMp4File {
         -RotateFlip $RotateFlip `
         -ScaleMode $ScaleMode `
         -AudioNormalize:$AudioNormalize `
+        -EncoderMode $EncoderMode `
+        -EncoderInventory $EncoderInventory `
         -SharedState $SharedState
 
     return (Complete-VhsMp4FileProcess -Process $started.Process -OutputPath $OutputPath -SharedState $SharedState)
@@ -3284,6 +3705,8 @@ function Invoke-VhsMp4Batch {
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
         [switch]$AudioNormalize,
+        [string]$EncoderMode = "Auto",
+        [object]$EncoderInventory,
         [scriptblock]$OnLog,
         [scriptblock]$OnStatusChange,
         [scriptblock]$ShouldStop,
@@ -3306,7 +3729,9 @@ function Invoke-VhsMp4Batch {
         -Denoise $Denoise `
         -RotateFlip $RotateFlip `
         -ScaleMode $ScaleMode `
-        -AudioNormalize:$AudioNormalize
+        -AudioNormalize:$AudioNormalize `
+        -EncoderMode $EncoderMode `
+        -EncoderInventory $EncoderInventory
 
     $items = if ($Plan -and $Plan.Count -gt 0) {
         @($Plan)
@@ -3402,6 +3827,8 @@ function Invoke-VhsMp4Batch {
                 -RotateFlip $context.RotateFlip `
                 -ScaleMode $context.ScaleMode `
                 -AudioNormalize:([bool]$context.AudioNormalize) `
+                -EncoderMode $context.EncoderMode `
+                -EncoderInventory $context.EncoderInventory `
                 -SharedState $SharedState
 
             if ($result.StdOut) {
@@ -3479,6 +3906,11 @@ Export-ModuleMember -Function @(
     "Get-VhsMp4ErrorMessage",
     "Get-VhsMp4ResolvedFfmpegPath",
     "Test-VhsMp4FfmpegPreflight",
+    "Get-VhsMp4NormalizedEncoderMode",
+    "Get-VhsMp4EncoderInventoryFromText",
+    "Test-VhsMp4EncoderRuntime",
+    "Get-VhsMp4EncoderInventory",
+    "Resolve-VhsMp4VideoEncoderPlan",
     "Resolve-VhsMp4FfprobePath",
     "Get-VhsMp4MediaDurationSeconds",
     "Get-VhsMp4MediaInfo",

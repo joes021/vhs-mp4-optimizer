@@ -54,6 +54,16 @@ $script:WorkflowPresetState = $null
 $script:WorkflowPresetApplying = $false
 $script:WorkflowPresetSuppressSelection = $false
 $script:WorkflowPresetStorageWarning = ""
+$script:EncoderInventory = $null
+$script:EncoderModeDefaultName = "Auto"
+$script:EncoderModeCpuLabel = "CPU (libx264/libx265)"
+$script:EncoderModeLabels = @(
+    $script:EncoderModeDefaultName,
+    $script:EncoderModeCpuLabel,
+    "NVIDIA NVENC",
+    "Intel QSV",
+    "AMD AMF"
+)
 $script:AspectModeControlSync = $false
 $script:AspectModeBatchActionLabel = "Copy Aspect to All"
 $script:AspectModeOptionLabels = @("Keep Original", "Force 4:3", "Force 16:9")
@@ -325,6 +335,7 @@ function New-WorkflowPresetSettingsObject {
         RotateFlip = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "RotateFlip")
         ScaleMode = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "ScaleMode")
         AudioNormalize = [bool](Get-WorkflowPresetObjectValue -Object $Settings -Name "AudioNormalize")
+        EncoderMode = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "EncoderMode")
         SplitOutput = [bool](Get-WorkflowPresetObjectValue -Object $Settings -Name "SplitOutput")
         AutoApplyCrop = [bool](Get-WorkflowPresetObjectValue -Object $Settings -Name "AutoApplyCrop")
         MaxPartGb = [Math]::Min(1024.0, [Math]::Max(0.001, $maxPartGb))
@@ -361,6 +372,7 @@ function Get-WorkflowPresetDefinitions {
                 RotateFlip = "None"
                 ScaleMode = "Original"
                 AudioNormalize = $false
+                EncoderMode = "Auto"
                 SplitOutput = $true
                 AutoApplyCrop = $false
                 MaxPartGb = 3.8
@@ -375,6 +387,7 @@ function Get-WorkflowPresetDefinitions {
                 RotateFlip = "None"
                 ScaleMode = "Original"
                 AudioNormalize = $false
+                EncoderMode = "Auto"
                 SplitOutput = $true
                 AutoApplyCrop = $false
                 MaxPartGb = 3.8
@@ -389,6 +402,7 @@ function Get-WorkflowPresetDefinitions {
                 RotateFlip = "None"
                 ScaleMode = "Original"
                 AudioNormalize = $false
+                EncoderMode = "Auto"
                 SplitOutput = $false
                 AutoApplyCrop = $false
                 MaxPartGb = 3.8
@@ -403,6 +417,7 @@ function Get-WorkflowPresetDefinitions {
                 RotateFlip = "None"
                 ScaleMode = "Original"
                 AudioNormalize = $false
+                EncoderMode = "Auto"
                 SplitOutput = $true
                 AutoApplyCrop = $false
                 MaxPartGb = 3.8
@@ -417,6 +432,7 @@ function Get-WorkflowPresetDefinitions {
                 RotateFlip = "None"
                 ScaleMode = "PAL 576p"
                 AudioNormalize = $true
+                EncoderMode = "Auto"
                 SplitOutput = $true
                 AutoApplyCrop = $true
                 MaxPartGb = 3.8
@@ -1195,7 +1211,7 @@ function Get-CurrentWorkflowPresetSettings {
         }
     }
 
-    return (New-WorkflowPresetSettingsObject -Settings @{
+        return (New-WorkflowPresetSettingsObject -Settings @{
             QualityMode = [string]$qualityModeComboBox.SelectedItem
             Crf = $crfValue
             Preset = [string]$presetComboBox.SelectedItem
@@ -1205,6 +1221,7 @@ function Get-CurrentWorkflowPresetSettings {
             RotateFlip = [string]$rotateFlipComboBox.SelectedItem
             ScaleMode = [string]$scaleModeComboBox.SelectedItem
             AudioNormalize = [bool]$audioNormalizeCheckBox.Checked
+            EncoderMode = if (Get-Variable -Name encoderModeComboBox -ErrorAction SilentlyContinue) { [string]$encoderModeComboBox.SelectedItem } else { $script:EncoderModeDefaultName }
             SplitOutput = [bool]$splitOutputCheckBox.Checked
             AutoApplyCrop = if (Get-Variable -Name autoApplyCropCheckBox -ErrorAction SilentlyContinue) { [bool]$autoApplyCropCheckBox.Checked } else { $false }
             MaxPartGb = $maxPartGb
@@ -1223,7 +1240,7 @@ function Test-WorkflowPresetMatchesCurrentSettings {
     }
 
     $presetSettings = New-WorkflowPresetSettingsObject -Settings $Preset.Settings
-    foreach ($propertyName in @("QualityMode", "Crf", "Preset", "AudioBitrate", "Deinterlace", "Denoise", "RotateFlip", "ScaleMode", "AudioNormalize", "SplitOutput", "AutoApplyCrop", "MaxPartGb")) {
+    foreach ($propertyName in @("QualityMode", "Crf", "Preset", "AudioBitrate", "Deinterlace", "Denoise", "RotateFlip", "ScaleMode", "AudioNormalize", "EncoderMode", "SplitOutput", "AutoApplyCrop", "MaxPartGb")) {
         $leftValue = $presetSettings.$propertyName
         $rightValue = $CurrentSettings.$propertyName
         if ($propertyName -eq "MaxPartGb") {
@@ -1295,6 +1312,15 @@ function Set-WorkflowPresetControlsFromSettings {
         $rotateFlipComboBox.SelectedItem = $normalizedSettings.RotateFlip
         $scaleModeComboBox.SelectedItem = $normalizedSettings.ScaleMode
         $audioNormalizeCheckBox.Checked = [bool]$normalizedSettings.AudioNormalize
+        if (Get-Variable -Name encoderModeComboBox -ErrorAction SilentlyContinue) {
+            $preferredEncoderMode = if ([string]::IsNullOrWhiteSpace([string]$normalizedSettings.EncoderMode)) { $script:EncoderModeDefaultName } else { [string]$normalizedSettings.EncoderMode }
+            if ($encoderModeComboBox.Items.Contains($preferredEncoderMode)) {
+                $encoderModeComboBox.SelectedItem = $preferredEncoderMode
+            }
+            else {
+                $encoderModeComboBox.SelectedItem = $script:EncoderModeDefaultName
+            }
+        }
         $splitOutputCheckBox.Checked = [bool]$normalizedSettings.SplitOutput
         if (Get-Variable -Name autoApplyCropCheckBox -ErrorAction SilentlyContinue) {
             $autoApplyCropCheckBox.Checked = [bool]$normalizedSettings.AutoApplyCrop
@@ -1637,6 +1663,25 @@ function Test-HasQueuedPlanItems {
     return $false
 }
 
+function Get-PlanItemStatusText {
+    param(
+        [AllowNull()]
+        $Item,
+        [string]$Default = ""
+    )
+
+    if ($null -eq $Item) {
+        return $Default
+    }
+
+    $statusProperty = $Item.PSObject.Properties["Status"]
+    if (-not $statusProperty -or [string]::IsNullOrWhiteSpace([string]$statusProperty.Value)) {
+        return $Default
+    }
+
+    return [string]$statusProperty.Value
+}
+
 function Show-CompletionNotice {
     param(
         [Parameter(Mandatory = $true)]
@@ -1728,7 +1773,63 @@ function Sync-FfmpegState {
         $ffmpegHintLabel.Text = "Klikni Install FFmpeg ili Browse FFmpeg."
     }
 
+    Sync-EncoderModeState
     Update-ActionButtons
+}
+
+function Sync-EncoderModeState {
+    $inventory = $null
+    if (-not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) {
+        try {
+            $inventory = Get-VhsMp4EncoderInventory -FfmpegPath $script:ResolvedFfmpegPath
+        }
+        catch {
+            $message = "Encode engine provera nije uspela; hardverski modovi ce pasti nazad na CPU. " + (Get-VhsMp4ErrorMessage -ErrorObject $_)
+            Add-LogLine -Text $message
+            $inventory = Get-VhsMp4EncoderInventoryFromText -EncodersText ""
+        }
+    }
+    else {
+        $inventory = Get-VhsMp4EncoderInventoryFromText -EncodersText ""
+    }
+
+    $script:EncoderInventory = $inventory
+
+    if (Get-Variable -Name encoderModeComboBox -ErrorAction SilentlyContinue) {
+        $selectedMode = [string]$encoderModeComboBox.SelectedItem
+        if ([string]::IsNullOrWhiteSpace($selectedMode)) {
+            $selectedMode = $script:EncoderModeDefaultName
+        }
+
+        $previousApplying = $script:WorkflowPresetApplying
+        $script:WorkflowPresetApplying = $true
+        try {
+            $encoderModeComboBox.Items.Clear()
+            foreach ($modeName in $script:EncoderModeLabels) {
+                [void]$encoderModeComboBox.Items.Add($modeName)
+            }
+            if (-not $encoderModeComboBox.Items.Contains($selectedMode)) {
+                $selectedMode = $script:EncoderModeDefaultName
+            }
+            $encoderModeComboBox.SelectedItem = $selectedMode
+        }
+        finally {
+            $script:WorkflowPresetApplying = $previousApplying
+        }
+    }
+
+    if (Get-Variable -Name encoderStatusLabel -ErrorAction SilentlyContinue) {
+        if ([string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) {
+            $encoderStatusLabel.Text = "RuntimeReadyModes: CPU | Auto koristi CPU dok FFmpeg ne bude spreman."
+        }
+        else {
+            $runtimeReadyModes = @($inventory.RuntimeReadyModes | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+            $runtimeNotes = @($inventory.RuntimeNotes | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+            $readyText = if ($runtimeReadyModes.Count -gt 0) { $runtimeReadyModes -join ", " } else { "CPU" }
+            $noteText = if ($runtimeNotes.Count -gt 0) { " | " + ($runtimeNotes -join "; ") } else { "" }
+            $encoderStatusLabel.Text = "RuntimeReadyModes: " + $readyText + $noteText
+        }
+    }
 }
 
 function Update-ProgressBar {
@@ -1845,6 +1946,8 @@ function Update-ActionButtons {
     $hasSelectedPlanItem = ($null -ne $selectedPlanItem)
     $canEditSelectedItem = Test-CanEditPlanItem -Item $selectedPlanItem
     $selectedQueued = Test-PlanItemQueued -Item $selectedPlanItem
+    $hasFailed = @($script:PlanItems | Where-Object { (Get-PlanItemStatusText -Item $_) -eq "failed" }).Count -gt 0
+    $hasCompleted = @($script:PlanItems | Where-Object { (Get-PlanItemStatusText -Item $_) -in @("done", "skipped", "stopped") }).Count -gt 0
 
     $inputTextBox.Enabled = -not $isRunning
     $outputTextBox.Enabled = -not $isEditLocked
@@ -1876,6 +1979,9 @@ function Update-ActionButtons {
     }
     $splitOutputCheckBox.Enabled = -not $isEditLocked
     $maxPartGbTextBox.Enabled = (-not $isEditLocked) -and $splitOutputCheckBox.Checked
+    if (Get-Variable -Name "encoderModeComboBox" -ErrorAction SilentlyContinue) {
+        $encoderModeComboBox.Enabled = -not $isEditLocked
+    }
     $scanButton.Enabled = (-not $isRunning) -and $hasInput
     $sampleButton.Enabled = ((-not $isEditLocked) -or $isPaused) -and $hasInput -and $hasQueued -and (-not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath))
     if (Get-Variable -Name "openPlayerButton" -ErrorAction SilentlyContinue) {
@@ -1885,8 +1991,25 @@ function Update-ActionButtons {
         $moveUpButton.Enabled = $selectedQueued -and (-not $isEditLocked)
         $moveDownButton.Enabled = $selectedQueued -and (-not $isEditLocked)
     }
+    if (Get-Variable -Name "skipSelectedButton" -ErrorAction SilentlyContinue) {
+        $skipSelectedButton.Enabled = $selectedQueued -and (-not $isEditLocked)
+    }
+    if (Get-Variable -Name "retryFailedButton" -ErrorAction SilentlyContinue) {
+        $retryFailedButton.Enabled = (-not $isRunning) -and $hasFailed
+    }
+    if (Get-Variable -Name "clearCompletedButton" -ErrorAction SilentlyContinue) {
+        $clearCompletedButton.Enabled = (-not $isRunning) -and $hasCompleted
+    }
     if (Get-Variable -Name "advancedToggleButton" -ErrorAction SilentlyContinue) {
         $advancedToggleButton.Enabled = -not $isEditLocked
+    }
+    if (Get-Variable -Name "queueMenuItem" -ErrorAction SilentlyContinue) {
+        $queueMenuItem.Enabled = ($script:PlanItems.Count -gt 0) -or (-not $isRunning)
+        $saveQueueMenuItem.Enabled = ($script:PlanItems.Count -gt 0) -and (-not $isEditLocked)
+        $loadQueueMenuItem.Enabled = -not $isRunning
+        $skipSelectedMenuItem.Enabled = $selectedQueued -and (-not $isEditLocked)
+        $retryFailedMenuItem.Enabled = (-not $isRunning) -and $hasFailed
+        $clearCompletedMenuItem.Enabled = (-not $isRunning) -and $hasCompleted
     }
     $startEnabled = (-not $isRunning) -and $hasInput -and $hasOutput -and $hasQueued -and (-not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath))
     $startButton.Enabled = $startEnabled
@@ -5308,6 +5431,7 @@ function Set-GridRows {
     param(
         [Parameter(Mandatory = $true)]
         [AllowNull()]
+        [AllowEmptyCollection()]
         [object[]]$Plan
     )
 
@@ -5495,6 +5619,8 @@ function Update-BatchContextSettingsFromSettings {
     $context.RotateFlip = $Settings.RotateFlip
     $context.ScaleMode = $Settings.ScaleMode
     $context.AudioNormalize = [bool]$Settings.AudioNormalize
+    $context.EncoderMode = [string]$Settings.EncoderMode
+    $context.EncoderInventory = $script:EncoderInventory
     $context.FilterSummary = $Settings.FilterSummary
 }
 
@@ -5689,6 +5815,212 @@ function Move-SelectedQueuedItem {
     return $true
 }
 
+function Skip-SelectedQueuedItem {
+    if (Test-BatchEditLocked) {
+        return $false
+    }
+
+    $selectedItem = Get-SelectedPlanItem
+    if (-not (Test-PlanItemQueued -Item $selectedItem)) {
+        return $false
+    }
+
+    Update-RowStatus -SourceName ([string]$selectedItem.SourceName) -Status "skipped"
+    Set-StatusText ("Skip Selected: " + [string]$selectedItem.SourceName)
+    return $true
+}
+
+function Retry-FailedPlanItems {
+    if (Test-BatchRunning) {
+        return $false
+    }
+
+    $failedItems = @($script:PlanItems | Where-Object { (Get-PlanItemStatusText -Item $_) -eq "failed" })
+    if ($failedItems.Count -eq 0) {
+        return $false
+    }
+
+    foreach ($item in $failedItems) {
+        $item.Status = "queued"
+    }
+
+    Set-GridRows -Plan $script:PlanItems
+    if ($script:PlanItems.Count -gt 0) {
+        [void](Select-PlanGridRowBySourceName -SourceName ([string]$failedItems[0].SourceName))
+    }
+    Set-StatusText ("Retry Failed: " + $failedItems.Count + " fajl(ova) vraceno u queue.")
+    return $true
+}
+
+function Clear-CompletedPlanItems {
+    if (Test-BatchRunning) {
+        return $false
+    }
+
+    $remainingItems = @($script:PlanItems | Where-Object { (Get-PlanItemStatusText -Item $_) -notin @("done", "skipped", "stopped") })
+    if ($remainingItems.Count -eq $script:PlanItems.Count) {
+        return $false
+    }
+
+    Set-GridRows -Plan $remainingItems
+    if ($script:PlanItems.Count -gt 0) {
+        [void](Select-PlanGridRowBySourceName -SourceName ([string]$script:PlanItems[0].SourceName))
+    }
+    Set-StatusText "Clear Completed: zavrseni/skipped/stopped fajlovi su uklonjeni iz queue."
+    return $true
+}
+
+function Export-QueuePlanToFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ($script:PlanItems.Count -eq 0) {
+        throw "Queue je prazan; nema sta da se sacuva."
+    }
+
+    $crfValue = 22
+    [void][int]::TryParse([string]$crfTextBox.Text, [ref]$crfValue)
+    $maxPartGb = 3.8
+    $numberStyles = [System.Globalization.NumberStyles]::Float
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    $maxPartText = [string]$maxPartGbTextBox.Text
+    if (-not [string]::IsNullOrWhiteSpace($maxPartText)) {
+        [void][double]::TryParse($maxPartText.Trim().Replace(",", "."), $numberStyles, $culture, [ref]$maxPartGb)
+    }
+
+    $payload = [pscustomobject]@{
+        SchemaVersion = 1
+        SavedAtUtc = ((Get-Date).ToUniversalTime().ToString("o"))
+        AppName = "VHS MP4 Optimizer"
+        Settings = [pscustomobject]@{
+            InputDir = [string]$inputTextBox.Text
+            OutputDir = [string]$outputTextBox.Text
+            FfmpegPath = if (-not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) { [string]$script:ResolvedFfmpegPath } else { [string]$ffmpegPathTextBox.Text }
+            WorkflowPresetName = if ([string]::IsNullOrWhiteSpace([string]$workflowPresetComboBox.SelectedItem)) { $script:WorkflowPresetCustomName } else { [string]$workflowPresetComboBox.SelectedItem }
+            QualityMode = [string]$qualityModeComboBox.SelectedItem
+            Crf = $crfValue
+            Preset = [string]$presetComboBox.SelectedItem
+            AudioBitrate = [string]$audioTextBox.Text
+            Deinterlace = [string]$deinterlaceComboBox.SelectedItem
+            Denoise = [string]$denoiseComboBox.SelectedItem
+            RotateFlip = [string]$rotateFlipComboBox.SelectedItem
+            ScaleMode = [string]$scaleModeComboBox.SelectedItem
+            AudioNormalize = [bool]$audioNormalizeCheckBox.Checked
+            EncoderMode = if ([string]::IsNullOrWhiteSpace([string]$encoderModeComboBox.SelectedItem)) { $script:EncoderModeDefaultName } else { [string]$encoderModeComboBox.SelectedItem }
+            SplitOutput = [bool]$splitOutputCheckBox.Checked
+            AutoApplyCrop = [bool]$autoApplyCropCheckBox.Checked
+            MaxPartGb = $maxPartGb
+        }
+        PlanItems = @($script:PlanItems)
+    }
+
+    $parent = Split-Path -Path $Path -Parent
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        $null = New-Item -ItemType Directory -Path $parent -Force
+    }
+
+    Set-Content -LiteralPath $Path -Value ($payload | ConvertTo-Json -Depth 16) -Encoding UTF8
+    Set-StatusText ("Queue sacuvan: " + $Path)
+    return $true
+}
+
+function Import-QueuePlanFromFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (Test-BatchRunning) {
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Queue fajl ne postoji."
+    }
+
+    $rawContent = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($rawContent)) {
+        throw "Queue fajl je prazan."
+    }
+
+    $parsed = ConvertFrom-Json -InputObject $rawContent -ErrorAction Stop
+    $settingsObject = Get-WorkflowPresetObjectValue -Object $parsed -Name "Settings"
+    if ($null -eq $settingsObject) {
+        throw "Queue fajl nema Settings sekciju."
+    }
+
+    $normalizedSettings = New-WorkflowPresetSettingsObject -Settings $settingsObject
+    $inputTextBox.Text = [string](Get-WorkflowPresetObjectValue -Object $settingsObject -Name "InputDir")
+    $outputTextBox.Text = [string](Get-WorkflowPresetObjectValue -Object $settingsObject -Name "OutputDir")
+    $ffmpegPathTextBox.Text = [string](Get-WorkflowPresetObjectValue -Object $settingsObject -Name "FfmpegPath")
+    Sync-FfmpegState
+    Set-WorkflowPresetControlsFromSettings -Settings $normalizedSettings
+    Update-WorkflowPresetDirtyState
+
+    $rawPlanItems = @((Get-WorkflowPresetObjectValue -Object $parsed -Name "PlanItems"))
+    $planItems = New-Object System.Collections.Generic.List[object]
+    $aspectModeBySource = @{}
+    foreach ($item in $rawPlanItems) {
+        if ($null -eq $item) {
+            continue
+        }
+
+        $status = [string](Get-PlanItemPropertyText -Item $item -Name "Status" -Default "queued")
+        $aspectModeRaw = [string](Get-PlanItemPropertyText -Item $item -Name "AspectMode" -Default "")
+        $aspectMode = if ([string]::IsNullOrWhiteSpace($aspectModeRaw)) { "" } else { Get-AspectModeDisplayName -AspectMode $aspectModeRaw -Default $aspectModeRaw }
+        if ($status -in @("running", "processing", "paused")) {
+            $status = "queued"
+        }
+        $item | Add-Member -NotePropertyName "Status" -NotePropertyValue $status -Force
+        Sync-PlanItemAspectSnapshot -Item $item | Out-Null
+        if (-not [string]::IsNullOrWhiteSpace($aspectMode)) {
+            $aspectModeBySource[[string]$item.SourcePath] = $aspectMode
+            $item | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue $aspectMode -Force
+        }
+        $planItems.Add($item)
+    }
+
+    $restoredPlan = @($planItems.ToArray())
+    $restoredPlan = @(Add-PlanEstimates -Plan $restoredPlan)
+    foreach ($item in $restoredPlan) {
+        $sourcePath = [string]$item.SourcePath
+        if (-not [string]::IsNullOrWhiteSpace($sourcePath) -and $aspectModeBySource.ContainsKey($sourcePath)) {
+            $item | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue ([string]$aspectModeBySource[$sourcePath]) -Force
+        }
+    }
+    Set-GridRows -Plan $restoredPlan
+    if ($script:PlanItems.Count -gt 0) {
+        [void](Select-PlanGridRowBySourceName -SourceName ([string]$script:PlanItems[0].SourceName))
+    }
+    Set-StatusText ("Queue ucitan: " + $Path)
+    return $true
+}
+
+function Show-SaveQueueDialog {
+    $dialog = New-Object System.Windows.Forms.SaveFileDialog
+    $dialog.Filter = "Queue (*.json)|*.json|All files (*.*)|*.*"
+    $dialog.Title = "Save Queue"
+    $dialog.FileName = "vhs-mp4-queue.json"
+    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        return $false
+    }
+
+    return (Export-QueuePlanToFile -Path $dialog.FileName)
+}
+
+function Show-LoadQueueDialog {
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Filter = "Queue (*.json)|*.json|All files (*.*)|*.*"
+    $dialog.Title = "Load Queue"
+    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        return $false
+    }
+
+    return (Import-QueuePlanFromFile -Path $dialog.FileName)
+}
+
 function Update-RowStatus {
     param(
         [Parameter(Mandatory = $true)]
@@ -5775,6 +6107,7 @@ function Get-Settings {
         RotateFlip = [string]$rotateFlipComboBox.SelectedItem
         ScaleMode = [string]$scaleModeComboBox.SelectedItem
         AudioNormalize = [bool]$audioNormalizeCheckBox.Checked
+        EncoderMode = if ([string]::IsNullOrWhiteSpace([string]$encoderModeComboBox.SelectedItem)) { $script:EncoderModeDefaultName } else { [string]$encoderModeComboBox.SelectedItem }
         AutoApplyCrop = [bool]$autoApplyCropCheckBox.Checked
         FilterSummary = Get-VhsMp4FilterSummary `
             -Deinterlace ([string]$deinterlaceComboBox.SelectedItem) `
@@ -6363,6 +6696,8 @@ function Start-NextQueuedItem {
                 -RotateFlip $script:BatchContext.Context.RotateFlip `
                 -ScaleMode $script:BatchContext.Context.ScaleMode `
                 -AudioNormalize:([bool]$script:BatchContext.Context.AudioNormalize) `
+                -EncoderMode ([string]$script:BatchContext.Context.EncoderMode) `
+                -EncoderInventory $script:BatchContext.Context.EncoderInventory `
                 -SharedState $script:SharedState
 
             $script:CurrentProcess = $started.Process
@@ -6472,7 +6807,9 @@ function Start-BatchSession {
         -Denoise $Settings.Denoise `
         -RotateFlip $Settings.RotateFlip `
         -ScaleMode $Settings.ScaleMode `
-        -AudioNormalize:([bool]$Settings.AudioNormalize)
+        -AudioNormalize:([bool]$Settings.AudioNormalize) `
+        -EncoderMode ([string]$Settings.EncoderMode) `
+        -EncoderInventory $script:EncoderInventory
     $context | Add-Member -NotePropertyName "WorkflowPresetName" -NotePropertyValue ([string]$Settings.WorkflowPresetName) -Force
 
     $plan = if ($script:PlanItems.Count -gt 0) {
@@ -6524,6 +6861,7 @@ function Start-BatchSession {
     }
     Write-SessionLog -Message ("QualityMode: " + $context.QualityMode + " | CRF: " + $context.Crf + " | Preset: " + $context.Preset + " | AudioBitrate: " + $context.AudioBitrate)
     Write-SessionLog -Message ("SplitOutput: " + $context.SplitOutput + " | MaxPartGb: " + $context.MaxPartGb)
+    Write-SessionLog -Message ("Encode engine: requested " + [string]$context.EncoderMode + " | using " + [string]$context.ResolvedEncoderMode)
     if (-not [string]::IsNullOrWhiteSpace([string]$context.FilterSummary)) {
         Write-SessionLog -Message ("Filters: " + $context.FilterSummary)
     }
@@ -6609,6 +6947,32 @@ $menuStrip = New-Object System.Windows.Forms.MenuStrip
 $menuStrip.Dock = "Fill"
 $form.MainMenuStrip = $menuStrip
 $shellLayout.Controls.Add($menuStrip, 0, 0)
+
+$queueMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$queueMenuItem.Text = "Queue"
+$menuStrip.Items.Add($queueMenuItem) | Out-Null
+
+$saveQueueMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$saveQueueMenuItem.Text = "Save Queue"
+$queueMenuItem.DropDownItems.Add($saveQueueMenuItem) | Out-Null
+
+$loadQueueMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$loadQueueMenuItem.Text = "Load Queue"
+$queueMenuItem.DropDownItems.Add($loadQueueMenuItem) | Out-Null
+
+$queueMenuItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+$skipSelectedMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$skipSelectedMenuItem.Text = "Skip Selected"
+$queueMenuItem.DropDownItems.Add($skipSelectedMenuItem) | Out-Null
+
+$retryFailedMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$retryFailedMenuItem.Text = "Retry Failed"
+$queueMenuItem.DropDownItems.Add($retryFailedMenuItem) | Out-Null
+
+$clearCompletedMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$clearCompletedMenuItem.Text = "Clear Completed"
+$queueMenuItem.DropDownItems.Add($clearCompletedMenuItem) | Out-Null
 
 $helpMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $helpMenuItem.Text = "Help"
@@ -6819,9 +7183,10 @@ $configLayout.Controls.Add($advancedSettingsGroupBox, 0, 2)
 $advancedSettingsLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $advancedSettingsLayout.Dock = "Fill"
 $advancedSettingsLayout.ColumnCount = 1
-$advancedSettingsLayout.RowCount = 2
+$advancedSettingsLayout.RowCount = 3
 $advancedSettingsLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
 $advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
+$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
 $advancedSettingsGroupBox.Controls.Add($advancedSettingsLayout)
 
@@ -6909,11 +7274,38 @@ $maxPartGbTextBox.Text = "3.8"
 $maxPartGbTextBox.Enabled = $false
 $settingsFlow.Controls.Add($maxPartGbTextBox)
 
+$encoderFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+$encoderFlow.Dock = "Fill"
+$encoderFlow.WrapContents = $false
+$encoderFlow.AutoSize = $true
+$advancedSettingsLayout.Controls.Add($encoderFlow, 0, 1)
+
+$encoderModeLabel = New-Object System.Windows.Forms.Label
+$encoderModeLabel.Text = "Encode engine"
+$encoderModeLabel.Width = 88
+$encoderModeLabel.TextAlign = "MiddleLeft"
+$encoderFlow.Controls.Add($encoderModeLabel)
+
+$encoderModeComboBox = New-Object System.Windows.Forms.ComboBox
+$encoderModeComboBox.Name = "encoderModeComboBox"
+$encoderModeComboBox.Width = 172
+$encoderModeComboBox.DropDownStyle = "DropDownList"
+[void]$encoderModeComboBox.Items.AddRange($script:EncoderModeLabels)
+$encoderModeComboBox.SelectedItem = $script:EncoderModeDefaultName
+$encoderFlow.Controls.Add($encoderModeComboBox)
+
+$encoderStatusLabel = New-Object System.Windows.Forms.Label
+$encoderStatusLabel.Name = "encoderStatusLabel"
+$encoderStatusLabel.AutoSize = $true
+$encoderStatusLabel.Margin = New-Object System.Windows.Forms.Padding(12, 6, 3, 3)
+$encoderStatusLabel.Text = "RuntimeReadyModes: CPU"
+$encoderFlow.Controls.Add($encoderStatusLabel)
+
 $filterFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $filterFlow.Dock = "Fill"
 $filterFlow.WrapContents = $true
 $filterFlow.AutoSize = $true
-$advancedSettingsLayout.Controls.Add($filterFlow, 0, 1)
+$advancedSettingsLayout.Controls.Add($filterFlow, 0, 2)
 
 $filterLabel = New-Object System.Windows.Forms.Label
 $filterLabel.Text = "Video filters"
@@ -7030,6 +7422,21 @@ $moveDownButton = New-Object System.Windows.Forms.Button
 $moveDownButton.Text = "Move Down"
 $moveDownButton.AutoSize = $true
 $secondaryActionsFlow.Controls.Add($moveDownButton)
+
+$skipSelectedButton = New-Object System.Windows.Forms.Button
+$skipSelectedButton.Text = "Skip Selected"
+$skipSelectedButton.AutoSize = $true
+$secondaryActionsFlow.Controls.Add($skipSelectedButton)
+
+$retryFailedButton = New-Object System.Windows.Forms.Button
+$retryFailedButton.Text = "Retry Failed"
+$retryFailedButton.AutoSize = $true
+$secondaryActionsFlow.Controls.Add($retryFailedButton)
+
+$clearCompletedButton = New-Object System.Windows.Forms.Button
+$clearCompletedButton.Text = "Clear Completed"
+$clearCompletedButton.AutoSize = $true
+$secondaryActionsFlow.Controls.Add($clearCompletedButton)
 
 $startButton = New-Object System.Windows.Forms.Button
 $startButton.Text = "Start Conversion"
@@ -7580,6 +7987,36 @@ $checkForUpdatesMenuItem.Add_Click({
     [void](Invoke-UpdateCheck)
 })
 
+$saveQueueMenuItem.Add_Click({
+    try {
+        [void](Show-SaveQueueDialog)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Save Queue", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+    }
+})
+
+$loadQueueMenuItem.Add_Click({
+    try {
+        [void](Show-LoadQueueDialog)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Load Queue", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+    }
+})
+
+$skipSelectedMenuItem.Add_Click({
+    [void](Skip-SelectedQueuedItem)
+})
+
+$retryFailedMenuItem.Add_Click({
+    [void](Retry-FailedPlanItems)
+})
+
+$clearCompletedMenuItem.Add_Click({
+    [void](Clear-CompletedPlanItems)
+})
+
 $openUserGuideMenuItem.Add_Click({
     Open-UserGuide
 })
@@ -7594,6 +8031,18 @@ $moveUpButton.Add_Click({
 
 $moveDownButton.Add_Click({
     [void](Move-SelectedQueuedItem -Direction 1)
+})
+
+$skipSelectedButton.Add_Click({
+    [void](Skip-SelectedQueuedItem)
+})
+
+$retryFailedButton.Add_Click({
+    [void](Retry-FailedPlanItems)
+})
+
+$clearCompletedButton.Add_Click({
+    [void](Clear-CompletedPlanItems)
 })
 
 $previewFrameButton.Add_Click({
@@ -7911,6 +8360,10 @@ $crfTextBox.Add_TextChanged({
 })
 
 $audioTextBox.Add_TextChanged({
+    Invoke-WorkflowPresetFieldChanged
+})
+
+$encoderModeComboBox.Add_SelectedIndexChanged({
     Invoke-WorkflowPresetFieldChanged
 })
 

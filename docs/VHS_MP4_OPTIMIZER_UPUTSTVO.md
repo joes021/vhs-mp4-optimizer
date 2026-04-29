@@ -69,23 +69,33 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - `Scale` za izlaz na `PAL 576p`, `720p` ili `1080p`.
    - `Audio normalize` za tise ili neujednacene snimke.
    - `Auto apply crop if detected` automatski primenjuje detektovan crop pri `Start Conversion` za fajlove koji nemaju rucni crop.
-14. Pogledaj kolone `Estimate` i `USB note`:
+14. U istom `Advanced Settings` delu imas i `Encode engine`:
+   - `Auto` je bezbedan podrazumevani tok.
+   - `CPU (libx264/libx265)` daje najpredvidljiviji kvalitet.
+   - `NVIDIA NVENC`, `Intel QSV` i `AMD AMF` su dostupni kada ih FFmpeg i masina stvarno podrzavaju.
+   - Ako hardware init padne, alat se bezbedno vraca na CPU umesto da prekine batch.
+15. Pogledaj kolone `Estimate` i `USB note`:
    - `Estimate` je okvirna velicina gotovog MP4 fajla ili broj delova.
    - `USB note` javlja da li je bolje koristiti `Split output` ili `exFAT`.
-15. Klikni `Test Sample` ako zelis prvo da napravis kratak probni MP4 od 120 sekundi. Sample ide u folder `samples`.
-16. Klikni `Start Conversion`.
-17. Program pre starta radi `FFmpeg preflight` proveru da uhvati losu ili pogresnu FFmpeg putanju.
-18. Dok batch radi, `Pause` znaci: zavrsi trenutni fajl pa stani pre sledeceg.
-19. Kada status predje na `Paused`, mozes da:
+16. Klikni `Test Sample` ako zelis prvo da napravis kratak probni MP4 od 120 sekundi. Sample ide u folder `samples`.
+17. Klikni `Start Conversion`.
+18. Program pre starta radi `FFmpeg preflight` proveru da uhvati losu ili pogresnu FFmpeg putanju.
+19. Dok batch radi, `Pause` znaci: zavrsi trenutni fajl pa stani pre sledeceg.
+20. Kada status predje na `Paused`, mozes da:
    - kliknes `Resume` da nastavis od prvog sledeceg `queued` fajla
    - koristis `Move Up` i `Move Down` da promenis redosled preostalih `queued` stavki
    - promenis opsta batch podesavanja i `Workflow preset`; queued fajlovi se odmah osvezavaju
    - otvoris `Open Player`, `Test Sample`, trim, crop i aspect za fajlove koji jos nisu krenuli
-20. Prati `Total progress` za ceo posao i `File progress` za trenutni fajl, procenat i ETA.
+21. `Queue` meni i batch dugmad daju jos brzu kontrolu:
+   - `Skip Selected` sklanja jedan queued fajl iz ove runde
+   - `Retry Failed` vraca neuspele fajlove nazad u queue
+   - `Clear Completed` cisti `done`, `skipped` i `stopped` stavke
+   - `Save Queue` i `Load Queue` cuvaju ceo batch plan sa trim/crop/aspect stanjem
+22. Prati `Total progress` za ceo posao i `File progress` za trenutni fajl, procenat i ETA.
    - Donji workspace je sada podeljen na `Status`, `Progress` i `Log`, tako da pregled batch-a ne guta preview prostor.
-21. Kada zavrsi, program pravi `IZVESTAJ.txt`, pusti kratak Windows signal i prikaze obavestenje.
-22. Klikni `Open Output` i prebaci gotove `.mp4` fajlove na USB ili cloud.
-23. U meniju `Help` imas `About VHS MP4 Optimizer`, `Check for Updates` i `Open User Guide`.
+23. Kada zavrsi, program pravi `IZVESTAJ.txt`, pusti kratak Windows signal i prikaze obavestenje.
+24. Klikni `Open Output` i prebaci gotove `.mp4` fajlove na USB ili cloud.
+25. U meniju `Help` imas `About VHS MP4 Optimizer`, `Check for Updates` i `Open User Guide`.
 
 ## Split output
 
@@ -192,6 +202,26 @@ Kad izaberes preset, te vrednosti se odmah upisu u formu. Ako zatim rucno promen
 - `Move Up` i `Move Down` rade nad `queued` stavkama, pa mozes da prepakujes ostatak batch-a bez diranja vec zavrsenih fajlova.
 - Ako tokom pauze promenis `Quality mode`, `CRF`, `Workflow preset`, `Split output` ili druge opste batch filtere, queued deo plana se odmah osvezava.
 - Vec zavrseni fajlovi ostaju zavrseni; pause/resume ne vraca ih nazad u queue.
+
+## Queue alati
+
+Glavni meni `Queue` i batch dugmad u glavnom prozoru sluze za brze korekcije reda bez ponovnog skeniranja foldera.
+
+- `Skip Selected` odmah prebacuje jedan queued fajl u `skipped`.
+- `Retry Failed` vraca sve `failed` stavke nazad u `queued`.
+- `Clear Completed` izbacuje `done`, `skipped` i `stopped` stavke iz liste.
+- `Save Queue` cuva ceo batch plan u `.json`, ukljucujuci trim, crop, aspect i opsta podesavanja.
+- `Load Queue` vraca taj isti plan kasnije, tako da mozes da nastavis posao bez novog ručnog preslaganja.
+
+## Encode engine
+
+`Encode engine` je u `Advanced Settings` delu i odredjuje da li kodiranje ide preko CPU ili podrzanog hardverskog enkodera.
+
+- `Auto` ostavlja provereni CPU tok kao podrazumevani izbor.
+- `CPU (libx264/libx265)` je najpredvidljiviji za kvalitet i kompatibilnost.
+- `NVIDIA NVENC`, `Intel QSV` i `AMD AMF` koriste hardware encode kada ih FFmpeg i masina stvarno podrzavaju.
+- Status linija pokazuje `RuntimeReadyModes`, pa odmah vidis sta je spremno za rad.
+- Ako hardware init ne uspe, alat bezbedno pada nazad na CPU umesto da prekine batch.
 
 ## Help / About / Update
 
