@@ -16,6 +16,8 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
 1. Pokreni Desktop precicu `VHS MP4 Optimizer`.
 2. Klikni `Browse...` kod `Input folder` i izaberi folder sa velikim video fajlovima.
 3. `Output folder` moze da ostane podrazumevano: `vhs-mp4-output`.
+   - Glavni prozor je sada podeljen na `Source / Output / FFmpeg`, `Quick Setup` i skriveni `Advanced Settings`.
+   - Za svakodnevni batch tok obicno ostajes u `Quick Setup`, a `Show Advanced` otvaras samo kad ti trebaju detaljni parametri.
 4. Izaberi `Workflow preset` ako zelis gotov skup opštih batch podesavanja:
    - `USB standard` za najprakticniju predaju na USB, sa ukljucenim split tokom.
    - `Mali fajl` kada je prioritet sto manja velicina.
@@ -60,7 +62,7 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - `Start` i `End` primaju `HH:MM:SS`, `MM:SS` ili sekunde.
    - `Apply Trim` pamti trim samo za izabrani fajl, a `Clear Trim` ga brise.
    - kolone `Range` i `Crop` pokazuju koji fajlovi imaju trim i da li je crop `Auto` ili `Manual`.
-13. Ako snimak treba tehnicki popraviti, koristi red `Video filters`:
+13. Ako snimak treba tehnicki popraviti, klikni `Show Advanced` pa koristi red `Video filters`:
    - `Deinterlace` za nazubljene linije kod VHS/DVD interlaced snimaka.
    - `Denoise` za blago smanjenje suma.
    - `Rotate/flip` za pogresno okrenute snimke.
@@ -80,6 +82,7 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - promenis opsta batch podesavanja i `Workflow preset`; queued fajlovi se odmah osvezavaju
    - otvoris `Open Player`, `Test Sample`, trim, crop i aspect za fajlove koji jos nisu krenuli
 20. Prati `Total progress` za ceo posao i `File progress` za trenutni fajl, procenat i ETA.
+   - Donji workspace je sada podeljen na `Status`, `Progress` i `Log`, tako da pregled batch-a ne guta preview prostor.
 21. Kada zavrsi, program pravi `IZVESTAJ.txt`, pusti kratak Windows signal i prikaze obavestenje.
 22. Klikni `Open Output` i prebaci gotove `.mp4` fajlove na USB ili cloud.
 23. U meniju `Help` imas `About VHS MP4 Optimizer`, `Check for Updates` i `Open User Guide`.

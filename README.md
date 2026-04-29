@@ -69,6 +69,7 @@ Umesto da se svaki fajl obradjuje rucno, alat pravi batch workflow sa pregledom,
 | Crop / Overscan | Auto detect + rucni crop za crne ivice i VHS overscan |
 | Aspect / Pixel shape | `Auto`, `Keep Original`, `Force 4:3`, `Force 16:9` sa PAL/DV i NTSC/DV logikom |
 | Workflow presets | Gotovi preset-i plus cuvanje sopstvenih batch podesavanja |
+| Quick / Advanced raspored | Cist glavni ekran sa brzim batch tokom i odvojenim naprednim parametrima |
 | Split output | Deljenje dugackih fajlova na validne MP4 delove za FAT32/USB scenario |
 | Pause / Resume | Pauza posle trenutnog fajla, pa nastavak od sledeceg queued reda |
 | Help / About / Updates | Vidljiva lokalna verzija, user guide i GitHub update provera sa potvrdom |
@@ -106,11 +107,13 @@ Program ume da radi i sa modernijim i sa starijim fajlovima, a kada playback nij
 1. Izaberes `Input folder`.
 2. Kliknes `Scan Files`.
 3. Pregledas `Properties`, procenu velicine i `USB note`.
-4. Po potrebi otvoris `Open Player` za trim, multi-cut, crop i aspect korekciju.
-5. Ukljucis `Split output` ako isporuka ide na FAT32 ili zelis manje delove.
-6. Pokrenes `Start Conversion`.
-7. Dobijes gotove `mp4` fajlove i `IZVESTAJ.txt` u output folderu.
-8. Po potrebi otvaras `Help -> About VHS MP4 Optimizer` ili `Help -> Check for Updates`.
+4. U `Quick Setup` zoni radis svakodnevni batch tok, a `Show Advanced` otvara detaljne parametre tek kada zatrebaju.
+5. Po potrebi otvoris `Open Player` za trim, multi-cut, crop i aspect korekciju.
+6. Donji `Status / Progress / Log` tabovi daju pregled bez gutanja preview prostora.
+7. Ukljucis `Split output` ako isporuka ide na FAT32 ili zelis manje delove.
+8. Pokrenes `Start Conversion`.
+9. Dobijes gotove `mp4` fajlove i `IZVESTAJ.txt` u output folderu.
+10. Po potrebi otvaras `Help -> About VHS MP4 Optimizer` ili `Help -> Check for Updates`.
 
 ## Izdvojene funkcije koje olaksavaju posao
 

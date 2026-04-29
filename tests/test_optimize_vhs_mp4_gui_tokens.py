@@ -175,9 +175,21 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
         script,
     )
     assert top_row, "missing fixed top configuration row"
-    assert int(top_row.group(1)) >= 300
+    assert int(top_row.group(1)) <= 220
 
-    assert script.count("$configLayout.RowStyles.Add") >= 6
+    for token in [
+        "$sourceGroupBox = New-Object System.Windows.Forms.GroupBox",
+        '$sourceGroupBox.Text = "Source / Output / FFmpeg"',
+        "$quickRunGroupBox = New-Object System.Windows.Forms.GroupBox",
+        '$quickRunGroupBox.Text = "Quick Setup"',
+        "$advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox",
+        '$advancedSettingsGroupBox.Text = "Advanced Settings"',
+        "$advancedToggleButton = New-Object System.Windows.Forms.Button",
+        '$advancedToggleButton.Text = "Show Advanced"',
+        "function Set-AdvancedSettingsVisibility",
+    ]:
+        assert token in script, f"missing modern top-layout token: {token}"
+
     assert script.count("$statusPanel.RowStyles.Add") >= 3
     assert "$configLayout.AutoScroll = $true" in script
 
@@ -248,8 +260,23 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
             script,
         )
     ]
-    assert root_fixed_rows == [300, 60, 90]
-    assert sum(root_fixed_rows) <= 480
+    assert root_fixed_rows == [210, 156]
+    assert sum(root_fixed_rows) <= 380
+
+    for token in [
+        "$rootLayout.RowCount = 3",
+        "$activityTabControl = New-Object System.Windows.Forms.TabControl",
+        '$statusTabPage.Text = "Status"',
+        '$progressTabPage.Text = "Progress"',
+        '$logTabPage.Text = "Log"',
+        "$activityTabControl.TabPages.Add($statusTabPage)",
+        "$activityTabControl.TabPages.Add($progressTabPage)",
+        "$activityTabControl.TabPages.Add($logTabPage)",
+        "$statusTabPage.Controls.Add($statusPanel)",
+        "$progressTabPage.Controls.Add($progressPanel)",
+        "$logTabPage.Controls.Add($logTextBox)",
+    ]:
+        assert token in script, f"missing bottom activity workspace token: {token}"
 
     right_rows = re.findall(
         r"\$rightPanel\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
@@ -266,7 +293,7 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
     )
     assert preview_rows[:2] == [
         ("Percent", "100"),
-        ("Absolute", "96"),
+        ("Absolute", "92"),
     ]
 
 

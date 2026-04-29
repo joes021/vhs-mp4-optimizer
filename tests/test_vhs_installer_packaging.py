@@ -4,6 +4,7 @@ import json
 import subprocess
 import zipfile
 from pathlib import Path
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,14 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
         "AppName=VHS MP4 Optimizer",
         "DefaultDirName={localappdata}\\Programs\\VHS MP4 Optimizer",
         "DefaultGroupName=VHS MP4 Optimizer",
+        "AppPublisherURL",
+        "AppSupportURL",
+        "AppUpdatesURL",
+        "UninstallDisplayName",
+        "VersionInfoCompany",
+        "VersionInfoDescription",
+        "VersionInfoProductName",
+        "VersionInfoProductVersion",
         "PrivilegesRequired=lowest",
         "OutputBaseFilename",
         "Compression=lzma",
@@ -161,3 +170,61 @@ def test_vhs_release_builder_creates_app_manifest(tmp_path: Path) -> None:
     assert app_manifest["ReleaseTag"] == release_tag
     assert app_manifest["Repository"] == "joes021/vhs-mp4-optimizer"
     assert app_manifest["LatestReleaseApi"].endswith("/releases/latest")
+
+
+def test_vhs_setup_exe_can_install_release_payload_to_custom_dir(tmp_path: Path) -> None:
+    output_root = tmp_path / "dist"
+    version = "2026.04.29-smoke"
+    git_ref = "smoke123"
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "build-vhs-mp4-installer.ps1"),
+            "-OutputRoot",
+            str(output_root),
+            "-Version",
+            version,
+            "-GitRef",
+            git_ref,
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+    assert run.returncode == 0, run.stderr
+    manifest = json.loads((output_root / "installer-manifest.json").read_text(encoding="utf-8"))
+    if not manifest["SetupBuilt"]:
+        pytest.skip("Inno Setup nije dostupan za installer smoke test.")
+
+    setup_path = Path(manifest["SetupExePath"])
+    install_dir = tmp_path / "installed-app"
+    install_run = subprocess.run(
+        [
+            str(setup_path),
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            f"/DIR={install_dir}",
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+    assert install_run.returncode == 0, install_run.stderr
+    assert (install_dir / "VHS MP4 Optimizer.bat").exists()
+    assert (install_dir / "app-manifest.json").exists()
+    assert (install_dir / "scripts" / "optimize-vhs-mp4-gui.ps1").exists()

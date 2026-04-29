@@ -64,6 +64,19 @@ function Get-InnoSetupCompilerPath {
     return $null
 }
 
+function Get-VersionInfoNumber {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    if ($Version -match '^(\d{4})\.(\d{2})\.(\d{2})') {
+        return ("{0}.{1}.{2}.0" -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
+    }
+
+    return "0.0.0.0"
+}
+
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($ReleaseRoot)) {
     $ReleaseRoot = Join-Path $projectRoot "release\VHS MP4 Optimizer"
@@ -81,6 +94,7 @@ if ([string]::IsNullOrWhiteSpace($GitRef)) {
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = (Get-Date -Format "yyyy.MM.dd") + "-" + $GitRef
 }
+$versionInfoVersion = Get-VersionInfoNumber -Version $Version
 
 if (-not $SkipReleaseRefresh) {
     $releaseBuilder = Join-Path $PSScriptRoot "build-vhs-mp4-release.ps1"
@@ -131,6 +145,7 @@ if (-not $SkipInstallerBuild) {
             "/Qp",
             "/DMyAppVersion=$Version",
             "/DMyReleaseId=$Version",
+            "/DMyVersionInfoVersion=$versionInfoVersion",
             "/DMyReleaseRoot=$releaseRootFull",
             "/DMyOutputRoot=$outputRootFull",
             $issPath
