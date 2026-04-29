@@ -175,9 +175,12 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
         script,
     )
     assert top_row, "missing fixed top configuration row"
-    assert int(top_row.group(1)) <= 220
+    assert int(top_row.group(1)) <= 190
 
     for token in [
+        "$topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        "$topWorkspaceLayout.ColumnCount = 2",
+        "$controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel",
         "$sourceGroupBox = New-Object System.Windows.Forms.GroupBox",
         '$sourceGroupBox.Text = "Source / Output / FFmpeg"',
         "$quickRunGroupBox = New-Object System.Windows.Forms.GroupBox",
@@ -194,41 +197,46 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
     assert "$configLayout.AutoScroll = $true" in script
 
 
-def test_vhs_gui_uses_tabbed_right_workspace_for_preview_trim_and_properties() -> None:
+def test_vhs_gui_uses_split_editor_with_always_visible_preview_and_trim() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
         "$rightPanel.RowCount = 2",
-        "$rightTabControl = New-Object System.Windows.Forms.TabControl",
-        '$previewTabPage.Text = "Preview"',
+        "$rightWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer",
+        "$rightWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
+        "$rightWorkspaceSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
+        "$rightWorkspaceSplit.Panel1.Controls.Add($previewWorkspaceLayout)",
+        "$rightEditorTabControl = New-Object System.Windows.Forms.TabControl",
         '$trimTabPage.Text = "Trim"',
         '$propertiesTabPage.Text = "Properties"',
-        "$rightTabControl.TabPages.Add($previewTabPage)",
-        "$rightTabControl.TabPages.Add($trimTabPage)",
-        "$rightTabControl.TabPages.Add($propertiesTabPage)",
-        "$rightPanel.Controls.Add($rightTabControl, 0, 1)",
-        "$previewTabPage.Controls.Add($previewTabLayout)",
+        "$rightEditorTabControl.TabPages.Add($trimTabPage)",
+        "$rightEditorTabControl.TabPages.Add($propertiesTabPage)",
+        "$rightWorkspaceSplit.Panel2.Controls.Add($rightEditorTabControl)",
+        "$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)",
         "$trimTabPage.Controls.Add($trimGroupBox)",
         "$propertiesTabPage.Controls.Add($infoBox)",
-        "$previewTabLayout.Controls.Add($previewPictureBox, 0, 0)",
-        "$previewTabLayout.Controls.Add($previewControlsPanel, 0, 1)",
+        "$previewWorkspaceLayout.Controls.Add($previewPictureBox, 0, 0)",
+        "$previewWorkspaceLayout.Controls.Add($previewControlsPanel, 0, 1)",
     ]:
-        assert token in script, f"missing tabbed right-workspace token: {token}"
+        assert token in script, f"missing split editor token: {token}"
 
-    assert "$rightPanel.Controls.Add($trimGroupBox, 0, 1)" not in script
-    assert "$rightPanel.Controls.Add($previewPictureBox, 0, 3)" not in script
+    assert "$rightTabControl = New-Object System.Windows.Forms.TabControl" not in script
+    assert '$previewTabPage.Text = "Preview"' not in script
 
 
 def test_vhs_gui_reserves_readable_right_panel_width_and_stable_trim_layout() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$script:RightPanelTargetWidth = 500",
+        "$script:RightPanelTargetWidth = 620",
         "$mainSplit.Panel2MinSize = $script:RightPanelTargetWidth",
         "$mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
         "function Set-MainSplitLayout",
         "$form.Add_Shown({",
         "Set-MainSplitLayout",
+        "$previewStartMarkerLabel = New-Object System.Windows.Forms.Label",
+        "$previewEndMarkerLabel = New-Object System.Windows.Forms.Label",
+        "$previewTrimSummaryLabel = New-Object System.Windows.Forms.Label",
         "$trimLayout = New-Object System.Windows.Forms.TableLayoutPanel",
         "$trimLayout.ColumnCount = 4",
         "$trimLayout.RowCount = 4",
@@ -260,8 +268,8 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
             script,
         )
     ]
-    assert root_fixed_rows == [210, 156]
-    assert sum(root_fixed_rows) <= 380
+    assert root_fixed_rows == [184, 128]
+    assert sum(root_fixed_rows) <= 320
 
     for token in [
         "$rootLayout.RowCount = 3",
@@ -288,13 +296,137 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
     ]
 
     preview_rows = re.findall(
-        r"\$previewTabLayout\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
+        r"\$previewWorkspaceLayout\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
         script,
     )
-    assert preview_rows[:2] == [
+    assert preview_rows[:3] == [
         ("Percent", "100"),
-        ("Absolute", "92"),
+        ("Absolute", "132"),
+        ("Absolute", "28"),
     ]
+
+
+def test_vhs_gui_main_workspace_keeps_quick_actions_and_trim_controls_visible(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "out"
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+function Test-ControlReachableOnForm {{
+    param(
+        [System.Windows.Forms.Control]$Control,
+        [System.Windows.Forms.Form]$OwnerForm
+    )
+
+    if ($null -eq $Control -or $null -eq $OwnerForm -or -not $Control.Visible) {{
+        return $false
+    }}
+
+    $controlRect = $Control.RectangleToScreen($Control.ClientRectangle)
+    $formRect = $OwnerForm.RectangleToScreen($OwnerForm.ClientRectangle)
+    return $controlRect.Width -gt 0 -and $controlRect.Height -gt 0 -and $formRect.Contains($controlRect)
+}}
+
+$form.Size = New-Object System.Drawing.Size(1600, 960)
+$form.MinimumSize = New-Object System.Drawing.Size(1260, 820)
+$inputTextBox.Text = '{ps_quote(tmp_path)}'
+$outputTextBox.Text = '{ps_quote(output_dir)}'
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mp4'
+    ContainerLongName = 'MP4'
+    DurationSeconds = 754.485
+    DurationText = '00:12:34'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '1920x1080'
+    DisplayAspectRatio = '16:9'
+    SampleAspectRatio = '1:1'
+    FrameRate = 30.01
+    FrameRateText = '30.01 fps'
+    FrameCount = 22643
+    VideoSummary = 'h264 | 1920x1080 | 16:9 | 30.01 fps'
+    VideoBitrateText = '900 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioSummary = 'aac | 2 ch | 48000 Hz'
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    OutputPath = '{ps_quote(output_dir / "clip.mp4")}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+    Status = 'queued'
+}}
+Set-GridRows -Plan @($item)
+[void](Select-PlanGridRowBySourceName -SourceName 'clip.mp4')
+Update-PreviewTrimPanel
+$form.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$trimStartTextBox.Text = '00:00:10'
+$trimEndTextBox.Text = '00:00:20'
+Update-CutRangeDisplay
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    SavePresetVisible = Test-ControlReachableOnForm $savePresetButton $form
+    StartConversionVisible = Test-ControlReachableOnForm $startButton $form
+    OpenReportVisible = Test-ControlReachableOnForm $openReportButton $form
+    ApplyTrimVisible = Test-ControlReachableOnForm $applyTrimButton $form
+    StartMarkerVisible = Test-ControlReachableOnForm $previewStartMarkerLabel $form
+    EndMarkerVisible = Test-ControlReachableOnForm $previewEndMarkerLabel $form
+    TrimSummaryVisible = Test-ControlReachableOnForm $previewTrimSummaryLabel $form
+    StartMarkerText = $previewStartMarkerLabel.Text
+    EndMarkerText = $previewEndMarkerLabel.Text
+    TrimSummaryText = $previewTrimSummaryLabel.Text
+}} | ConvertTo-Json -Depth 6
+try {{ $form.Close() }} catch {{}}
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-layout-visibility-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["SavePresetVisible"] is True
+    assert payload["StartConversionVisible"] is True
+    assert payload["OpenReportVisible"] is True
+    assert payload["ApplyTrimVisible"] is True
+    assert payload["StartMarkerVisible"] is True
+    assert payload["EndMarkerVisible"] is True
+    assert payload["TrimSummaryVisible"] is True
+    assert payload["StartMarkerText"] == "Start: 00:00:10"
+    assert payload["EndMarkerText"] == "End: 00:00:20"
+    assert "CUT:" in payload["TrimSummaryText"]
 
 
 def test_vhs_gui_has_manual_timeline_frame_and_cut_controls() -> None:

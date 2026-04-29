@@ -27,7 +27,7 @@ $script:CurrentDurationSeconds = $null
 $script:CurrentFileStartedAt = $null
 $script:PollTimer = New-Object System.Windows.Forms.Timer
 $script:PollTimer.Interval = 250
-$script:RightPanelTargetWidth = 500
+$script:RightPanelTargetWidth = 620
 $script:PreviewTimelineScale = 100
 $script:PreviewAutoPending = $false
 $script:PreviewAutoDelayMs = 250
@@ -133,6 +133,27 @@ function Set-MainSplitLayout {
     }
 }
 
+function Set-RightWorkspaceLayout {
+    if (-not (Get-Variable -Name "rightWorkspaceSplit" -ErrorAction SilentlyContinue)) {
+        return
+    }
+
+    $split = $rightWorkspaceSplit
+    if ($null -eq $split -or $split.Height -le 0) {
+        return
+    }
+
+    $bottomPanelTargetHeight = 230
+    $split.Panel2MinSize = 210
+    $desiredDistance = $split.Height - $bottomPanelTargetHeight - $split.SplitterWidth
+    $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
+    $distance = [Math]::Max(120, $desiredDistance)
+    $distance = [Math]::Min($distance, $maxDistance)
+    if ($distance -gt 0 -and $distance -ne $split.SplitterDistance) {
+        $split.SplitterDistance = $distance
+    }
+}
+
 function Set-AdvancedSettingsVisibility {
     param(
         [bool]$Visible
@@ -149,10 +170,10 @@ function Set-AdvancedSettingsVisibility {
     }
 
     if (Get-Variable -Name "configLayout" -ErrorAction SilentlyContinue) {
-        $advancedRowIndex = 2
+        $advancedRowIndex = 1
         if ($configLayout.RowStyles.Count -gt $advancedRowIndex) {
             $configLayout.RowStyles[$advancedRowIndex].SizeType = [System.Windows.Forms.SizeType]::Absolute
-            $configLayout.RowStyles[$advancedRowIndex].Height = if ($Visible) { 94 } else { 0 }
+            $configLayout.RowStyles[$advancedRowIndex].Height = if ($Visible) { 124 } else { 0 }
         }
         $configLayout.PerformLayout()
     }
@@ -3458,16 +3479,26 @@ function Format-CutTimelineMarkerText {
 }
 
 function Update-CutRangeDisplay {
-    if (-not (Get-Variable -Name "cutRangeLabel" -ErrorAction SilentlyContinue)) {
-        return
+    $cutText = Format-CutTimelineMarkerText -TrimStart $trimStartTextBox.Text -TrimEnd $trimEndTextBox.Text
+    $isInvalid = $cutText -like "CUT: neispravno*"
+    $cutColor = if ($isInvalid) { [System.Drawing.Color]::FromArgb(176, 32, 32) } else { [System.Drawing.SystemColors]::ControlText }
+
+    if (Get-Variable -Name "cutRangeLabel" -ErrorAction SilentlyContinue) {
+        $cutRangeLabel.Text = $cutText
+        $cutRangeLabel.ForeColor = $cutColor
     }
 
-    $cutRangeLabel.Text = Format-CutTimelineMarkerText -TrimStart $trimStartTextBox.Text -TrimEnd $trimEndTextBox.Text
-    if ($cutRangeLabel.Text -like "CUT: neispravno*") {
-        $cutRangeLabel.ForeColor = [System.Drawing.Color]::FromArgb(176, 32, 32)
+    if (Get-Variable -Name "previewTrimSummaryLabel" -ErrorAction SilentlyContinue) {
+        $previewTrimSummaryLabel.Text = $cutText
+        $previewTrimSummaryLabel.ForeColor = $cutColor
     }
-    else {
-        $cutRangeLabel.ForeColor = [System.Drawing.SystemColors]::ControlText
+
+    if (Get-Variable -Name "previewStartMarkerLabel" -ErrorAction SilentlyContinue) {
+        $previewStartMarkerLabel.Text = if ([string]::IsNullOrWhiteSpace($trimStartTextBox.Text)) { "Start: --" } else { "Start: " + $trimStartTextBox.Text }
+    }
+
+    if (Get-Variable -Name "previewEndMarkerLabel" -ErrorAction SilentlyContinue) {
+        $previewEndMarkerLabel.Text = if ([string]::IsNullOrWhiteSpace($trimEndTextBox.Text)) { "End: --" } else { "End: " + $trimEndTextBox.Text }
     }
 }
 
@@ -3757,7 +3788,7 @@ function Load-SelectedTrimFields {
 function Update-PreviewTrimPanel {
     $item = Get-SelectedPlanItem
     if ($null -eq $item) {
-        $previewStatusLabel.Text = "Izaberi fajl za Preview / Properties."
+        $previewStatusLabel.Text = "Preview: izaberi fajl iz queue liste."
         Sync-SelectedTrimSegmentsList
         Load-SelectedTrimFields
         Update-PreviewTimeline
@@ -3769,7 +3800,7 @@ function Update-PreviewTrimPanel {
 
     $trimSummary = Get-PlanItemPropertyText -Item $item -Name "TrimSummary" -Default "--"
     $cropStatus = Get-PlanItemCropStatusText -Item $item
-    $previewStatusLabel.Text = "Preview / Properties: " + $item.SourceName + " | Range: " + $trimSummary + " | " + $cropStatus
+    $previewStatusLabel.Text = "Preview: " + $item.SourceName + " | Range: " + $trimSummary + " | " + $cropStatus
     Sync-SelectedTrimSegmentsList
     Load-SelectedTrimFields
     Update-PreviewTimeline
@@ -6924,9 +6955,9 @@ function Register-DragDropTarget {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Video Converter"
-$form.Size = New-Object System.Drawing.Size(1280, 860)
+$form.Size = New-Object System.Drawing.Size(1360, 900)
 $form.StartPosition = "CenterScreen"
-$form.MinimumSize = New-Object System.Drawing.Size(1120, 760)
+$form.MinimumSize = New-Object System.Drawing.Size(1260, 820)
 $form.KeyPreview = $true
 
 $toolTip = New-Object System.Windows.Forms.ToolTip
@@ -6994,28 +7025,24 @@ $rootLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $rootLayout.Dock = "Fill"
 $rootLayout.ColumnCount = 1
 $rootLayout.RowCount = 3
-$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 210)))
+$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 184)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 156)))
+$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
 $shellLayout.Controls.Add($rootLayout, 0, 1)
 
-$configLayout = New-Object System.Windows.Forms.TableLayoutPanel
-$configLayout.Dock = "Fill"
-$configLayout.AutoScroll = $true
-$configLayout.ColumnCount = 1
-$configLayout.RowCount = 4
-$configLayout.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8)
-$configLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$configLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
-$configLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 98)))
-$configLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
-$configLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$rootLayout.Controls.Add($configLayout, 0, 0)
+$topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$topWorkspaceLayout.Dock = "Fill"
+$topWorkspaceLayout.ColumnCount = 2
+$topWorkspaceLayout.RowCount = 1
+$topWorkspaceLayout.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8)
+$topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 55)))
+$topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 45)))
+$rootLayout.Controls.Add($topWorkspaceLayout, 0, 0)
 
 $sourceGroupBox = New-Object System.Windows.Forms.GroupBox
 $sourceGroupBox.Text = "Source / Output / FFmpeg"
 $sourceGroupBox.Dock = "Fill"
-$configLayout.Controls.Add($sourceGroupBox, 0, 0)
+$topWorkspaceLayout.Controls.Add($sourceGroupBox, 0, 0)
 
 $sourceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $sourceLayout.Dock = "Fill"
@@ -7025,7 +7052,7 @@ $sourceLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 108)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
-$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 250)))
+$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 216)))
 $sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
@@ -7093,47 +7120,69 @@ $installFfmpegButton.Text = "Install FFmpeg"
 $installFfmpegButton.Dock = "Fill"
 $sourceLayout.Controls.Add($installFfmpegButton, 3, 2)
 
+$controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$controlsStackLayout.Dock = "Fill"
+$controlsStackLayout.ColumnCount = 1
+$controlsStackLayout.RowCount = 2
+$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 116)))
+$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
+$topWorkspaceLayout.Controls.Add($controlsStackLayout, 1, 0)
+
+$configLayout = $controlsStackLayout
+$configLayout.AutoScroll = $true
+
 $quickRunGroupBox = New-Object System.Windows.Forms.GroupBox
 $quickRunGroupBox.Text = "Quick Setup"
 $quickRunGroupBox.Dock = "Fill"
-$configLayout.Controls.Add($quickRunGroupBox, 0, 1)
+$configLayout.Controls.Add($quickRunGroupBox, 0, 0)
 
 $quickRunLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $quickRunLayout.Dock = "Fill"
-$quickRunLayout.ColumnCount = 1
-$quickRunLayout.RowCount = 4
+$quickRunLayout.ColumnCount = 2
+$quickRunLayout.RowCount = 1
 $quickRunLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
-$quickRunLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 18)))
-$quickRunLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
-$quickRunLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$quickRunLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$quickRunLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 40)))
+$quickRunLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 60)))
 $quickRunGroupBox.Controls.Add($quickRunLayout)
+
+$presetColumnLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$presetColumnLayout.Dock = "Fill"
+$presetColumnLayout.Margin = New-Object System.Windows.Forms.Padding(0)
+$presetColumnLayout.ColumnCount = 1
+$presetColumnLayout.RowCount = 4
+$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 16)))
+$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
+$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 48)))
+$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
+$quickRunLayout.Controls.Add($presetColumnLayout, 0, 0)
 
 $workflowPresetLabel = New-Object System.Windows.Forms.Label
 $workflowPresetLabel.Text = "Workflow preset"
 $workflowPresetLabel.Anchor = "Left"
 $workflowPresetLabel.AutoSize = $true
-$quickRunLayout.Controls.Add($workflowPresetLabel, 0, 0)
+$workflowPresetLabel.Margin = New-Object System.Windows.Forms.Padding(0)
+$presetColumnLayout.Controls.Add($workflowPresetLabel, 0, 0)
 
-$workflowPresetPanel = New-Object System.Windows.Forms.TableLayoutPanel
-$workflowPresetPanel.Dock = "Fill"
-$workflowPresetPanel.ColumnCount = 1
-$workflowPresetPanel.RowCount = 2
-$workflowPresetPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
-$workflowPresetPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$quickRunLayout.Controls.Add($workflowPresetPanel, 0, 1)
+$workflowPresetToolbar = New-Object System.Windows.Forms.TableLayoutPanel
+$workflowPresetToolbar.Dock = "Fill"
+$workflowPresetToolbar.Margin = New-Object System.Windows.Forms.Padding(0)
+$workflowPresetToolbar.ColumnCount = 1
+$workflowPresetToolbar.RowCount = 1
+$workflowPresetToolbar.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$presetColumnLayout.Controls.Add($workflowPresetToolbar, 0, 1)
 
 $workflowPresetFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $workflowPresetFlow.Dock = "Fill"
-$workflowPresetFlow.WrapContents = $false
-$workflowPresetFlow.AutoSize = $true
-$workflowPresetPanel.Controls.Add($workflowPresetFlow, 0, 0)
+$workflowPresetFlow.WrapContents = $true
+$workflowPresetFlow.AutoSize = $false
+$workflowPresetFlow.Margin = New-Object System.Windows.Forms.Padding(0)
+$presetColumnLayout.Controls.Add($workflowPresetFlow, 0, 2)
 
 $workflowPresetComboBox = New-Object System.Windows.Forms.ComboBox
 $workflowPresetComboBox.Name = "workflowPresetComboBox"
-$workflowPresetComboBox.Width = 180
+$workflowPresetComboBox.Dock = "Fill"
 $workflowPresetComboBox.DropDownStyle = "DropDownList"
-$workflowPresetFlow.Controls.Add($workflowPresetComboBox)
+$workflowPresetToolbar.Controls.Add($workflowPresetComboBox, 0, 0)
 
 $savePresetButton = New-Object System.Windows.Forms.Button
 $savePresetButton.Text = "Save Preset"
@@ -7160,25 +7209,59 @@ $presetDescriptionLabel.Name = "presetDescriptionLabel"
 $presetDescriptionLabel.Dock = "Fill"
 $presetDescriptionLabel.AutoEllipsis = $true
 $presetDescriptionLabel.Text = "Workflow preset odmah primenjuje opsta batch podesavanja. Rucne izmene prelaze u Custom."
-$workflowPresetPanel.Controls.Add($presetDescriptionLabel, 0, 1)
+$presetDescriptionLabel.Visible = $false
+$presetColumnLayout.Controls.Add($presetDescriptionLabel, 0, 3)
+
+$actionsColumnLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$actionsColumnLayout.Dock = "Fill"
+$actionsColumnLayout.Margin = New-Object System.Windows.Forms.Padding(0)
+$actionsColumnLayout.ColumnCount = 1
+$actionsColumnLayout.RowCount = 4
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 16)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$quickRunLayout.Controls.Add($actionsColumnLayout, 1, 0)
+
+$quickActionsLabel = New-Object System.Windows.Forms.Label
+$quickActionsLabel.Text = "Quick actions"
+$quickActionsLabel.Anchor = "Left"
+$quickActionsLabel.AutoSize = $true
+$quickActionsLabel.Margin = New-Object System.Windows.Forms.Padding(0)
+$actionsColumnLayout.Controls.Add($quickActionsLabel, 0, 0)
 
 $primaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $primaryActionsFlow.Dock = "Fill"
 $primaryActionsFlow.WrapContents = $false
-$primaryActionsFlow.AutoSize = $true
-$quickRunLayout.Controls.Add($primaryActionsFlow, 0, 2)
+$primaryActionsFlow.AutoSize = $false
+$primaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
+$actionsColumnLayout.Controls.Add($primaryActionsFlow, 0, 1)
 
 $secondaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $secondaryActionsFlow.Dock = "Fill"
 $secondaryActionsFlow.WrapContents = $false
-$secondaryActionsFlow.AutoSize = $true
-$quickRunLayout.Controls.Add($secondaryActionsFlow, 0, 3)
+$secondaryActionsFlow.AutoSize = $false
+$secondaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
+$actionsColumnLayout.Controls.Add($secondaryActionsFlow, 0, 2)
+
+$tertiaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+$tertiaryActionsFlow.Dock = "Fill"
+$tertiaryActionsFlow.WrapContents = $false
+$tertiaryActionsFlow.AutoSize = $false
+$tertiaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
+$actionsColumnLayout.Controls.Add($tertiaryActionsFlow, 0, 3)
+
+$queueToolbar = New-Object System.Windows.Forms.FlowLayoutPanel
+$queueToolbar.Dock = "Fill"
+$queueToolbar.WrapContents = $true
+$queueToolbar.AutoSize = $false
+$queueToolbar.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 
 $advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox
 $advancedSettingsGroupBox.Text = "Advanced Settings"
 $advancedSettingsGroupBox.Dock = "Fill"
 $advancedSettingsGroupBox.Visible = $false
-$configLayout.Controls.Add($advancedSettingsGroupBox, 0, 2)
+$configLayout.Controls.Add($advancedSettingsGroupBox, 0, 1)
 
 $advancedSettingsLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $advancedSettingsLayout.Dock = "Fill"
@@ -7411,32 +7494,32 @@ $primaryActionsFlow.Controls.Add($sampleButton)
 $openPlayerButton = New-Object System.Windows.Forms.Button
 $openPlayerButton.Text = "Open Player"
 $openPlayerButton.AutoSize = $true
-$primaryActionsFlow.Controls.Add($openPlayerButton)
+$queueToolbar.Controls.Add($openPlayerButton)
 
 $moveUpButton = New-Object System.Windows.Forms.Button
 $moveUpButton.Text = "Move Up"
 $moveUpButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($moveUpButton)
+$queueToolbar.Controls.Add($moveUpButton)
 
 $moveDownButton = New-Object System.Windows.Forms.Button
 $moveDownButton.Text = "Move Down"
 $moveDownButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($moveDownButton)
+$queueToolbar.Controls.Add($moveDownButton)
 
 $skipSelectedButton = New-Object System.Windows.Forms.Button
 $skipSelectedButton.Text = "Skip Selected"
 $skipSelectedButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($skipSelectedButton)
+$queueToolbar.Controls.Add($skipSelectedButton)
 
 $retryFailedButton = New-Object System.Windows.Forms.Button
 $retryFailedButton.Text = "Retry Failed"
 $retryFailedButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($retryFailedButton)
+$queueToolbar.Controls.Add($retryFailedButton)
 
 $clearCompletedButton = New-Object System.Windows.Forms.Button
 $clearCompletedButton.Text = "Clear Completed"
 $clearCompletedButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($clearCompletedButton)
+$queueToolbar.Controls.Add($clearCompletedButton)
 
 $startButton = New-Object System.Windows.Forms.Button
 $startButton.Text = "Start Conversion"
@@ -7455,19 +7538,19 @@ $pauseButton = New-Object System.Windows.Forms.Button
 $pauseButton.Text = "Pause"
 $pauseButton.AutoSize = $true
 $pauseButton.Enabled = $false
-$primaryActionsFlow.Controls.Add($pauseButton)
+$secondaryActionsFlow.Controls.Add($pauseButton)
 
 $resumeButton = New-Object System.Windows.Forms.Button
 $resumeButton.Text = "Resume"
 $resumeButton.AutoSize = $true
 $resumeButton.Enabled = $false
-$primaryActionsFlow.Controls.Add($resumeButton)
+$secondaryActionsFlow.Controls.Add($resumeButton)
 
 $stopButton = New-Object System.Windows.Forms.Button
 $stopButton.Text = "Stop"
 $stopButton.AutoSize = $true
 $stopButton.Enabled = $false
-$primaryActionsFlow.Controls.Add($stopButton)
+$secondaryActionsFlow.Controls.Add($stopButton)
 
 $openOutputButton = New-Object System.Windows.Forms.Button
 $openOutputButton.Text = "Open Output"
@@ -7477,17 +7560,17 @@ $secondaryActionsFlow.Controls.Add($openOutputButton)
 $openLogButton = New-Object System.Windows.Forms.Button
 $openLogButton.Text = "Open Log"
 $openLogButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($openLogButton)
+$tertiaryActionsFlow.Controls.Add($openLogButton)
 
 $openReportButton = New-Object System.Windows.Forms.Button
 $openReportButton.Text = "Open Report"
 $openReportButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($openReportButton)
+$tertiaryActionsFlow.Controls.Add($openReportButton)
 
 $advancedToggleButton = New-Object System.Windows.Forms.Button
 $advancedToggleButton.Text = "Show Advanced"
 $advancedToggleButton.AutoSize = $true
-$secondaryActionsFlow.Controls.Add($advancedToggleButton)
+$tertiaryActionsFlow.Controls.Add($advancedToggleButton)
 
 $statusPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $statusPanel.Dock = "Fill"
@@ -7539,6 +7622,15 @@ $mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2
 $mainSplit.SplitterDistance = 880
 $rootLayout.Controls.Add($mainSplit, 0, 1)
 
+$leftWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$leftWorkspaceLayout.Dock = "Fill"
+$leftWorkspaceLayout.ColumnCount = 1
+$leftWorkspaceLayout.RowCount = 2
+$leftWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
+$leftWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$mainSplit.Panel1.Controls.Add($leftWorkspaceLayout)
+$leftWorkspaceLayout.Controls.Add($queueToolbar, 0, 0)
+
 $grid = New-Object System.Windows.Forms.DataGridView
 $grid.Dock = "Fill"
 $grid.AllowUserToAddRows = $false
@@ -7563,7 +7655,7 @@ $grid.RowHeadersVisible = $false
 [void]$grid.Columns.Add("EstimatedSize", "Estimate")
 [void]$grid.Columns.Add("UsbNote", "USB note")
 [void]$grid.Columns.Add("Status", "Status")
-$mainSplit.Panel1.Controls.Add($grid)
+$leftWorkspaceLayout.Controls.Add($grid, 0, 1)
 
 $rightPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $rightPanel.Dock = "Fill"
@@ -7580,24 +7672,26 @@ $previewStatusLabel.TextAlign = "MiddleLeft"
 $previewStatusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $rightPanel.Controls.Add($previewStatusLabel, 0, 0)
 
-$rightTabControl = New-Object System.Windows.Forms.TabControl
-$rightTabControl.Dock = "Fill"
-$rightPanel.Controls.Add($rightTabControl, 0, 1)
-
-$previewTabPage = New-Object System.Windows.Forms.TabPage
-$previewTabPage.Text = "Preview"
-$previewTabPage.Padding = New-Object System.Windows.Forms.Padding(6)
-$rightTabControl.TabPages.Add($previewTabPage)
+$rightWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer
+$rightWorkspaceSplit.Dock = "Fill"
+$rightWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
+$rightWorkspaceSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2
+$rightWorkspaceSplit.SplitterDistance = 350
+$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)
 
 $trimTabPage = New-Object System.Windows.Forms.TabPage
 $trimTabPage.Text = "Trim"
 $trimTabPage.Padding = New-Object System.Windows.Forms.Padding(6)
-$rightTabControl.TabPages.Add($trimTabPage)
 
 $propertiesTabPage = New-Object System.Windows.Forms.TabPage
 $propertiesTabPage.Text = "Properties"
 $propertiesTabPage.Padding = New-Object System.Windows.Forms.Padding(6)
-$rightTabControl.TabPages.Add($propertiesTabPage)
+
+$rightEditorTabControl = New-Object System.Windows.Forms.TabControl
+$rightEditorTabControl.Dock = "Fill"
+$rightEditorTabControl.TabPages.Add($trimTabPage)
+$rightEditorTabControl.TabPages.Add($propertiesTabPage)
+$rightWorkspaceSplit.Panel2.Controls.Add($rightEditorTabControl)
 
 $trimGroupBox = New-Object System.Windows.Forms.GroupBox
 $trimGroupBox.Text = "Trim selected file"
@@ -7645,8 +7739,8 @@ $trimLayout.Controls.Add($trimEndTextBox, 3, 0)
 
 $trimButtonsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $trimButtonsFlow.Dock = "Fill"
-$trimButtonsFlow.WrapContents = $false
-$trimButtonsFlow.AutoSize = $true
+$trimButtonsFlow.WrapContents = $true
+$trimButtonsFlow.AutoSize = $false
 $trimButtonsFlow.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 $trimLayout.Controls.Add($trimButtonsFlow, 0, 1)
 $trimLayout.SetColumnSpan($trimButtonsFlow, 4)
@@ -7697,23 +7791,24 @@ $previewControlsPanel.Dock = "Fill"
 $previewControlsPanel.ColumnCount = 5
 $previewControlsPanel.RowCount = 4
 $previewControlsPanel.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
-$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 84)))
-$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 88)))
+$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 96)))
+$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 98)))
-$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
+$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 92)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 32)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
 
-$previewTabLayout = New-Object System.Windows.Forms.TableLayoutPanel
-$previewTabLayout.Dock = "Fill"
-$previewTabLayout.ColumnCount = 1
-$previewTabLayout.RowCount = 2
-$previewTabLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$previewTabLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 92)))
-$previewTabPage.Controls.Add($previewTabLayout)
+$previewWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$previewWorkspaceLayout.Dock = "Fill"
+$previewWorkspaceLayout.ColumnCount = 1
+$previewWorkspaceLayout.RowCount = 3
+$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 132)))
+$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$rightWorkspaceSplit.Panel1.Controls.Add($previewWorkspaceLayout)
 
 $previewTimeLabel = New-Object System.Windows.Forms.Label
 $previewTimeLabel.Text = "Preview time"
@@ -7799,6 +7894,34 @@ $previewCropOverlayLabel.ForeColor = [System.Drawing.SystemColors]::GrayText
 $previewControlsPanel.Controls.Add($previewCropOverlayLabel, 0, 3)
 $previewControlsPanel.SetColumnSpan($previewCropOverlayLabel, 5)
 
+$previewMarkersPanel = New-Object System.Windows.Forms.TableLayoutPanel
+$previewMarkersPanel.Dock = "Fill"
+$previewMarkersPanel.ColumnCount = 3
+$previewMarkersPanel.RowCount = 1
+$previewMarkersPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 140)))
+$previewMarkersPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 140)))
+$previewMarkersPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$previewMarkersPanel.Margin = New-Object System.Windows.Forms.Padding(0)
+
+$previewStartMarkerLabel = New-Object System.Windows.Forms.Label
+$previewStartMarkerLabel.Text = "Start: --"
+$previewStartMarkerLabel.Dock = "Fill"
+$previewStartMarkerLabel.TextAlign = "MiddleLeft"
+$previewMarkersPanel.Controls.Add($previewStartMarkerLabel, 0, 0)
+
+$previewEndMarkerLabel = New-Object System.Windows.Forms.Label
+$previewEndMarkerLabel.Text = "End: --"
+$previewEndMarkerLabel.Dock = "Fill"
+$previewEndMarkerLabel.TextAlign = "MiddleLeft"
+$previewMarkersPanel.Controls.Add($previewEndMarkerLabel, 1, 0)
+
+$previewTrimSummaryLabel = New-Object System.Windows.Forms.Label
+$previewTrimSummaryLabel.Text = "CUT: --"
+$previewTrimSummaryLabel.Dock = "Fill"
+$previewTrimSummaryLabel.TextAlign = "MiddleLeft"
+$previewTrimSummaryLabel.Font = New-Object System.Drawing.Font("Consolas", 8)
+$previewMarkersPanel.Controls.Add($previewTrimSummaryLabel, 2, 0)
+
 $previewPictureBox = New-Object System.Windows.Forms.PictureBox
 $previewPictureBox.Dock = "Fill"
 $previewPictureBox.BorderStyle = "FixedSingle"
@@ -7814,8 +7937,9 @@ $previewPictureBox.Add_Paint({
 
     Draw-PreviewCropOverlay -PictureBox $previewPictureBox -EventArgs $eventArgs -Item $item
 })
-$previewTabLayout.Controls.Add($previewPictureBox, 0, 0)
-$previewTabLayout.Controls.Add($previewControlsPanel, 0, 1)
+$previewWorkspaceLayout.Controls.Add($previewPictureBox, 0, 0)
+$previewWorkspaceLayout.Controls.Add($previewControlsPanel, 0, 1)
+$previewWorkspaceLayout.Controls.Add($previewMarkersPanel, 0, 2)
 
 $script:DragDropVisualDefaults = [pscustomobject]@{
     StatusPanelBackColor = $statusPanel.BackColor
@@ -8472,7 +8596,9 @@ $script:PollTimer.Add_Tick({
 })
 
 $form.Add_Shown({
+    $mainSplit.Panel2MinSize = $script:RightPanelTargetWidth
     Set-MainSplitLayout
+    Set-RightWorkspaceLayout
     Set-AdvancedSettingsVisibility -Visible:$false
     Update-VhsMp4ProcessPathFromEnvironment | Out-Null
     Sync-FfmpegState
@@ -8487,6 +8613,7 @@ $form.Add_Shown({
 
 $form.Add_Resize({
     Set-MainSplitLayout
+    Set-RightWorkspaceLayout
 })
 
 $dragEnterHandler = {

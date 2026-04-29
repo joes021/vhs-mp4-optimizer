@@ -380,7 +380,6 @@ Add-DemoGridRow -Item \$item3
 \$firstRow = \$grid.Rows[0]
 \$firstRow.Selected = \$true
 \$grid.CurrentCell = \$firstRow.Cells['SourceName']
-\$rightTabControl.SelectedTab = \$previewTabPage
 \$previewTimeTextBox.Text = '00:00:12'
 Set-PreviewImage -ImagePath '__MAIN_PREVIEW__'
 Update-PreviewTrimPanel
@@ -475,7 +474,7 @@ Add-DemoGridRow -Item \$itemC
 \$secondRow = \$grid.Rows[1]
 \$secondRow.Selected = \$true
 \$grid.CurrentCell = \$secondRow.Cells['SourceName']
-\$rightTabControl.SelectedTab = \$trimTabPage
+\$rightEditorTabControl.SelectedTab = \$trimTabPage
 Set-PreviewImage -ImagePath '__MAIN_PREVIEW__'
 Update-PreviewTrimPanel
 Update-MediaInfoPanel
