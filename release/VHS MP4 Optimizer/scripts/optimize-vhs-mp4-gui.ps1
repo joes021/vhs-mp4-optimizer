@@ -868,6 +868,71 @@ function Close-MainFormForUpdate {
     }
 }
 
+function Test-IsApplicationControlBlockedError {
+    param(
+        [Parameter(Mandatory = $true)]
+        $ErrorObject
+    )
+
+    $message = Get-VhsMp4ErrorMessage -ErrorObject $ErrorObject
+    if ([string]::IsNullOrWhiteSpace($message)) {
+        return $false
+    }
+
+    foreach ($token in @(
+            "Application Control policy has blocked this file",
+            "AppLocker",
+            "blocked this file",
+            "blocked by group policy",
+            "software restriction policy"
+        )) {
+        if ($message -like ("*" + $token + "*")) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Invoke-UpdatePolicyBlockedFallback {
+    param(
+        [string]$DownloadPath,
+        [string]$ReleaseUrl,
+        [string]$ArtifactLabel = "update"
+    )
+
+    $downloadRoot = if ([string]::IsNullOrWhiteSpace($DownloadPath)) { "" } else { Split-Path -Parent $DownloadPath }
+    $message = @"
+Application Control policy je blokirao automatsko pokretanje update-a.
+
+Preuzet artefakt: $ArtifactLabel
+Lokacija: $DownloadPath
+
+Otvoricu release stranicu i download folder da mozes rucno da probas update ili da uzmes portable ZIP ako setup.exe ostane blokiran.
+"@
+
+    Add-LogLine -Text ("Update launch blocked by policy: " + $ArtifactLabel + " | " + $DownloadPath)
+    Set-StatusText "Check for Updates: automatsko pokretanje blokirano politikom"
+
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseUrl)) {
+        try {
+            Start-Process -FilePath $ReleaseUrl
+        }
+        catch {
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($downloadRoot) -and (Test-Path -LiteralPath $downloadRoot)) {
+        try {
+            Start-Process -FilePath $downloadRoot
+        }
+        catch {
+        }
+    }
+
+    [System.Windows.Forms.MessageBox]::Show($message.Trim(), "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+}
+
 function Start-ConfirmedAppUpdate {
     param(
         [Parameter(Mandatory = $true)]
@@ -919,10 +984,21 @@ function Start-ConfirmedAppUpdate {
     Add-LogLine -Text ("Update downloaded: " + $downloadPath)
 
     if ($downloadKind -eq "setup.exe") {
-        Add-LogLine -Text ("Launching updater: " + $downloadPath)
-        Start-Process -FilePath $downloadPath
-        [System.Windows.Forms.MessageBox]::Show("Update je preuzet. Pokrecem setup.exe; posle toga zavrsi upgrade preko postojece instalacije.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
-        Close-MainFormForUpdate
+        try {
+            Add-LogLine -Text ("Launching updater: " + $downloadPath)
+            Start-Process -FilePath $downloadPath -ErrorAction Stop
+            [System.Windows.Forms.MessageBox]::Show("Update je preuzet. Pokrecem setup.exe; posle toga zavrsi upgrade preko postojece instalacije.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            Close-MainFormForUpdate
+        }
+        catch {
+            if (Test-IsApplicationControlBlockedError -ErrorObject $_) {
+                Invoke-UpdatePolicyBlockedFallback -DownloadPath $downloadPath -ReleaseUrl ([string]$LatestRelease.HtmlUrl) -ArtifactLabel "setup.exe"
+                return
+            }
+
+            throw
+        }
+
         return
     }
 
@@ -963,20 +1039,30 @@ Remove-Item -LiteralPath `$PSCommandPath -Force -ErrorAction SilentlyContinue
 
     Set-Content -LiteralPath $helperPath -Value $helperScript -Encoding UTF8
 
-    Add-LogLine -Text ("Launching portable update helper: " + $helperPath)
-    Start-Process -FilePath "powershell" -ArgumentList @(
-        "-NoProfile",
-        "-ExecutionPolicy", "RemoteSigned",
-        "-WindowStyle", "Hidden",
-        "-File", $helperPath,
-        "-ParentProcessId", $PID,
-        "-ZipPath", $downloadPath,
-        "-TargetRoot", $targetRoot,
-        "-RestartLauncher", $restartLauncher
-    )
+    try {
+        Add-LogLine -Text ("Launching portable update helper: " + $helperPath)
+        Start-Process -FilePath "powershell" -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "RemoteSigned",
+            "-WindowStyle", "Hidden",
+            "-File", $helperPath,
+            "-ParentProcessId", $PID,
+            "-ZipPath", $downloadPath,
+            "-TargetRoot", $targetRoot,
+            "-RestartLauncher", $restartLauncher
+        ) -ErrorAction Stop
 
-    [System.Windows.Forms.MessageBox]::Show("Portable update je preuzet. Program ce se zatvoriti, zameniti fajlove i ponovo pokrenuti novu verziju.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
-    Close-MainFormForUpdate
+        [System.Windows.Forms.MessageBox]::Show("Portable update je preuzet. Program ce se zatvoriti, zameniti fajlove i ponovo pokrenuti novu verziju.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        Close-MainFormForUpdate
+    }
+    catch {
+        if (Test-IsApplicationControlBlockedError -ErrorObject $_) {
+            Invoke-UpdatePolicyBlockedFallback -DownloadPath $downloadPath -ReleaseUrl ([string]$LatestRelease.HtmlUrl) -ArtifactLabel "portable update helper"
+            return
+        }
+
+        throw
+    }
 }
 
 function Invoke-UpdateCheck {
