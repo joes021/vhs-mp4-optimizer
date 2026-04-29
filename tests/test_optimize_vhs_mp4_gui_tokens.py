@@ -3452,3 +3452,10 @@ def test_vhs_gui_contains_help_about_and_update_tokens() -> None:
         "portable zip",
     ]:
         assert token in script, f"missing help/update token: {token}"
+
+
+def test_vhs_gui_update_prompt_braces_update_artifact_variable() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    assert "preko ${updateArtifact}?" in script or "preko $($updateArtifact)?" in script
+    assert "preko $updateArtifact?" not in script

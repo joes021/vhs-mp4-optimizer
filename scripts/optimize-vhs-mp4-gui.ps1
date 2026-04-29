@@ -1003,7 +1003,7 @@ Release tag: $([string]$metadata.ReleaseTag)
 Latest release: $([string]$latestRelease.TagName)
 Install type: $installType
 
-Da li zelis da preuzmem i pokrenem update preko $updateArtifact?
+Da li zelis da preuzmem i pokrenem update preko ${updateArtifact}?
 "@
 
         $result = [System.Windows.Forms.MessageBox]::Show($message.Trim(), "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
