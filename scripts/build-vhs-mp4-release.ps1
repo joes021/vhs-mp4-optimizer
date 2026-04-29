@@ -1,14 +1,53 @@
 [CmdletBinding()]
 param(
-    [string]$ReleaseRoot
+    [string]$ReleaseRoot,
+    [string]$Version,
+    [string]$GitRef,
+    [string]$ReleaseTag,
+    [string]$Repository = "joes021/vhs-mp4-optimizer"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Get-GitValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [string]$Fallback = "unknown"
+    )
+
+    try {
+        $result = & git @Arguments 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            return $Fallback
+        }
+
+        $text = [string]($result | Select-Object -First 1)
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            return $Fallback
+        }
+
+        return $text.Trim()
+    }
+    catch {
+        return $Fallback
+    }
+}
+
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($ReleaseRoot)) {
     $ReleaseRoot = Join-Path $projectRoot "release\VHS MP4 Optimizer"
+}
+
+if ([string]::IsNullOrWhiteSpace($GitRef)) {
+    $GitRef = Get-GitValue -Arguments @("rev-parse", "--short", "HEAD")
+}
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = (Get-Date -Format "yyyy.MM.dd") + "-" + $GitRef
+}
+if ([string]::IsNullOrWhiteSpace($ReleaseTag)) {
+    $ReleaseTag = "vhs-mp4-optimizer-" + $Version
 }
 
 $releaseRootFull = [System.IO.Path]::GetFullPath($ReleaseRoot)
@@ -44,6 +83,23 @@ foreach ($scriptFile in $scriptFiles) {
 }
 
 Copy-Item -LiteralPath (Join-Path $projectRoot "assets\vhs-mp4-optimizer.ico") -Destination (Join-Path $assetsDir "vhs-mp4-optimizer.ico") -Force
+
+$releaseApiUrl = "https://api.github.com/repos/$Repository/releases/latest"
+$releasesPageUrl = "https://github.com/$Repository/releases"
+$appManifest = [pscustomobject]@{
+    AppName = "VHS MP4 Optimizer"
+    Version = $Version
+    GitRef = $GitRef
+    ReleaseTag = $ReleaseTag
+    Repository = $Repository
+    LatestReleaseApi = $releaseApiUrl
+    ReleasesPage = $releasesPageUrl
+    BuiltAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+}
+$appManifestPath = Join-Path $releaseRootFull "app-manifest.json"
+$appManifestJson = $appManifest | ConvertTo-Json -Depth 5
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($appManifestPath, $appManifestJson, $utf8NoBom)
 
 $launcher = @"
 @echo off
@@ -128,6 +184,8 @@ Brzi start:
 18. "Pause" zavrsava trenutni fajl i onda staje pre sledeceg.
 19. Kada batch udje u "Paused", mozes da kliknes "Resume", da menjas Workflow preset i ostala opsta batch podesavanja, kao i da koristis "Move Up" / "Move Down" za queued redosled.
 20. Posle obrade prebaci gotove MP4 fajlove, IZVESTAJ.txt i po potrebi USB PREDAJA CHECKLIST.txt.
+21. U meniju "Help" imas "About VHS MP4 Optimizer", "Check for Updates" i "Open User Guide".
+22. Ako je dostupan noviji GitHub release, program moze da te pita da li hoces update pre preuzimanja.
 
 Desktop precica:
 - Pokreni "Install Desktop Shortcut.bat" ako zelis precicu "VHS MP4 Optimizer" na desktopu.
@@ -151,6 +209,8 @@ Napomene:
 - Aspect / Pixel shape koristi lokalni Aspect mode po fajlu; Auto, Keep Original, Force 4:3 i Force 16:9 pomazu kad PAL/DV ili NTSC/DV snimak izgleda stisnuto ili razvuceno.
 - Detected, DAR, SAR i Planned output aspect daju brz tehnicki pregled pre Save to Queue.
 - Video filters su podrazumevano iskljuceni; prvo probaj Test Sample za vazne snimke.
+- Help -> About pokazuje Current version, Release tag, Install type, Install path i GitHub repo.
+- Help -> Check for Updates proverava poslednji GitHub release i pita pre download/install toka.
 "@
 Set-Content -LiteralPath (Join-Path $releaseRootFull "README - kako se koristi.txt") -Value $readme -Encoding UTF8
 

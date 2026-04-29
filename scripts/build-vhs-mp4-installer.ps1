@@ -84,7 +84,12 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 
 if (-not $SkipReleaseRefresh) {
     $releaseBuilder = Join-Path $PSScriptRoot "build-vhs-mp4-release.ps1"
-    & $releaseBuilder -ReleaseRoot $releaseRootFull
+    & $releaseBuilder `
+        -ReleaseRoot $releaseRootFull `
+        -Version $Version `
+        -GitRef $GitRef `
+        -ReleaseTag ("vhs-mp4-optimizer-" + $Version) `
+        -Repository "joes021/vhs-mp4-optimizer"
 }
 
 if (-not (Test-Path -LiteralPath $releaseRootFull)) {
@@ -149,6 +154,9 @@ if (-not $SkipInstallerBuild) {
 $manifest = [pscustomobject]@{
     Version = $Version
     GitRef = $GitRef
+    ReleaseTag = ("vhs-mp4-optimizer-" + $Version)
+    Repository = "joes021/vhs-mp4-optimizer"
+    AppManifestPath = (Join-Path $releaseRootFull "app-manifest.json")
     ProjectRoot = $projectRoot
     ReleaseRoot = $releaseRootFull
     OutputRoot = $outputRootFull

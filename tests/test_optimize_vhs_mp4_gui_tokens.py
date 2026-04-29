@@ -3142,3 +3142,37 @@ try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch 
     assert payload["ActiveGridBackColor"] != payload["DefaultGridBackColor"]
     assert payload["ActiveHelpForeColor"] != payload["DefaultHelpForeColor"]
     assert payload["FinalStatus"] == payload["BeforeStatus"]
+
+
+def test_vhs_gui_contains_help_about_and_update_tokens() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "MenuStrip",
+        "Help",
+        "About VHS MP4 Optimizer",
+        "Check for Updates",
+        "Open User Guide",
+        "Current version",
+        "Install type",
+        "Install path",
+        "GitHub repo",
+        "Release tag",
+        "function Get-AppMetadataPath",
+        "function Get-UpdateStatePath",
+        "function Get-VhsMp4ApplicationMetadata",
+        "function Get-VhsMp4InstallType",
+        "function Get-VhsMp4LatestReleaseInfo",
+        "function Compare-VhsMp4ReleaseTag",
+        "function Test-ShouldAutoCheckForUpdates",
+        "function Save-UpdateCheckState",
+        "function Show-AboutDialog",
+        "function Invoke-UpdateCheck",
+        "function Start-ConfirmedAppUpdate",
+        "function Open-UserGuide",
+        "api.github.com/repos/joes021/vhs-mp4-optimizer/releases/latest",
+        "browser_download_url",
+        "setup.exe",
+        "portable zip",
+    ]:
+        assert token in script, f"missing help/update token: {token}"

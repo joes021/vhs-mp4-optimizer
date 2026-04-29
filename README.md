@@ -71,6 +71,7 @@ Umesto da se svaki fajl obradjuje rucno, alat pravi batch workflow sa pregledom,
 | Workflow presets | Gotovi preset-i plus cuvanje sopstvenih batch podesavanja |
 | Split output | Deljenje dugackih fajlova na validne MP4 delove za FAT32/USB scenario |
 | Pause / Resume | Pauza posle trenutnog fajla, pa nastavak od sledeceg queued reda |
+| Help / About / Updates | Vidljiva lokalna verzija, user guide i GitHub update provera sa potvrdom |
 | Installer i portable build | `Setup.exe`, portable ZIP i release builder za deljenje drugima |
 
 ## Za koga je alat
@@ -109,6 +110,7 @@ Program ume da radi i sa modernijim i sa starijim fajlovima, a kada playback nij
 5. Ukljucis `Split output` ako isporuka ide na FAT32 ili zelis manje delove.
 6. Pokrenes `Start Conversion`.
 7. Dobijes gotove `mp4` fajlove i `IZVESTAJ.txt` u output folderu.
+8. Po potrebi otvaras `Help -> About VHS MP4 Optimizer` ili `Help -> Check for Updates`.
 
 ## Izdvojene funkcije koje olaksavaju posao
 
@@ -162,6 +164,7 @@ Plus:
 2. Preuzmi `Setup.exe`.
 3. Pokreni instalaciju.
 4. Po potrebi iz samog programa podesi `FFmpeg path` ili instaliraj FFmpeg.
+5. Kada izadje nova verzija, dovoljno je da pokrenes novi `Setup.exe` preko postojece instalacije ili da iz programa kliknes `Help -> Check for Updates`.
 
 ### Opcija 2: Portable
 
@@ -169,6 +172,14 @@ Plus:
 2. Raspakuj ceo folder.
 3. Pokreni `VHS MP4 Optimizer.bat`.
 4. Ako zelis, pokreni `Install Desktop Shortcut.bat`.
+5. Nova verzija moze da se preuzme i iz samog programa preko `Help -> Check for Updates`; program prvo pita za potvrdu.
+
+## Help i update
+
+- `Help -> About VHS MP4 Optimizer` pokazuje `Current version`, `Release tag`, `Install type`, `Install path` i GitHub repo.
+- `Help -> Open User Guide` otvara lokalno uputstvo iz release paketa.
+- `Help -> Check for Updates` proverava poslednji GitHub release i pita pre preuzimanja update-a.
+- Pri pokretanju program povremeno sam proveri da li postoji novija verzija, ali ne preuzima nista bez pitanja.
 
 ## FFmpeg napomena
 

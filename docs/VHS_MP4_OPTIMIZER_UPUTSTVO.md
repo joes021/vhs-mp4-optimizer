@@ -82,6 +82,7 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
 20. Prati `Total progress` za ceo posao i `File progress` za trenutni fajl, procenat i ETA.
 21. Kada zavrsi, program pravi `IZVESTAJ.txt`, pusti kratak Windows signal i prikaze obavestenje.
 22. Klikni `Open Output` i prebaci gotove `.mp4` fajlove na USB ili cloud.
+23. U meniju `Help` imas `About VHS MP4 Optimizer`, `Check for Updates` i `Open User Guide`.
 
 ## Split output
 
@@ -188,6 +189,13 @@ Kad izaberes preset, te vrednosti se odmah upisu u formu. Ako zatim rucno promen
 - `Move Up` i `Move Down` rade nad `queued` stavkama, pa mozes da prepakujes ostatak batch-a bez diranja vec zavrsenih fajlova.
 - Ako tokom pauze promenis `Quality mode`, `CRF`, `Workflow preset`, `Split output` ili druge opste batch filtere, queued deo plana se odmah osvezava.
 - Vec zavrseni fajlovi ostaju zavrseni; pause/resume ne vraca ih nazad u queue.
+
+## Help / About / Update
+
+- `Help -> About VHS MP4 Optimizer` pokazuje `Current version`, `Release tag`, `Git ref`, `Install type`, `Install path` i GitHub repo.
+- `Help -> Open User Guide` otvara lokalno uputstvo iz release paketa.
+- `Help -> Check for Updates` proverava poslednji GitHub release i pita pre bilo kakvog preuzimanja.
+- Pri pokretanju program povremeno sam proveri da li postoji noviji release, ali nista ne preuzima bez pitanja.
 
 ## Procena za USB
 

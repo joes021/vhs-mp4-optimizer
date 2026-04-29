@@ -57,6 +57,10 @@ $script:WorkflowPresetStorageWarning = ""
 $script:AspectModeControlSync = $false
 $script:AspectModeBatchActionLabel = "Copy Aspect to All"
 $script:AspectModeOptionLabels = @("Keep Original", "Force 4:3", "Force 16:9")
+$script:GitHubLatestReleaseApi = "https://api.github.com/repos/joes021/vhs-mp4-optimizer/releases/latest"
+$script:ApplicationMetadata = $null
+$script:UpdateCheckState = $null
+$script:UpdateCheckInProgress = $false
 if (Test-Path -LiteralPath $script:AppIconPath) {
     $script:NotifyIcon.Icon = New-Object System.Drawing.Icon $script:AppIconPath
 }
@@ -555,6 +559,499 @@ function Export-WorkflowAppState {
 
     $json = $payload | ConvertTo-Json -Depth 8
     Set-Content -LiteralPath (Get-WorkflowAppStatePath) -Value $json -Encoding UTF8
+}
+
+function Get-AppMetadataPath {
+    return (Join-Path (Split-Path $PSScriptRoot -Parent) "app-manifest.json")
+}
+
+function Get-UpdateStatePath {
+    return (Join-Path (Get-WorkflowPresetStorageRoot) "update-state.json")
+}
+
+function Get-VhsMp4InstallRoot {
+    return [System.IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
+}
+
+function Get-VhsMp4ApplicationMetadata {
+    param(
+        [switch]$Refresh
+    )
+
+    if (-not $Refresh -and $null -ne $script:ApplicationMetadata) {
+        return $script:ApplicationMetadata
+    }
+
+    $defaultRepository = "joes021/vhs-mp4-optimizer"
+    $metadata = [ordered]@{
+        AppName = "VHS MP4 Optimizer"
+        Version = "dev"
+        GitRef = "local"
+        ReleaseTag = ""
+        Repository = $defaultRepository
+        LatestReleaseApi = $script:GitHubLatestReleaseApi
+        ReleasesPage = "https://github.com/$defaultRepository/releases"
+        BuiltAtUtc = ""
+    }
+
+    $appMetadataPath = Get-AppMetadataPath
+    if (Test-Path -LiteralPath $appMetadataPath) {
+        try {
+            $parsed = Get-Content -LiteralPath $appMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+            foreach ($propertyName in @("AppName", "Version", "GitRef", "ReleaseTag", "Repository", "LatestReleaseApi", "ReleasesPage", "BuiltAtUtc")) {
+                $value = Get-WorkflowPresetObjectValue -Object $parsed -Name $propertyName
+                if (-not [string]::IsNullOrWhiteSpace([string]$value)) {
+                    $metadata[$propertyName] = [string]$value
+                }
+            }
+        }
+        catch {
+            Add-LogLine -Text ("App metadata warning: " + (Get-VhsMp4ErrorMessage -ErrorObject $_))
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$metadata.LatestReleaseApi)) {
+        $metadata.LatestReleaseApi = "https://api.github.com/repos/$($metadata.Repository)/releases/latest"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$metadata.ReleasesPage)) {
+        $metadata.ReleasesPage = "https://github.com/$($metadata.Repository)/releases"
+    }
+
+    $script:ApplicationMetadata = [pscustomobject]$metadata
+    return $script:ApplicationMetadata
+}
+
+function Get-VhsMp4InstallType {
+    $installRoot = Get-VhsMp4InstallRoot
+    $installerRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Programs\VHS MP4 Optimizer"))
+    if (Test-GuiPathEquals -Left $installRoot -Right $installerRoot) {
+        return "Installer"
+    }
+
+    if (Test-Path -LiteralPath (Get-AppMetadataPath)) {
+        return "Portable"
+    }
+
+    return "Repo/dev"
+}
+
+function Get-VhsMp4UpdateCheckState {
+    if ($null -ne $script:UpdateCheckState) {
+        return $script:UpdateCheckState
+    }
+
+    $statePath = Get-UpdateStatePath
+    if (-not (Test-Path -LiteralPath $statePath)) {
+        $script:UpdateCheckState = [pscustomobject]@{
+            LastCheckedUtc = ""
+            LastPromptedTag = ""
+            LastAcceptedTag = ""
+        }
+        return $script:UpdateCheckState
+    }
+
+    try {
+        $parsed = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $script:UpdateCheckState = [pscustomobject]@{
+            LastCheckedUtc = [string](Get-WorkflowPresetObjectValue -Object $parsed -Name "LastCheckedUtc")
+            LastPromptedTag = [string](Get-WorkflowPresetObjectValue -Object $parsed -Name "LastPromptedTag")
+            LastAcceptedTag = [string](Get-WorkflowPresetObjectValue -Object $parsed -Name "LastAcceptedTag")
+        }
+    }
+    catch {
+        $script:UpdateCheckState = [pscustomobject]@{
+            LastCheckedUtc = ""
+            LastPromptedTag = ""
+            LastAcceptedTag = ""
+        }
+    }
+
+    return $script:UpdateCheckState
+}
+
+function Save-UpdateCheckState {
+    param(
+        [string]$LastCheckedUtc = ((Get-Date).ToUniversalTime().ToString("o")),
+        [string]$LastPromptedTag = "",
+        [string]$LastAcceptedTag = ""
+    )
+
+    Ensure-WorkflowPresetStorageDirectory | Out-Null
+    $payload = [pscustomobject]@{
+        SchemaVersion = 1
+        LastCheckedUtc = $LastCheckedUtc
+        LastPromptedTag = $LastPromptedTag
+        LastAcceptedTag = $LastAcceptedTag
+    }
+
+    $json = $payload | ConvertTo-Json -Depth 4
+    Set-Content -LiteralPath (Get-UpdateStatePath) -Value $json -Encoding UTF8
+    $script:UpdateCheckState = $payload
+}
+
+function Compare-VhsMp4ReleaseTag {
+    param(
+        [string]$CurrentTag,
+        [string]$LatestTag
+    )
+
+    if ([string]::IsNullOrWhiteSpace($LatestTag)) {
+        return $false
+    }
+    if ([string]::IsNullOrWhiteSpace($CurrentTag)) {
+        return $true
+    }
+
+    return (-not [string]::Equals($CurrentTag.Trim(), $LatestTag.Trim(), [System.StringComparison]::OrdinalIgnoreCase))
+}
+
+function Test-ShouldAutoCheckForUpdates {
+    if ((Get-VhsMp4InstallType) -eq "Repo/dev") {
+        return $false
+    }
+
+    $state = Get-VhsMp4UpdateCheckState
+    if ([string]::IsNullOrWhiteSpace([string]$state.LastCheckedUtc)) {
+        return $true
+    }
+
+    try {
+        $lastChecked = [datetime]::Parse([string]$state.LastCheckedUtc, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::RoundtripKind)
+        return (((Get-Date).ToUniversalTime() - $lastChecked.ToUniversalTime()).TotalHours -ge 12.0)
+    }
+    catch {
+        return $true
+    }
+}
+
+function Get-VhsMp4LatestReleaseInfo {
+    $metadata = Get-VhsMp4ApplicationMetadata
+    $uri = [string]$metadata.LatestReleaseApi
+    if ([string]::IsNullOrWhiteSpace($uri)) {
+        $uri = "https://api.github.com/repos/$([string]$metadata.Repository)/releases/latest"
+    }
+
+    $headers = @{
+        "Accept" = "application/vnd.github+json"
+        "User-Agent" = ("VhsMp4Optimizer/" + [string]$metadata.Version)
+    }
+
+    try {
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+    }
+    catch {
+    }
+
+    $response = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -TimeoutSec 15 -ErrorAction Stop
+    $assets = @()
+    if ($null -ne $response -and $response.PSObject.Properties["assets"]) {
+        $assets = @($response.assets)
+    }
+
+    $setupAsset = $assets | Where-Object { [string](Get-WorkflowPresetObjectValue -Object $_ -Name "name") -match '(?i)setup.*\.exe$' } | Select-Object -First 1
+    $portableZipAsset = $assets | Where-Object { [string](Get-WorkflowPresetObjectValue -Object $_ -Name "name") -match '(?i)portable.*\.zip$' } | Select-Object -First 1
+
+    return [pscustomobject]@{
+        TagName = [string](Get-WorkflowPresetObjectValue -Object $response -Name "tag_name")
+        Name = [string](Get-WorkflowPresetObjectValue -Object $response -Name "name")
+        HtmlUrl = [string](Get-WorkflowPresetObjectValue -Object $response -Name "html_url")
+        PublishedAt = [string](Get-WorkflowPresetObjectValue -Object $response -Name "published_at")
+        SetupAssetName = if ($null -ne $setupAsset) { [string](Get-WorkflowPresetObjectValue -Object $setupAsset -Name "name") } else { "" }
+        SetupAssetUrl = if ($null -ne $setupAsset) { [string](Get-WorkflowPresetObjectValue -Object $setupAsset -Name "browser_download_url") } else { "" }
+        PortableZipName = if ($null -ne $portableZipAsset) { [string](Get-WorkflowPresetObjectValue -Object $portableZipAsset -Name "name") } else { "" }
+        PortableZipUrl = if ($null -ne $portableZipAsset) { [string](Get-WorkflowPresetObjectValue -Object $portableZipAsset -Name "browser_download_url") } else { "" }
+    }
+}
+
+function Get-UserGuidePath {
+    $installRoot = Get-VhsMp4InstallRoot
+    foreach ($candidate in @(
+            (Join-Path $installRoot "README - kako se koristi.txt"),
+            (Join-Path $installRoot "docs\VHS_MP4_OPTIMIZER_UPUTSTVO.md")
+        )) {
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Open-UserGuide {
+    $guidePath = Get-UserGuidePath
+    if ([string]::IsNullOrWhiteSpace([string]$guidePath)) {
+        [System.Windows.Forms.MessageBox]::Show("User guide nije pronadjen uz aplikaciju.", "Open User Guide", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return
+    }
+
+    try {
+        Start-Process -FilePath $guidePath
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Open User Guide", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+    }
+}
+
+function Close-MainFormForUpdate {
+    $formVariable = Get-Variable -Name form -ErrorAction SilentlyContinue
+    if ($null -eq $formVariable -or $null -eq $formVariable.Value) {
+        return
+    }
+
+    try {
+        $formVariable.Value.Close()
+    }
+    catch {
+    }
+}
+
+function Start-ConfirmedAppUpdate {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$LatestRelease,
+        [Parameter(Mandatory = $true)]
+        [object]$CurrentMetadata
+    )
+
+    $installType = Get-VhsMp4InstallType
+    $downloadUrl = ""
+    $downloadName = ""
+    $downloadKind = ""
+
+    if ($installType -eq "Installer" -and -not [string]::IsNullOrWhiteSpace([string]$LatestRelease.SetupAssetUrl)) {
+        $downloadUrl = [string]$LatestRelease.SetupAssetUrl
+        $downloadName = if ([string]::IsNullOrWhiteSpace([string]$LatestRelease.SetupAssetName)) { "VHS-MP4-Optimizer-Setup-latest.exe" } else { [string]$LatestRelease.SetupAssetName }
+        $downloadKind = "setup.exe"
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace([string]$LatestRelease.PortableZipUrl)) {
+        $downloadUrl = [string]$LatestRelease.PortableZipUrl
+        $downloadName = if ([string]::IsNullOrWhiteSpace([string]$LatestRelease.PortableZipName)) { "VHS-MP4-Optimizer-portable-latest.zip" } else { [string]$LatestRelease.PortableZipName }
+        $downloadKind = "portable zip"
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace([string]$LatestRelease.SetupAssetUrl)) {
+        $downloadUrl = [string]$LatestRelease.SetupAssetUrl
+        $downloadName = if ([string]::IsNullOrWhiteSpace([string]$LatestRelease.SetupAssetName)) { "VHS-MP4-Optimizer-Setup-latest.exe" } else { [string]$LatestRelease.SetupAssetName }
+        $downloadKind = "setup.exe"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($downloadUrl)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$LatestRelease.HtmlUrl)) {
+            Start-Process -FilePath ([string]$LatestRelease.HtmlUrl)
+            return
+        }
+
+        throw "GitHub release nema setup.exe ni portable zip asset za update."
+    }
+
+    $downloadRoot = Join-Path $env:TEMP "VhsMp4OptimizerUpdates"
+    $null = New-Item -ItemType Directory -Path $downloadRoot -Force
+    $downloadPath = Join-Path $downloadRoot $downloadName
+    $headers = @{
+        "Accept" = "application/octet-stream"
+        "User-Agent" = ("VhsMp4Optimizer/" + [string]$CurrentMetadata.Version)
+    }
+
+    Set-StatusText ("Check for Updates: preuzimam " + $downloadKind + " ...")
+    Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile $downloadPath -TimeoutSec 300 -ErrorAction Stop
+    Add-LogLine -Text ("Update downloaded: " + $downloadPath)
+
+    if ($downloadKind -eq "setup.exe") {
+        Add-LogLine -Text ("Launching updater: " + $downloadPath)
+        Start-Process -FilePath $downloadPath
+        [System.Windows.Forms.MessageBox]::Show("Update je preuzet. Pokrecem setup.exe; posle toga zavrsi upgrade preko postojece instalacije.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        Close-MainFormForUpdate
+        return
+    }
+
+    $targetRoot = Get-VhsMp4InstallRoot
+    $restartLauncher = Join-Path $targetRoot "VHS MP4 Optimizer.bat"
+    $helperPath = Join-Path $downloadRoot ("apply-vhs-mp4-update-" + [System.Guid]::NewGuid().ToString("N") + ".ps1")
+    $helperScript = @"
+param(
+    [int]`$ParentProcessId,
+    [string]`$ZipPath,
+    [string]`$TargetRoot,
+    [string]`$RestartLauncher
+)
+
+`$ErrorActionPreference = 'Stop'
+
+for (`$attempt = 0; `$attempt -lt 240; `$attempt++) {
+    `$process = Get-Process -Id `$ParentProcessId -ErrorAction SilentlyContinue
+    if (`$null -eq `$process) {
+        break
+    }
+    Start-Sleep -Milliseconds 500
+}
+
+Start-Sleep -Milliseconds 700
+
+`$extractRoot = Join-Path ([System.IO.Path]::GetDirectoryName(`$ZipPath)) ('vhs-mp4-opt-update-' + [System.Guid]::NewGuid().ToString('N'))
+Expand-Archive -LiteralPath `$ZipPath -DestinationPath `$extractRoot -Force
+`$sourceRoot = Join-Path `$extractRoot 'VHS MP4 Optimizer'
+Copy-Item -Path (Join-Path `$sourceRoot '*') -Destination `$TargetRoot -Recurse -Force
+if (Test-Path -LiteralPath `$RestartLauncher) {
+    Start-Process -FilePath `$RestartLauncher
+}
+Remove-Item -LiteralPath `$extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath `$ZipPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath `$PSCommandPath -Force -ErrorAction SilentlyContinue
+"@
+
+    Set-Content -LiteralPath $helperPath -Value $helperScript -Encoding UTF8
+
+    Add-LogLine -Text ("Launching portable update helper: " + $helperPath)
+    Start-Process -FilePath "powershell" -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "RemoteSigned",
+        "-WindowStyle", "Hidden",
+        "-File", $helperPath,
+        "-ParentProcessId", $PID,
+        "-ZipPath", $downloadPath,
+        "-TargetRoot", $targetRoot,
+        "-RestartLauncher", $restartLauncher
+    )
+
+    [System.Windows.Forms.MessageBox]::Show("Portable update je preuzet. Program ce se zatvoriti, zameniti fajlove i ponovo pokrenuti novu verziju.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+    Close-MainFormForUpdate
+}
+
+function Invoke-UpdateCheck {
+    param(
+        [switch]$Silent,
+        [switch]$Startup
+    )
+
+    if ($script:UpdateCheckInProgress) {
+        return $false
+    }
+
+    $script:UpdateCheckInProgress = $true
+    try {
+        $metadata = Get-VhsMp4ApplicationMetadata
+        $latestRelease = Get-VhsMp4LatestReleaseInfo
+        Save-UpdateCheckState -LastCheckedUtc ((Get-Date).ToUniversalTime().ToString("o")) -LastPromptedTag ([string]$latestRelease.TagName) -LastAcceptedTag ([string](Get-VhsMp4UpdateCheckState).LastAcceptedTag)
+
+        if (-not (Compare-VhsMp4ReleaseTag -CurrentTag ([string]$metadata.ReleaseTag) -LatestTag ([string]$latestRelease.TagName))) {
+            if (-not $Silent) {
+                [System.Windows.Forms.MessageBox]::Show("Vec koristis najnoviju verziju.", "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            }
+            return $false
+        }
+
+        $installType = Get-VhsMp4InstallType
+        $updateArtifact = if ($installType -eq "Installer" -and -not [string]::IsNullOrWhiteSpace([string]$latestRelease.SetupAssetUrl)) {
+            "setup.exe"
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace([string]$latestRelease.PortableZipUrl)) {
+            "portable zip"
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace([string]$latestRelease.SetupAssetUrl)) {
+            "setup.exe"
+        }
+        else {
+            "release page"
+        }
+
+        $message = @"
+Pronadjena je novija verzija.
+
+Current version: $([string]$metadata.Version)
+Release tag: $([string]$metadata.ReleaseTag)
+Latest release: $([string]$latestRelease.TagName)
+Install type: $installType
+
+Da li zelis da preuzmem i pokrenem update preko $updateArtifact?
+"@
+
+        $result = [System.Windows.Forms.MessageBox]::Show($message.Trim(), "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+        if ($result -ne [System.Windows.Forms.DialogResult]::Yes) {
+            return $false
+        }
+
+        Save-UpdateCheckState -LastCheckedUtc ((Get-Date).ToUniversalTime().ToString("o")) -LastPromptedTag ([string]$latestRelease.TagName) -LastAcceptedTag ([string]$latestRelease.TagName)
+        Start-ConfirmedAppUpdate -LatestRelease $latestRelease -CurrentMetadata $metadata
+        return $true
+    }
+    catch {
+        $message = "Check for Updates nije uspeo: " + (Get-VhsMp4ErrorMessage -ErrorObject $_)
+        Add-LogLine -Text $message
+        if (-not $Silent) {
+            [System.Windows.Forms.MessageBox]::Show($message, "Check for Updates", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        }
+        return $false
+    }
+    finally {
+        $script:UpdateCheckInProgress = $false
+    }
+}
+
+function Show-AboutDialog {
+    $metadata = Get-VhsMp4ApplicationMetadata
+    $installType = Get-VhsMp4InstallType
+    $installPath = Get-VhsMp4InstallRoot
+
+    $dialog = New-Object System.Windows.Forms.Form
+    $dialog.Text = "About VHS MP4 Optimizer"
+    $dialog.StartPosition = "CenterParent"
+    $dialog.ClientSize = New-Object System.Drawing.Size(640, 320)
+    $dialog.MinimumSize = New-Object System.Drawing.Size(640, 320)
+    if (Test-Path -LiteralPath $script:AppIconPath) {
+        $dialog.Icon = New-Object System.Drawing.Icon $script:AppIconPath
+    }
+
+    $layout = New-Object System.Windows.Forms.TableLayoutPanel
+    $layout.Dock = "Fill"
+    $layout.Padding = New-Object System.Windows.Forms.Padding(12)
+    $layout.ColumnCount = 1
+    $layout.RowCount = 2
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 40)))
+    $dialog.Controls.Add($layout)
+
+    $detailsBox = New-Object System.Windows.Forms.TextBox
+    $detailsBox.Multiline = $true
+    $detailsBox.ReadOnly = $true
+    $detailsBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+    $detailsBox.Dock = "Fill"
+    $detailsBox.Text = @"
+VHS MP4 Optimizer
+
+Current version: $([string]$metadata.Version)
+Release tag: $([string]$metadata.ReleaseTag)
+Git ref: $([string]$metadata.GitRef)
+Install type: $installType
+Install path: $installPath
+GitHub repo: $([string]$metadata.Repository)
+Releases page: $([string]$metadata.ReleasesPage)
+"@.Trim()
+    $layout.Controls.Add($detailsBox, 0, 0)
+
+    $buttonsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+    $buttonsFlow.Dock = "Fill"
+    $buttonsFlow.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+    $buttonsFlow.WrapContents = $false
+    $layout.Controls.Add($buttonsFlow, 0, 1)
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = "OK"
+    $okButton.AutoSize = $true
+    $okButton.Add_Click({ $dialog.Close() })
+    $buttonsFlow.Controls.Add($okButton)
+
+    $checkButton = New-Object System.Windows.Forms.Button
+    $checkButton.Text = "Check for Updates"
+    $checkButton.AutoSize = $true
+    $checkButton.Add_Click({ [void](Invoke-UpdateCheck) })
+    $buttonsFlow.Controls.Add($checkButton)
+
+    $guideButton = New-Object System.Windows.Forms.Button
+    $guideButton.Text = "Open User Guide"
+    $guideButton.AutoSize = $true
+    $guideButton.Add_Click({ Open-UserGuide })
+    $buttonsFlow.Controls.Add($guideButton)
+
+    [void]$dialog.ShowDialog($form)
 }
 
 function Update-WorkflowPresetActionButtons {
@@ -6068,6 +6565,37 @@ $form.KeyPreview = $true
 $toolTip = New-Object System.Windows.Forms.ToolTip
 $previewAutoTimer = New-Object System.Windows.Forms.Timer
 $previewAutoTimer.Interval = $script:PreviewAutoDelayMs
+$startupUpdateTimer = New-Object System.Windows.Forms.Timer
+$startupUpdateTimer.Interval = 900
+
+$shellLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$shellLayout.Dock = "Fill"
+$shellLayout.ColumnCount = 1
+$shellLayout.RowCount = 2
+$shellLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$shellLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$form.Controls.Add($shellLayout)
+
+$menuStrip = New-Object System.Windows.Forms.MenuStrip
+$menuStrip.Dock = "Fill"
+$form.MainMenuStrip = $menuStrip
+$shellLayout.Controls.Add($menuStrip, 0, 0)
+
+$helpMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$helpMenuItem.Text = "Help"
+$menuStrip.Items.Add($helpMenuItem) | Out-Null
+
+$aboutMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$aboutMenuItem.Text = "About VHS MP4 Optimizer"
+$helpMenuItem.DropDownItems.Add($aboutMenuItem) | Out-Null
+
+$checkForUpdatesMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$checkForUpdatesMenuItem.Text = "Check for Updates"
+$helpMenuItem.DropDownItems.Add($checkForUpdatesMenuItem) | Out-Null
+
+$openUserGuideMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$openUserGuideMenuItem.Text = "Open User Guide"
+$helpMenuItem.DropDownItems.Add($openUserGuideMenuItem) | Out-Null
 
 $rootLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $rootLayout.Dock = "Fill"
@@ -6077,7 +6605,7 @@ $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Wind
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 60)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 90)))
-$form.Controls.Add($rootLayout)
+$shellLayout.Controls.Add($rootLayout, 0, 1)
 
 $configLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $configLayout.Dock = "Fill"
@@ -6943,6 +7471,18 @@ $sampleButton.Add_Click({
     Invoke-TestSample
 })
 
+$aboutMenuItem.Add_Click({
+    Show-AboutDialog
+})
+
+$checkForUpdatesMenuItem.Add_Click({
+    [void](Invoke-UpdateCheck)
+})
+
+$openUserGuideMenuItem.Add_Click({
+    Open-UserGuide
+})
+
 $openPlayerButton.Add_Click({
     Show-SelectedPlayerTrimWindow
 })
@@ -6987,6 +7527,13 @@ $previewTimelineTrackBar.Add_MouseUp({
 
 $previewAutoTimer.Add_Tick({
     Invoke-PendingAutoPreview
+})
+
+$startupUpdateTimer.Add_Tick({
+    $startupUpdateTimer.Stop()
+    if (Test-ShouldAutoCheckForUpdates) {
+        [void](Invoke-UpdateCheck -Silent -Startup)
+    }
 })
 
 $previousFrameButton.Add_Click({
@@ -7380,6 +7927,7 @@ $form.Add_Shown({
         Set-StatusText $script:WorkflowPresetStorageWarning
     }
     Update-ActionButtons
+    $startupUpdateTimer.Start()
 })
 
 $form.Add_Resize({
@@ -7437,6 +7985,7 @@ Register-DragDropTarget -Control $form -DragEnterAction $dragEnterHandler -DragO
 
 $form.Add_FormClosing({
     $script:PollTimer.Stop()
+    $startupUpdateTimer.Stop()
     $script:SharedState.StopRequested = $true
     try {
         Save-WorkflowPresetStartupState

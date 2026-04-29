@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 
@@ -15,6 +16,7 @@ def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
         RELEASE_ROOT / "Install Desktop Shortcut.bat",
         RELEASE_ROOT / "README - kako se koristi.txt",
         RELEASE_ROOT / "USB PREDAJA CHECKLIST.txt",
+        RELEASE_ROOT / "app-manifest.json",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4-core.psm1",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4.ps1",
@@ -38,6 +40,10 @@ def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
     for token in [
         "Video Converter",
         "VHS MP4 Optimizer",
+        "Help",
+        "About VHS MP4 Optimizer",
+        "Check for Updates",
+        "Open User Guide",
         "Install FFmpeg",
         "Test Sample",
         "Start Conversion",
@@ -112,6 +118,13 @@ def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
         "Originalni fajlovi se ne menjaju",
     ]:
         assert token in readme, f"missing README token: {token}"
+
+    app_manifest = json.loads(read(RELEASE_ROOT / "app-manifest.json"))
+    assert app_manifest["AppName"] == "VHS MP4 Optimizer"
+    assert app_manifest["Repository"] == "joes021/vhs-mp4-optimizer"
+    assert app_manifest["LatestReleaseApi"].endswith("/releases/latest")
+    assert "Version" in app_manifest
+    assert "ReleaseTag" in app_manifest
 
     checklist = read(RELEASE_ROOT / "USB PREDAJA CHECKLIST.txt")
     for token in [
