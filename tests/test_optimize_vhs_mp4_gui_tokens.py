@@ -3591,3 +3591,19 @@ def test_vhs_gui_update_prompt_braces_update_artifact_variable() -> None:
 
     assert "preko ${updateArtifact}?" in script or "preko $($updateArtifact)?" in script
     assert "preko $updateArtifact?" not in script
+
+
+def test_vhs_gui_update_handles_application_control_policy_block_with_fallback() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "function Test-IsApplicationControlBlockedError",
+        "function Invoke-UpdatePolicyBlockedFallback",
+        "Application Control policy has blocked this file",
+        "Application Control policy je blokirao automatsko pokretanje update-a.",
+        "Otvoricu release stranicu i download folder",
+        "Start-Process -FilePath $downloadPath -ErrorAction Stop",
+        "Start-Process -FilePath $downloadRoot",
+        "Start-Process -FilePath ([string]$LatestRelease.HtmlUrl)",
+    ]:
+        assert token in script, f"missing update policy fallback token: {token}"
