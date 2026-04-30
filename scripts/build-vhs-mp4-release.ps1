@@ -146,13 +146,15 @@ Brzi start:
    - Small MP4 H.264 za manji fajl.
    - High Quality MP4 H.264 za vazne snimke.
    - HEVC H.265 Smaller za jos manji fajl uz noviji H.265 kodek.
-12. Pogledaj "Media info" kolone i "Properties" panel za format, kontejner, rezoluciju, odnos stranica, FPS, frames, protok, audio i trajanje.
+12. Pogledaj "Media info" kolone i "Properties" panel na glavnom batch ekranu za format, kontejner, rezoluciju, odnos stranica, FPS, frames, protok, audio i trajanje.
 13. Ako treba ozbiljniji pregled ili trim, izaberi fajl i klikni "Open Player" ili ga otvori duplim klikom.
 14. U prozoru "Player / Trim":
    - "Playback mode" radi za moderne fajlove kao .mp4, .mov i .mkv.
    - "Preview mode" je fallback za .avi, MSDV i .mpg, ili kad playback ne moze da se otvori.
-   - "Play / Pause", timeline i Frame dugmad sluze za precizno pomeranje kroz video.
-   - "Set Start", "Set End", "Add Segment", "Remove" i "Clear Seg" rade trim unutar posebnog prozora.
+   - "Preview Frame", "Auto preview", "Open Video", "Play / Pause", timeline i Frame dugmad sluze za precizno pomeranje kroz video.
+   - veliki preview je levo, timeline je ispod preview-a, a trim/crop/aspect/properties alati su u desnoj koloni.
+   - "Set Start", "Set End", "Apply Trim", "Add Segment", "Remove", "Clear Seg" i "Clear Trim" rade trim unutar posebnog prozora.
+   - "Start", "End" i "CUT" oznake ostaju stalno vidljive iznad trim sekcije.
    - "Aspect / Pixel shape" deo drzi lokalni "Aspect mode" za izabrani fajl.
    - U "Aspect mode" imas "Auto", "Keep Original", "Force 4:3" i "Force 16:9".
    - Linija "Detected: ... -> ..." pokazuje sta je alat procitao i na koju geometriju planira izlaz.
@@ -162,17 +164,10 @@ Brzi start:
    - Polja "Left", "Top", "Right" i "Bottom" sluze za rucnu pixel korekciju po strani.
    - "Crop overlay" preko preview slike pokazuje aktivnu crop zonu dok proveravas kadar.
    - "Save to Queue" vraca trim izmene nazad u glavni batch.
-15. Ako treba brzi pregled ili sitna korekcija bez otvaranja posebnog prozora, koristi "Preview / Properties" panel:
-   - "Trim selected file" je pri vrhu desnog panela.
-   - "Preview Frame" pravi jednu sliku iz videa na zadatom vremenu.
-   - "Auto preview" sam osvezava frame dok pomeras timeline ili ides frame po frame; iskljuci ga za spore fajlove.
-   - "Open Video" otvara originalni fajl u Windows player-u.
-   - "Start" i "End" primaju HH:MM:SS, MM:SS ili sekunde.
-   - "Apply Trim" cuva jedan trim ili menja izabrani segment.
-   - "Add Segment" dodaje jos jedan keep range za isti fajl.
-   - "Remove" brise trenutno izabrani segment, a "Clear Seg" prazni multi-cut listu.
-   - "Clear Trim" brise sve trim podatke za izabrani fajl.
-   - Crop overlay i kolone "Range" / "Crop" pokazuju koji fajlovi imaju trim i da li je crop Auto ili Manual.
+15. Glavni batch ekran ostaje cist i fokusiran na queue:
+   - prikazuje folder putanje, preset-e, batch akcije, queue tabelu i "Properties" pregled
+   - ne drzi stalno otvoren preview/trimming panel
+   - kolone "Range", "Crop" i "Aspect" i dalje pokazuju sta je vec podeseno za svaki fajl
 16. Ako snimak treba tehnicki popraviti, klikni "Show Advanced" pa koristi "Video filters":
    - "Deinterlace" za nazubljene linije kod VHS/DVD interlaced snimaka.
    - "Denoise" za blago smanjenje suma.
@@ -210,7 +205,7 @@ Napomene:
 - Preview Frame i trim ne menjaju original; trim se primenjuje samo na gotovu MP4 kopiju.
 - Crop / Overscan radi po fajlu: Detect Crop i Auto Crop pune Left, Top, Right i Bottom, Clear Crop ih brise, a Crop overlay pomaze da proveris kadar pre Save to Queue.
 - Auto apply crop if detected koristi auto crop pri batch obradi, ali ne gazi rucno unete crop vrednosti.
-- Open Player cuva izmene tek kada kliknes Save to Queue.
+- Open Player otvara poseban floating editor; izmene se vracaju tek kada kliknes Save to Queue.
 - Playback mode i Preview mode koriste isti trim rezultat u glavnom queue-u.
 - Pause / Resume radi samo nad preostalim queued fajlovima; vec gotovi fajlovi ostaju gotovi.
 - "Paused after current file" pokazuje da je zahtev za pauzu primljen, a "Paused" da batch ceka Resume.
@@ -218,7 +213,7 @@ Napomene:
 - "Queue" meni okuplja "Save Queue", "Load Queue", "Skip Selected", "Retry Failed" i "Clear Completed".
 - Batch dugmad "Skip Selected", "Retry Failed" i "Clear Completed" daju isti tok bez otvaranja menija.
 - Quick Setup cuva svakodnevni batch tok cistim, a Show Advanced otkriva dublja podesavanja samo kada ti zatrebaju.
-- Status, Progress i Log tabovi dole oslobadjaju vise vertikalnog prostora za grid i preview.
+- Status, Progress i Log tabovi dole oslobadjaju vise vertikalnog prostora za grid, dok preview zivi u posebnom Player / Trim prozoru.
 - Aspect / Pixel shape koristi lokalni Aspect mode po fajlu; Auto, Keep Original, Force 4:3 i Force 16:9 pomazu kad PAL/DV ili NTSC/DV snimak izgleda stisnuto ili razvuceno.
 - Detected, DAR, SAR i Planned output aspect daju brz tehnicki pregled pre Save to Queue.
 - Encode engine daje "Auto", "CPU (libx264/libx265)", "NVIDIA NVENC", "Intel QSV" i "AMD AMF", uz siguran fallback na CPU ako hardware init ne prodje.

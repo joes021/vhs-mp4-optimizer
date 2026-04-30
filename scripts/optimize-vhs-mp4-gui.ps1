@@ -27,11 +27,14 @@ $script:CurrentDurationSeconds = $null
 $script:CurrentFileStartedAt = $null
 $script:PollTimer = New-Object System.Windows.Forms.Timer
 $script:PollTimer.Interval = 250
-$script:RightPanelTargetWidth = 620
+$script:RightPanelTargetWidth = 440
 $script:PreviewTimelineScale = 100
 $script:PreviewAutoPending = $false
 $script:PreviewAutoDelayMs = 250
 $script:PendingTrimSegmentIndex = -1
+$script:PlayerTrimEditorWindow = $null
+$script:PlayerTrimEditorSourcePath = ""
+$script:PlayerTrimEditorBounds = $null
 $script:DragDropActive = $false
 $script:LastNormalStatusText = ""
 $script:DragDropAccentColor = [System.Drawing.Color]::FromArgb(22, 163, 74)
@@ -143,11 +146,12 @@ function Set-RightWorkspaceLayout {
         return
     }
 
-    $bottomPanelTargetHeight = 230
-    $split.Panel2MinSize = 210
-    $desiredDistance = $split.Height - $bottomPanelTargetHeight - $split.SplitterWidth
+    $desiredBottomHeight = 190
+    $split.Panel1MinSize = 250
+    $split.Panel2MinSize = 184
+    $desiredDistance = $split.Height - $desiredBottomHeight - $split.SplitterWidth
     $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
-    $distance = [Math]::Max(120, $desiredDistance)
+    $distance = [Math]::Max($split.Panel1MinSize, $desiredDistance)
     $distance = [Math]::Min($distance, $maxDistance)
     if ($distance -gt 0 -and $distance -ne $split.SplitterDistance) {
         $split.SplitterDistance = $distance
@@ -2174,16 +2178,12 @@ function Update-ActionButtons {
 
 function Get-MediaInfoIntroText {
     return @"
-Preview / Properties
+Selected file / Properties
 
-Properties / Media info
-
-Izaberi fajl u tabeli da vidis format, kontejner, rezoluciju, odnos stranica, FPS, broj frejmova, protok, audio i trajanje.
-Open Player ili dupli klik otvaraju poseban Player / Trim prozor sa Playback mode ili Preview mode rezimom.
-Timeline pomera preview vreme, Frame dugmad pomeraju za jedan frejm, a Set Start / Set End upisuju cut tacke.
-Preview Frame pravi jednu sliku iz izabranog fajla. Open Video otvara original u Windows player-u.
-Trim selected file je pri vrhu desnog panela. Apply Trim pamti jedan trim ili menja izabrani segment, a Add Segment pravi multi-cut listu za taj fajl.
-Player / Trim koristi Save to Queue da vrati trim izmene nazad u glavni batch.
+Izaberi fajl u tabeli da ovde vidis format, kontejner, rezoluciju, odnos stranica, FPS, broj frejmova, protok, audio i trajanje.
+Open Player ili dupli klik otvaraju poseban floating Player / Trim prozor. Tamo radis preview, timeline, trim, segmente, crop i aspect.
+Glavni ekran je sada batch radna povrsina: folderi, preset-i, queue, Start/Pause/Resume i status ostaju ovde.
+Player / Trim koristi Save to Queue da vrati izmene nazad u glavni batch bez zatrpavanja ovog ekrana.
 Video filters dodaje Deinterlace, Denoise, Rotate/flip, Scale i Audio normalize za ceo batch.
 
 Quality mode:
@@ -3149,7 +3149,7 @@ function Format-VhsMp4MediaDetails {
 
     if ($null -eq $mediaInfo) {
         return @"
-Preview / Properties
+Selected file / Properties
 
 Properties / Media info
 
@@ -3169,7 +3169,7 @@ $usbNote
     }
 
     return @"
-Preview / Properties
+Selected file / Properties
 
 Properties / Media info
 
@@ -3874,7 +3874,10 @@ function Load-SelectedTrimFields {
 function Update-PreviewTrimPanel {
     $item = Get-SelectedPlanItem
     if ($null -eq $item) {
-        $previewStatusLabel.Text = "Preview: izaberi fajl iz queue liste."
+        $previewStatusLabel.Text = "Selected file"
+        if (Get-Variable -Name "selectedFileSummaryLabel" -ErrorAction SilentlyContinue) {
+            $selectedFileSummaryLabel.Text = "Izaberi fajl u queue listi pa otvori Open Player kada hoces preview, trim, crop ili aspect korekciju."
+        }
         Sync-SelectedTrimSegmentsList
         Load-SelectedTrimFields
         Update-PreviewTimeline
@@ -3886,7 +3889,11 @@ function Update-PreviewTrimPanel {
 
     $trimSummary = Get-PlanItemPropertyText -Item $item -Name "TrimSummary" -Default "--"
     $cropStatus = Get-PlanItemCropStatusText -Item $item
-    $previewStatusLabel.Text = "Preview: " + $item.SourceName + " | Range: " + $trimSummary + " | " + $cropStatus
+    $aspectStatus = Get-PlanItemAspectStatusText -Item $item
+    $previewStatusLabel.Text = "Selected file: " + $item.SourceName
+    if (Get-Variable -Name "selectedFileSummaryLabel" -ErrorAction SilentlyContinue) {
+        $selectedFileSummaryLabel.Text = "Range: " + $trimSummary + " | " + $cropStatus + " | Aspect: " + $aspectStatus + " | Open Player za detaljnu obradu."
+    }
     Sync-SelectedTrimSegmentsList
     Load-SelectedTrimFields
     Update-PreviewTimeline
@@ -3981,7 +3988,10 @@ function Open-PlayerTrimWindow {
     param(
         [Parameter(Mandatory = $true)]
         $Item,
-        [switch]$PreviewOnly
+        [switch]$PreviewOnly,
+        [switch]$Modeless,
+        [System.Windows.Forms.Form]$OwnerForm,
+        [scriptblock]$OnSave
     )
 
     $trimState = Copy-PlanItemTrimState -Item $Item
@@ -4025,14 +4035,18 @@ function Open-PlayerTrimWindow {
 
     $dialog = New-Object System.Windows.Forms.Form
     $dialog.Text = Get-PlayerTrimWindowTitle -Item $Item
-    $dialog.StartPosition = "CenterParent"
-    $dialog.Width = 1080
-    $dialog.Height = 780
-    $dialog.MinimumSize = New-Object System.Drawing.Size(920, 660)
+    $dialog.StartPosition = if ($Modeless -and $null -ne $script:PlayerTrimEditorBounds) { "Manual" } elseif ($null -ne $OwnerForm) { "CenterParent" } else { "CenterScreen" }
+    $dialog.Width = 1320
+    $dialog.Height = 860
+    $dialog.MinimumSize = New-Object System.Drawing.Size(1120, 760)
     $dialog.KeyPreview = $true
     $dialog.BackColor = [System.Drawing.SystemColors]::Control
+    $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
     if (Test-Path -LiteralPath $script:AppIconPath) {
         $dialog.Icon = New-Object System.Drawing.Icon $script:AppIconPath
+    }
+    if ($Modeless -and $null -ne $script:PlayerTrimEditorBounds) {
+        $dialog.Bounds = $script:PlayerTrimEditorBounds
     }
 
     $localState = [ordered]@{
@@ -4075,21 +4089,29 @@ function Open-PlayerTrimWindow {
 
     $playerRootLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $playerRootLayout.Dock = "Fill"
-    $playerRootLayout.ColumnCount = 1
-    $playerRootLayout.RowCount = 5
+    $playerRootLayout.ColumnCount = 2
+    $playerRootLayout.RowCount = 2
     $playerRootLayout.Padding = New-Object System.Windows.Forms.Padding(10)
-    $playerRootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-    $playerRootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 44)))
+    $playerRootLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $playerRootLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 360)))
+    $playerRootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 58)))
     $playerRootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-    $playerRootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 84)))
-    $playerRootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 310)))
     $dialog.Controls.Add($playerRootLayout)
+
+    $playerHeaderLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $playerHeaderLayout.Dock = "Fill"
+    $playerHeaderLayout.ColumnCount = 1
+    $playerHeaderLayout.RowCount = 2
+    $playerHeaderLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+    $playerHeaderLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+    $playerRootLayout.Controls.Add($playerHeaderLayout, 0, 0)
+    $playerRootLayout.SetColumnSpan($playerHeaderLayout, 2)
 
     $playerModeLabel = New-Object System.Windows.Forms.Label
     $playerModeLabel.Dock = "Fill"
     $playerModeLabel.TextAlign = "MiddleLeft"
     $playerModeLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-    $playerRootLayout.Controls.Add($playerModeLabel, 0, 0)
+    $playerHeaderLayout.Controls.Add($playerModeLabel, 0, 0)
 
     $metaParts = New-Object System.Collections.Generic.List[string]
     $metaParts.Add([string]$Item.SourceName)
@@ -4105,12 +4127,23 @@ function Open-PlayerTrimWindow {
     $playerMetaLabel.Dock = "Fill"
     $playerMetaLabel.TextAlign = "MiddleLeft"
     $playerMetaLabel.Text = ($metaParts -join " | ")
-    $playerMetaLabel.MaximumSize = New-Object System.Drawing.Size(1020, 0)
-    $playerRootLayout.Controls.Add($playerMetaLabel, 0, 1)
+    $playerMetaLabel.MaximumSize = New-Object System.Drawing.Size(1220, 0)
+    $playerHeaderLayout.Controls.Add($playerMetaLabel, 0, 1)
+
+    $playerWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $playerWorkspaceLayout.Dock = "Fill"
+    $playerWorkspaceLayout.ColumnCount = 1
+    $playerWorkspaceLayout.RowCount = 5
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 36)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+    $playerRootLayout.Controls.Add($playerWorkspaceLayout, 0, 1)
 
     $surfacePanel = New-Object System.Windows.Forms.Panel
     $surfacePanel.Dock = "Fill"
-    $playerRootLayout.Controls.Add($surfacePanel, 0, 2)
+    $playerWorkspaceLayout.Controls.Add($surfacePanel, 0, 0)
 
     $playbackHost = New-Object System.Windows.Forms.Integration.ElementHost
     $playbackHost.Dock = "Fill"
@@ -4135,19 +4168,60 @@ function Open-PlayerTrimWindow {
     [void]$wpfGrid.Children.Add($mediaElement)
     $playbackHost.Child = $wpfGrid
 
-    $transportLayout = New-Object System.Windows.Forms.TableLayoutPanel
-    $transportLayout.Dock = "Fill"
-    $transportLayout.ColumnCount = 1
-    $transportLayout.RowCount = 3
-    $transportLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 32)))
-    $transportLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-    $transportLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-    $playerRootLayout.Controls.Add($transportLayout, 0, 3)
+    $timelineInfoLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $timelineInfoLayout.Dock = "Fill"
+    $timelineInfoLayout.ColumnCount = 4
+    $timelineInfoLayout.RowCount = 1
+    $timelineInfoLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 96)))
+    $timelineInfoLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 114)))
+    $timelineInfoLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $timelineInfoLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 208)))
+    $playerWorkspaceLayout.Controls.Add($timelineInfoLayout, 0, 1)
+
+    $playerPreviewTimeLabel = New-Object System.Windows.Forms.Label
+    $playerPreviewTimeLabel.Text = "Preview time"
+    $playerPreviewTimeLabel.Dock = "Fill"
+    $playerPreviewTimeLabel.TextAlign = "MiddleLeft"
+    $timelineInfoLayout.Controls.Add($playerPreviewTimeLabel, 0, 0)
+
+    $playerPreviewTimeTextBox = New-Object System.Windows.Forms.TextBox
+    $playerPreviewTimeTextBox.Dock = "Fill"
+    $playerPreviewTimeTextBox.Text = Format-VhsMp4FfmpegTime -Seconds $localState.PreviewPositionSeconds
+    $timelineInfoLayout.Controls.Add($playerPreviewTimeTextBox, 1, 0)
+
+    $playerPositionLabel = New-Object System.Windows.Forms.Label
+    $playerPositionLabel.Dock = "Fill"
+    $playerPositionLabel.TextAlign = "MiddleLeft"
+    $timelineInfoLayout.Controls.Add($playerPositionLabel, 2, 0)
+
+    $timelineActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+    $timelineActionsFlow.Dock = "Fill"
+    $timelineActionsFlow.WrapContents = $false
+    $timelineActionsFlow.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
+    $timelineInfoLayout.Controls.Add($timelineActionsFlow, 3, 0)
+
+    $playerPreviewFrameButton = New-Object System.Windows.Forms.Button
+    $playerPreviewFrameButton.Text = "Preview Frame"
+    $playerPreviewFrameButton.AutoSize = $true
+    $timelineActionsFlow.Controls.Add($playerPreviewFrameButton)
+
+    $playerOpenVideoButton = New-Object System.Windows.Forms.Button
+    $playerOpenVideoButton.Text = "Open Video"
+    $playerOpenVideoButton.AutoSize = $true
+    $timelineActionsFlow.Controls.Add($playerOpenVideoButton)
+
+    $playerTimelineTrackBar = New-Object System.Windows.Forms.TrackBar
+    $playerTimelineTrackBar.Dock = "Fill"
+    $playerTimelineTrackBar.Minimum = 0
+    $playerTimelineTrackBar.Maximum = [Math]::Max(1, [int][Math]::Round($durationSeconds * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))
+    $playerTimelineTrackBar.TickStyle = [System.Windows.Forms.TickStyle]::None
+    $playerTimelineTrackBar.LargeChange = $script:PreviewTimelineScale
+    $playerWorkspaceLayout.Controls.Add($playerTimelineTrackBar, 0, 2)
 
     $transportFlow = New-Object System.Windows.Forms.FlowLayoutPanel
     $transportFlow.Dock = "Fill"
-    $transportFlow.WrapContents = $false
-    $transportLayout.Controls.Add($transportFlow, 0, 0)
+    $transportFlow.WrapContents = $true
+    $playerWorkspaceLayout.Controls.Add($transportFlow, 0, 3)
 
     $playPauseButton = New-Object System.Windows.Forms.Button
     $playPauseButton.Text = "Play / Pause"
@@ -4169,40 +4243,74 @@ function Open-PlayerTrimWindow {
     $nextPlayerFrameButton.AutoSize = $true
     $transportFlow.Controls.Add($nextPlayerFrameButton)
 
-    $playerPreviewFrameButton = New-Object System.Windows.Forms.Button
-    $playerPreviewFrameButton.Text = "Preview Frame"
-    $playerPreviewFrameButton.AutoSize = $true
-    $transportFlow.Controls.Add($playerPreviewFrameButton)
+    $setPlayerTrimStartButton = New-Object System.Windows.Forms.Button
+    $setPlayerTrimStartButton.Text = "Set Start"
+    $setPlayerTrimStartButton.AutoSize = $true
+    $transportFlow.Controls.Add($setPlayerTrimStartButton)
 
-    $playerPositionLabel = New-Object System.Windows.Forms.Label
-    $playerPositionLabel.Dock = "Fill"
-    $playerPositionLabel.TextAlign = "MiddleLeft"
-    $transportLayout.Controls.Add($playerPositionLabel, 0, 1)
+    $setPlayerTrimEndButton = New-Object System.Windows.Forms.Button
+    $setPlayerTrimEndButton.Text = "Set End"
+    $setPlayerTrimEndButton.AutoSize = $true
+    $transportFlow.Controls.Add($setPlayerTrimEndButton)
 
-    $playerTimelineTrackBar = New-Object System.Windows.Forms.TrackBar
-    $playerTimelineTrackBar.Dock = "Fill"
-    $playerTimelineTrackBar.Minimum = 0
-    $playerTimelineTrackBar.Maximum = [Math]::Max(1, [int][Math]::Round($durationSeconds * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))
-    $playerTimelineTrackBar.TickStyle = [System.Windows.Forms.TickStyle]::None
-    $playerTimelineTrackBar.LargeChange = $script:PreviewTimelineScale
-    $transportLayout.Controls.Add($playerTimelineTrackBar, 0, 2)
+    $playerMarkersLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $playerMarkersLayout.Dock = "Fill"
+    $playerMarkersLayout.ColumnCount = 3
+    $playerMarkersLayout.RowCount = 1
+    $playerMarkersLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
+    $playerMarkersLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
+    $playerMarkersLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $playerWorkspaceLayout.Controls.Add($playerMarkersLayout, 0, 4)
+
+    $playerStartMarkerLabel = New-Object System.Windows.Forms.Label
+    $playerStartMarkerLabel.Text = "Start: --"
+    $playerStartMarkerLabel.Dock = "Fill"
+    $playerStartMarkerLabel.TextAlign = "MiddleLeft"
+    $playerMarkersLayout.Controls.Add($playerStartMarkerLabel, 0, 0)
+
+    $playerEndMarkerLabel = New-Object System.Windows.Forms.Label
+    $playerEndMarkerLabel.Text = "End: --"
+    $playerEndMarkerLabel.Dock = "Fill"
+    $playerEndMarkerLabel.TextAlign = "MiddleLeft"
+    $playerMarkersLayout.Controls.Add($playerEndMarkerLabel, 1, 0)
+
+    $playerTimelineSummaryLabel = New-Object System.Windows.Forms.Label
+    $playerTimelineSummaryLabel.Text = "CUT: --"
+    $playerTimelineSummaryLabel.Dock = "Fill"
+    $playerTimelineSummaryLabel.TextAlign = "MiddleLeft"
+    $playerTimelineSummaryLabel.Font = New-Object System.Drawing.Font("Consolas", 8)
+    $playerMarkersLayout.Controls.Add($playerTimelineSummaryLabel, 2, 0)
+
+    $toolColumnLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $toolColumnLayout.Dock = "Fill"
+    $toolColumnLayout.ColumnCount = 1
+    $toolColumnLayout.RowCount = 5
+    $toolColumnLayout.Padding = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+    $toolColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 222)))
+    $toolColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 150)))
+    $toolColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 126)))
+    $toolColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $toolColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 40)))
+    $playerRootLayout.Controls.Add($toolColumnLayout, 1, 1)
+
+    $playerTrimGroupBox = New-Object System.Windows.Forms.GroupBox
+    $playerTrimGroupBox.Text = "Trim"
+    $playerTrimGroupBox.Dock = "Fill"
+    $toolColumnLayout.Controls.Add($playerTrimGroupBox, 0, 0)
 
     $trimLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $trimLayout.Dock = "Fill"
-    $trimLayout.ColumnCount = 4
-    $trimLayout.RowCount = 7
-    $trimLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 110)))
-    $trimLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 130)))
-    $trimLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 110)))
+    $trimLayout.ColumnCount = 2
+    $trimLayout.RowCount = 5
+    $trimLayout.Padding = New-Object System.Windows.Forms.Padding(8, 6, 8, 6)
+    $trimLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 118)))
     $trimLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-    $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-    $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 32)))
     $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+    $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+    $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 56)))
     $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-    $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 132)))
-    $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 108)))
     $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-    $playerRootLayout.Controls.Add($trimLayout, 0, 4)
+    $playerTrimGroupBox.Controls.Add($trimLayout)
 
     $playerTrimStartLabel = New-Object System.Windows.Forms.Label
     $playerTrimStartLabel.Text = "Start (HH:MM:SS)"
@@ -4218,32 +4326,22 @@ function Open-PlayerTrimWindow {
     $playerTrimEndLabel.Text = "End (HH:MM:SS)"
     $playerTrimEndLabel.Dock = "Fill"
     $playerTrimEndLabel.TextAlign = "MiddleLeft"
-    $trimLayout.Controls.Add($playerTrimEndLabel, 2, 0)
+    $trimLayout.Controls.Add($playerTrimEndLabel, 0, 1)
 
     $playerTrimEndTextBox = New-Object System.Windows.Forms.TextBox
     $playerTrimEndTextBox.Dock = "Fill"
-    $trimLayout.Controls.Add($playerTrimEndTextBox, 3, 0)
+    $trimLayout.Controls.Add($playerTrimEndTextBox, 1, 1)
 
     $trimActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
     $trimActionsFlow.Dock = "Fill"
-    $trimActionsFlow.WrapContents = $false
-    $trimLayout.Controls.Add($trimActionsFlow, 0, 1)
-    $trimLayout.SetColumnSpan($trimActionsFlow, 4)
+    $trimActionsFlow.WrapContents = $true
+    $trimLayout.Controls.Add($trimActionsFlow, 0, 2)
+    $trimLayout.SetColumnSpan($trimActionsFlow, 2)
 
     $applyPlayerTrimButton = New-Object System.Windows.Forms.Button
     $applyPlayerTrimButton.Text = "Apply Trim"
     $applyPlayerTrimButton.AutoSize = $true
     $trimActionsFlow.Controls.Add($applyPlayerTrimButton)
-
-    $setPlayerTrimStartButton = New-Object System.Windows.Forms.Button
-    $setPlayerTrimStartButton.Text = "Set Start"
-    $setPlayerTrimStartButton.AutoSize = $true
-    $trimActionsFlow.Controls.Add($setPlayerTrimStartButton)
-
-    $setPlayerTrimEndButton = New-Object System.Windows.Forms.Button
-    $setPlayerTrimEndButton.Text = "Set End"
-    $setPlayerTrimEndButton.AutoSize = $true
-    $trimActionsFlow.Controls.Add($setPlayerTrimEndButton)
 
     $addPlayerSegmentButton = New-Object System.Windows.Forms.Button
     $addPlayerSegmentButton.Text = "Add Segment"
@@ -4260,11 +4358,10 @@ function Open-PlayerTrimWindow {
     $clearPlayerSegmentsButton.AutoSize = $true
     $trimActionsFlow.Controls.Add($clearPlayerSegmentsButton)
 
-    $playerSegmentsListBox = New-Object System.Windows.Forms.ComboBox
-    $playerSegmentsListBox.Dock = "Fill"
-    $playerSegmentsListBox.DropDownStyle = "DropDownList"
-    $trimLayout.Controls.Add($playerSegmentsListBox, 0, 2)
-    $trimLayout.SetColumnSpan($playerSegmentsListBox, 4)
+    $clearPlayerTrimButton = New-Object System.Windows.Forms.Button
+    $clearPlayerTrimButton.Text = "Clear Trim"
+    $clearPlayerTrimButton.AutoSize = $true
+    $trimActionsFlow.Controls.Add($clearPlayerTrimButton)
 
     $playerCutRangeLabel = New-Object System.Windows.Forms.Label
     $playerCutRangeLabel.Text = "CUT: --"
@@ -4272,13 +4369,18 @@ function Open-PlayerTrimWindow {
     $playerCutRangeLabel.TextAlign = "MiddleLeft"
     $playerCutRangeLabel.Font = New-Object System.Drawing.Font("Consolas", 8)
     $trimLayout.Controls.Add($playerCutRangeLabel, 0, 3)
-    $trimLayout.SetColumnSpan($playerCutRangeLabel, 4)
+    $trimLayout.SetColumnSpan($playerCutRangeLabel, 2)
+
+    $playerSegmentsListBox = New-Object System.Windows.Forms.ComboBox
+    $playerSegmentsListBox.Dock = "Fill"
+    $playerSegmentsListBox.DropDownStyle = "DropDownList"
+    $trimLayout.Controls.Add($playerSegmentsListBox, 0, 4)
+    $trimLayout.SetColumnSpan($playerSegmentsListBox, 2)
 
     $cropGroupBox = New-Object System.Windows.Forms.GroupBox
     $cropGroupBox.Text = "Crop / Overscan"
     $cropGroupBox.Dock = "Fill"
-    $trimLayout.Controls.Add($cropGroupBox, 0, 4)
-    $trimLayout.SetColumnSpan($cropGroupBox, 4)
+    $toolColumnLayout.Controls.Add($cropGroupBox, 0, 1)
 
     $cropLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $cropLayout.Dock = "Fill"
@@ -4366,8 +4468,7 @@ function Open-PlayerTrimWindow {
     $aspectGroupBox = New-Object System.Windows.Forms.GroupBox
     $aspectGroupBox.Text = "Aspect / Pixel shape"
     $aspectGroupBox.Dock = "Fill"
-    $trimLayout.Controls.Add($aspectGroupBox, 0, 5)
-    $trimLayout.SetColumnSpan($aspectGroupBox, 4)
+    $toolColumnLayout.Controls.Add($aspectGroupBox, 0, 2)
 
     $aspectLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $aspectLayout.Dock = "Fill"
@@ -4415,11 +4516,24 @@ function Open-PlayerTrimWindow {
     $aspectLayout.Controls.Add($playerAspectGeometryLabel, 0, 2)
     $aspectLayout.SetColumnSpan($playerAspectGeometryLabel, 4)
 
+    $playerPropertiesGroupBox = New-Object System.Windows.Forms.GroupBox
+    $playerPropertiesGroupBox.Text = "Properties"
+    $playerPropertiesGroupBox.Dock = "Fill"
+    $toolColumnLayout.Controls.Add($playerPropertiesGroupBox, 0, 3)
+
+    $playerInfoBox = New-Object System.Windows.Forms.RichTextBox
+    $playerInfoBox.Dock = "Fill"
+    $playerInfoBox.ReadOnly = $true
+    $playerInfoBox.BorderStyle = "None"
+    $playerInfoBox.BackColor = [System.Drawing.SystemColors]::Window
+    $playerInfoBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $playerInfoBox.Text = Format-VhsMp4MediaDetails -Item $Item
+    $playerPropertiesGroupBox.Controls.Add($playerInfoBox)
+
     $dialogButtonsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
     $dialogButtonsFlow.Dock = "Fill"
     $dialogButtonsFlow.WrapContents = $false
-    $trimLayout.Controls.Add($dialogButtonsFlow, 0, 6)
-    $trimLayout.SetColumnSpan($dialogButtonsFlow, 4)
+    $toolColumnLayout.Controls.Add($dialogButtonsFlow, 0, 4)
 
     $saveToQueueButton = New-Object System.Windows.Forms.Button
     $saveToQueueButton.Text = "Save to Queue"
@@ -4431,7 +4545,7 @@ function Open-PlayerTrimWindow {
     $dialogButtonsFlow.Controls.Add($saveToQueueButton)
 
     $cancelPlayerButton = New-Object System.Windows.Forms.Button
-    $cancelPlayerButton.Text = "Cancel"
+    $cancelPlayerButton.Text = if ($Modeless) { "Close" } else { "Cancel" }
     $cancelPlayerButton.AutoSize = $true
     $dialogButtonsFlow.Controls.Add($cancelPlayerButton)
 
@@ -4503,7 +4617,11 @@ function Open-PlayerTrimWindow {
     }
 
     function Update-PlayerCutDisplay {
-        $playerCutRangeLabel.Text = Format-CutTimelineMarkerText -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -DurationSeconds $durationSeconds
+        $cutText = Format-CutTimelineMarkerText -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -DurationSeconds $durationSeconds
+        $playerCutRangeLabel.Text = $cutText
+        $playerTimelineSummaryLabel.Text = $cutText
+        $playerStartMarkerLabel.Text = if ([string]::IsNullOrWhiteSpace($playerTrimStartTextBox.Text)) { "Start: --" } else { "Start: " + $playerTrimStartTextBox.Text }
+        $playerEndMarkerLabel.Text = if ([string]::IsNullOrWhiteSpace($playerTrimEndTextBox.Text)) { "End: --" } else { "End: " + $playerTrimEndTextBox.Text }
     }
 
     function Load-PlayerTrimFields {
@@ -4873,6 +4991,7 @@ function Open-PlayerTrimWindow {
 
         $totalText = if ($durationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $durationSeconds } else { "--:--:--" }
         $playerPositionLabel.Text = $positionText + " / " + $totalText
+        $playerPreviewTimeTextBox.Text = $positionText
 
         $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
         if ($playerTimelineTrackBar.Value -ne $timelineValue) {
@@ -5063,7 +5182,24 @@ function Open-PlayerTrimWindow {
         Set-PlayerTrimDialogDirty
     }
 
+    function Clear-PlayerTrimFields {
+        $localState.TrimSegments = @()
+        $localState.TrimStartText = ""
+        $localState.TrimEndText = ""
+        $localState.TrimSummary = ""
+        $localState.TrimDurationSeconds = $null
+        $playerTrimStartTextBox.Text = ""
+        $playerTrimEndTextBox.Text = ""
+        Sync-PlayerSegmentsList
+        Update-PlayerCutDisplay
+        Set-PlayerTrimDialogDirty
+    }
+
     function Save-PlayerTrimChanges {
+        param(
+            [switch]$CloseAfterSave
+        )
+
         try {
             if (@($localState.TrimSegments).Count -eq 0) {
                 $window = Get-VhsMp4TrimWindow -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text
@@ -5094,8 +5230,19 @@ function Open-PlayerTrimWindow {
                 }
                 CropState = (Get-PlayerCropStateFromFields)
             }
-            $closingAfterSave = $true
             Set-PlayerTrimDialogDirty -Value $false
+            if ($Modeless) {
+                if ($null -ne $OnSave) {
+                    & $OnSave $Item $dialogResult
+                }
+                if ($CloseAfterSave) {
+                    $closingAfterSave = $true
+                    $dialog.Close()
+                }
+                return
+            }
+
+            $closingAfterSave = $true
             $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
             $dialog.Close()
         }
@@ -5167,6 +5314,10 @@ function Open-PlayerTrimWindow {
         Clear-PlayerTrimSegments
     })
 
+    $clearPlayerTrimButton.Add_Click({
+        Clear-PlayerTrimFields
+    })
+
     $playerSegmentsListBox.Add_SelectedIndexChanged({
         Load-PlayerTrimFields
     })
@@ -5210,6 +5361,21 @@ function Open-PlayerTrimWindow {
         Set-PlayerPositionSeconds -Seconds ([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:$requestPreview
     })
 
+    $playerPreviewTimeTextBox.Add_Leave({
+        $seconds = $localState.PreviewPositionSeconds
+        try {
+            $parsed = Convert-VhsMp4TimeTextToSeconds -Value $playerPreviewTimeTextBox.Text
+            if ($null -ne $parsed) {
+                $seconds = [double]$parsed
+            }
+        }
+        catch {
+            $seconds = $localState.PreviewPositionSeconds
+        }
+
+        Set-PlayerPositionSeconds -Seconds $seconds -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
+    })
+
     $playPauseButton.Add_Click({
         if ($localState.Mode -ne "Playback mode") {
             return
@@ -5246,6 +5412,15 @@ function Open-PlayerTrimWindow {
 
     $playerPreviewFrameButton.Add_Click({
         Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -RequestPreview:$true
+    })
+
+    $playerOpenVideoButton.Add_Click({
+        try {
+            Start-Process -FilePath $Item.SourcePath
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Open Video", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        }
     })
 
     $detectCropButton.Add_Click({
@@ -5316,7 +5491,7 @@ function Open-PlayerTrimWindow {
 
         if ($response -eq [System.Windows.Forms.DialogResult]::Yes) {
             $eventArgs.Cancel = $true
-            Save-PlayerTrimChanges
+            Save-PlayerTrimChanges -CloseAfterSave
             return
         }
 
@@ -5354,6 +5529,32 @@ function Open-PlayerTrimWindow {
         }
     })
 
+    $dialog.Add_Move({
+        if ($dialog.WindowState -eq [System.Windows.Forms.FormWindowState]::Normal) {
+            $script:PlayerTrimEditorBounds = $dialog.Bounds
+        }
+    })
+
+    $dialog.Add_ResizeEnd({
+        if ($dialog.WindowState -eq [System.Windows.Forms.FormWindowState]::Normal) {
+            $script:PlayerTrimEditorBounds = $dialog.Bounds
+        }
+    })
+
+    $dialog.Add_FormClosed({
+        if ($dialog.WindowState -eq [System.Windows.Forms.FormWindowState]::Normal) {
+            $script:PlayerTrimEditorBounds = $dialog.Bounds
+        }
+        if ($script:PlayerTrimEditorWindow -eq $dialog) {
+            $script:PlayerTrimEditorWindow = $null
+            $script:PlayerTrimEditorSourcePath = ""
+        }
+    })
+
+    if ($Modeless) {
+        return $dialog
+    }
+
     if ($null -ne $form) {
         [void]$dialog.ShowDialog($form)
     }
@@ -5375,21 +5576,85 @@ function Show-SelectedPlayerTrimWindow {
         return
     }
 
-    if ($result.PSObject.Properties["AspectState"] -and $null -ne $result.AspectState -and $result.AspectState.PSObject.Properties["AspectMode"]) {
-        $normalizedAspectMode = Get-VhsMp4NormalizedAspectMode -AspectMode ([string]$result.AspectState.AspectMode)
-        $item | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue $normalizedAspectMode -Force
-        Update-PlanItemAspectPresentation -Item $item
+    Apply-PlayerTrimWindowResult -Item $item -Result $result
+}
+
+function Apply-PlayerTrimWindowResult {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Item,
+        [Parameter(Mandatory = $true)]
+        $Result
+    )
+
+    if ($Result.PSObject.Properties["AspectState"] -and $null -ne $Result.AspectState -and $Result.AspectState.PSObject.Properties["AspectMode"]) {
+        $normalizedAspectMode = Get-VhsMp4NormalizedAspectMode -AspectMode ([string]$Result.AspectState.AspectMode)
+        $Item | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue $normalizedAspectMode -Force
+        Update-PlanItemAspectPresentation -Item $Item
     }
-    Apply-PlayerTrimStateToItem -Item $item -TrimState $result.TrimState
-    if ($result.PSObject.Properties["CropState"]) {
-        Apply-PlayerCropStateToItem -Item $item -CropState $result.CropState
+    Apply-PlayerTrimStateToItem -Item $Item -TrimState $Result.TrimState
+    if ($Result.PSObject.Properties["CropState"]) {
+        Apply-PlayerCropStateToItem -Item $Item -CropState $Result.CropState
     }
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
-    $trimSummary = Get-PlanItemPropertyText -Item $item -Name "TrimSummary" -Default "--"
-    $cropSummary = Get-PlanItemPropertyText -Item $item -Name "CropSummary" -Default "--"
-    Add-LogLine ("Player / Trim saved: " + $item.SourceName + " | Trim " + $trimSummary + " | Crop " + $cropSummary)
-    Set-StatusText ("Player / Trim sacuvan za: " + $item.SourceName)
+    $trimSummary = Get-PlanItemPropertyText -Item $Item -Name "TrimSummary" -Default "--"
+    $cropSummary = Get-PlanItemPropertyText -Item $Item -Name "CropSummary" -Default "--"
+    Add-LogLine ("Player / Trim saved: " + $Item.SourceName + " | Trim " + $trimSummary + " | Crop " + $cropSummary)
+    Set-StatusText ("Player / Trim sacuvan za: " + $Item.SourceName)
+}
+
+function Open-SelectedPlayerTrimEditor {
+    $item = Get-SelectedPlanItem
+    if (-not (Test-CanEditPlanItem -Item $item)) {
+        return
+    }
+
+    $itemSourcePath = [System.IO.Path]::GetFullPath([string]$item.SourcePath)
+    $existingWindow = $script:PlayerTrimEditorWindow
+    if ($null -ne $existingWindow -and -not $existingWindow.IsDisposed) {
+        if ([string]$script:PlayerTrimEditorSourcePath -eq $itemSourcePath) {
+            try {
+                if ($existingWindow.WindowState -eq [System.Windows.Forms.FormWindowState]::Minimized) {
+                    $existingWindow.WindowState = [System.Windows.Forms.FormWindowState]::Normal
+                }
+                $existingWindow.Activate()
+                $existingWindow.Focus()
+            }
+            catch {
+            }
+            return
+        }
+
+        try {
+            $existingWindow.Close()
+        }
+        catch {
+        }
+
+        if ($null -ne $script:PlayerTrimEditorWindow -and -not $script:PlayerTrimEditorWindow.IsDisposed) {
+            return
+        }
+    }
+
+    $editorWindow = @(Open-PlayerTrimWindow -Item $item -Modeless -OwnerForm $form -OnSave {
+        param($savedItem, $saveResult)
+        Apply-PlayerTrimWindowResult -Item $savedItem -Result $saveResult
+    }) | Where-Object { $null -ne $_ -and $_ -is [System.Windows.Forms.Form] } | Select-Object -Last 1
+
+    if ($null -eq $editorWindow) {
+        return
+    }
+
+    $script:PlayerTrimEditorWindow = $editorWindow
+    $script:PlayerTrimEditorSourcePath = $itemSourcePath
+    if ($null -ne $form) {
+        $editorWindow.Show($form)
+    }
+    else {
+        $editorWindow.Show()
+    }
+    $editorWindow.Activate()
 }
 
 function Update-SelectedTrimGridRow {
@@ -5540,7 +5805,10 @@ function Clear-SelectedTrim {
     Update-PlanItemTrimEstimate -Item $item
     Update-SelectedTrimGridRow -Item $item
     Update-MediaInfoPanel
-    $previewStatusLabel.Text = "Preview / Properties: " + $item.SourceName + " | Range: --"
+    $previewStatusLabel.Text = "Selected file: " + $item.SourceName
+    if (Get-Variable -Name "selectedFileSummaryLabel" -ErrorAction SilentlyContinue) {
+        $selectedFileSummaryLabel.Text = "Range: -- | Crop: " + (Get-PlanItemCropStatusText -Item $item) + " | Aspect: " + (Get-PlanItemAspectStatusText -Item $item) + " | Open Player za detaljnu obradu."
+    }
     Add-LogLine ("Clear Trim: " + $item.SourceName)
 }
 
@@ -7111,7 +7379,7 @@ $rootLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $rootLayout.Dock = "Fill"
 $rootLayout.ColumnCount = 1
 $rootLayout.RowCount = 3
-$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 184)))
+$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 208)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
 $shellLayout.Controls.Add($rootLayout, 0, 1)
@@ -7210,7 +7478,7 @@ $controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $controlsStackLayout.Dock = "Fill"
 $controlsStackLayout.ColumnCount = 1
 $controlsStackLayout.RowCount = 2
-$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 116)))
+$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 144)))
 $controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
 $topWorkspaceLayout.Controls.Add($controlsStackLayout, 1, 0)
 
@@ -7226,7 +7494,7 @@ $quickRunLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $quickRunLayout.Dock = "Fill"
 $quickRunLayout.ColumnCount = 2
 $quickRunLayout.RowCount = 1
-$quickRunLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
+$quickRunLayout.Padding = New-Object System.Windows.Forms.Padding(8, 6, 8, 8)
 $quickRunLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 40)))
 $quickRunLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 60)))
 $quickRunGroupBox.Controls.Add($quickRunLayout)
@@ -7237,8 +7505,8 @@ $presetColumnLayout.Margin = New-Object System.Windows.Forms.Padding(0)
 $presetColumnLayout.ColumnCount = 1
 $presetColumnLayout.RowCount = 4
 $presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 16)))
-$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
-$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 48)))
+$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 60)))
 $presetColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
 $quickRunLayout.Controls.Add($presetColumnLayout, 0, 0)
 
@@ -7261,7 +7529,7 @@ $workflowPresetFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $workflowPresetFlow.Dock = "Fill"
 $workflowPresetFlow.WrapContents = $true
 $workflowPresetFlow.AutoSize = $false
-$workflowPresetFlow.Margin = New-Object System.Windows.Forms.Padding(0)
+$workflowPresetFlow.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 $presetColumnLayout.Controls.Add($workflowPresetFlow, 0, 2)
 
 $workflowPresetComboBox = New-Object System.Windows.Forms.ComboBox
@@ -7304,9 +7572,9 @@ $actionsColumnLayout.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.ColumnCount = 1
 $actionsColumnLayout.RowCount = 4
 $actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 16)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
 $quickRunLayout.Controls.Add($actionsColumnLayout, 1, 0)
 
 $quickActionsLabel = New-Object System.Windows.Forms.Label
@@ -7746,24 +8014,40 @@ $leftWorkspaceLayout.Controls.Add($grid, 0, 1)
 $rightPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $rightPanel.Dock = "Fill"
 $rightPanel.ColumnCount = 1
-$rightPanel.RowCount = 2
+$rightPanel.RowCount = 3
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 48)))
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $mainSplit.Panel2.Controls.Add($rightPanel)
 
 $previewStatusLabel = New-Object System.Windows.Forms.Label
-$previewStatusLabel.Text = "Preview / Properties"
+$previewStatusLabel.Text = "Selected file"
 $previewStatusLabel.Dock = "Fill"
 $previewStatusLabel.TextAlign = "MiddleLeft"
 $previewStatusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $rightPanel.Controls.Add($previewStatusLabel, 0, 0)
 
-$rightWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer
-$rightWorkspaceSplit.Dock = "Fill"
-$rightWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
-$rightWorkspaceSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2
-$rightWorkspaceSplit.SplitterDistance = 350
-$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)
+$selectedFileSummaryLabel = New-Object System.Windows.Forms.Label
+$selectedFileSummaryLabel.Name = "selectedFileSummaryLabel"
+$selectedFileSummaryLabel.Dock = "Fill"
+$selectedFileSummaryLabel.TextAlign = "MiddleLeft"
+$selectedFileSummaryLabel.AutoEllipsis = $true
+$selectedFileSummaryLabel.Text = "Izaberi fajl u queue listi pa koristi Open Player za preview, trim, crop i aspect korekciju."
+$rightPanel.Controls.Add($selectedFileSummaryLabel, 0, 1)
+
+$propertiesGroupBox = New-Object System.Windows.Forms.GroupBox
+$propertiesGroupBox.Text = "Properties / Media info"
+$propertiesGroupBox.Dock = "Fill"
+$rightPanel.Controls.Add($propertiesGroupBox, 0, 2)
+
+$infoBox = New-Object System.Windows.Forms.RichTextBox
+$infoBox.Dock = "Fill"
+$infoBox.ReadOnly = $true
+$infoBox.BorderStyle = "None"
+$infoBox.BackColor = [System.Drawing.SystemColors]::Window
+$infoBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$infoBox.Text = Get-MediaInfoIntroText
+$propertiesGroupBox.Controls.Add($infoBox)
 
 $trimTabPage = New-Object System.Windows.Forms.TabPage
 $trimTabPage.Text = "Trim"
@@ -7777,7 +8061,6 @@ $rightEditorTabControl = New-Object System.Windows.Forms.TabControl
 $rightEditorTabControl.Dock = "Fill"
 $rightEditorTabControl.TabPages.Add($trimTabPage)
 $rightEditorTabControl.TabPages.Add($propertiesTabPage)
-$rightWorkspaceSplit.Panel2.Controls.Add($rightEditorTabControl)
 
 $trimGroupBox = New-Object System.Windows.Forms.GroupBox
 $trimGroupBox.Text = "Trim selected file"
@@ -7882,19 +8165,18 @@ $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnSt
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 92)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 32)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 
 $previewWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $previewWorkspaceLayout.Dock = "Fill"
 $previewWorkspaceLayout.ColumnCount = 1
 $previewWorkspaceLayout.RowCount = 3
 $previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 132)))
-$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
-$rightWorkspaceSplit.Panel1.Controls.Add($previewWorkspaceLayout)
+$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 124)))
+$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 
 $previewTimeLabel = New-Object System.Windows.Forms.Label
 $previewTimeLabel.Text = "Preview time"
@@ -8043,15 +8325,6 @@ $script:DragDropVisualDefaults = [pscustomobject]@{
     OutputHelpText = $outputHelpLabel.Text
 }
 
-$infoBox = New-Object System.Windows.Forms.RichTextBox
-$infoBox.Dock = "Fill"
-$infoBox.ReadOnly = $true
-$infoBox.BorderStyle = "None"
-$infoBox.BackColor = [System.Drawing.SystemColors]::Window
-$infoBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-$infoBox.Text = Get-MediaInfoIntroText
-$propertiesTabPage.Controls.Add($infoBox)
-
 $grid.Add_SelectionChanged({
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
@@ -8064,7 +8337,7 @@ $grid.Add_CellDoubleClick({
         return
     }
 
-    Show-SelectedPlayerTrimWindow
+    Open-SelectedPlayerTrimEditor
 })
 
 $activityTabControl = New-Object System.Windows.Forms.TabControl
@@ -8232,7 +8505,7 @@ $openUserGuideMenuItem.Add_Click({
 })
 
 $openPlayerButton.Add_Click({
-    Show-SelectedPlayerTrimWindow
+    Open-SelectedPlayerTrimEditor
 })
 
 $moveUpButton.Add_Click({

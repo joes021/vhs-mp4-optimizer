@@ -31,10 +31,10 @@ Ako izadje noviji release, idi na [Releases](https://github.com/joes021/vhs-mp4-
 ![Kratak workflow kroz batch, player i batch kontrolu](docs/media/readme-workflow.gif)
 
 <p align="center">
-  <img src="docs/media/readme-main-overview.png" alt="Glavni batch pregled sa queue tabelom i preview tabom" width="100%">
+  <img src="docs/media/readme-main-overview.png" alt="Glavni batch pregled sa queue tabelom i properties panelom" width="100%">
 </p>
 
-Glavni batch pogled: scan, queue, media info kolone, USB procena i preview radni tab u istom prozoru.
+Glavni batch pogled: scan, queue, media info kolone, USB procena i properties pregled, bez stalno otvorenog preview editora.
 
 <p align="center">
   <img src="docs/media/readme-player-trim.png" alt="Player Trim prozor sa timeline, multi-cut i crop kontrolama" width="100%">
@@ -43,10 +43,10 @@ Glavni batch pogled: scan, queue, media info kolone, USB procena i preview radni
 `Player / Trim` prozor: preview mode, timeline, multi-cut segmenti, crop/overscan i aspect korekcija po fajlu.
 
 <p align="center">
-  <img src="docs/media/readme-batch-controls.png" alt="Batch kontrola sa trim tabom i pause resume tokom" width="100%">
+  <img src="docs/media/readme-batch-controls.png" alt="Batch kontrola sa presetima, queue alatima i pause resume tokom" width="100%">
 </p>
 
-Batch dorade: trim tab, workflow preset, `Pause / Resume` tok i uredjivanje queued fajlova bez izlaska iz glavnog ekrana.
+Batch dorade: workflow preset, `Pause / Resume` tok i uredjivanje queued fajlova, dok se pravi preview/trim rad prebacuje u poseban floating editor.
 
 ## Sta ovaj alat radi
 
@@ -69,7 +69,7 @@ Umesto da se svaki fajl obradjuje rucno, alat pravi batch workflow sa pregledom,
 | Crop / Overscan | Auto detect + rucni crop za crne ivice i VHS overscan |
 | Aspect / Pixel shape | `Auto`, `Keep Original`, `Force 4:3`, `Force 16:9` sa PAL/DV i NTSC/DV logikom |
 | Workflow presets | Gotovi preset-i plus cuvanje sopstvenih batch podesavanja |
-| Quick / Advanced raspored | Cist glavni ekran sa brzim batch tokom i odvojenim naprednim parametrima |
+| Quick / Advanced raspored | Cist glavni ekran sa brzim batch tokom, properties pregledom i odvojenim naprednim parametrima |
 | Split output | Deljenje dugackih fajlova na validne MP4 delove za FAT32/USB scenario |
 | Pause / Resume | Pauza posle trenutnog fajla, pa nastavak od sledeceg queued reda |
 | Queue alati | `Save Queue`, `Load Queue`, `Skip Selected`, `Retry Failed`, `Clear Completed`, `Move Up`, `Move Down` |
@@ -110,8 +110,8 @@ Program ume da radi i sa modernijim i sa starijim fajlovima, a kada playback nij
 2. Kliknes `Scan Files`.
 3. Pregledas `Properties`, procenu velicine i `USB note`.
 4. U `Quick Setup` zoni radis svakodnevni batch tok, a `Show Advanced` otvara detaljne parametre tek kada zatrebaju.
-5. Po potrebi otvoris `Open Player` za trim, multi-cut, crop i aspect korekciju.
-6. Donji `Status / Progress / Log` tabovi daju pregled bez gutanja preview prostora.
+5. Po potrebi otvoris `Open Player` za floating `Player / Trim` editor sa velikim preview-om, timeline-om i alatima sa strane.
+6. Donji `Status / Progress / Log` tabovi daju pregled, dok batch prozor ostaje rasterecen od stalnog preview panela.
 7. Ukljucis `Split output` ako isporuka ide na FAT32 ili zelis manje delove.
 8. Po potrebi biras `Encode engine`: `Auto`, `CPU (libx264/libx265)`, `NVIDIA NVENC`, `Intel QSV` ili `AMD AMF`.
 9. Po potrebi koristis `Queue` meni ili dugmad `Skip Selected`, `Retry Failed`, `Clear Completed`, `Save Queue` i `Load Queue`.

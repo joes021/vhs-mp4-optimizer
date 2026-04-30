@@ -37,7 +37,7 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - `Standard VHS`, `Smaller File`, `Better Quality` i `Custom` ostaju dostupni za stari VHS tok rada.
 7. Ako dugacak snimak mora da stane na USB koji ne prima fajlove vece od 4 GB, ukljuci `Split output` i ostavi `Max part GB` na `3.8`.
 8. Klikni `Scan Files`. Program pregleda izabrani folder i podfoldere.
-9. Pogledaj `Media info` kolone i desni `Properties` panel:
+9. Pogledaj `Media info` kolone i `Properties` panel na glavnom batch ekranu:
    - videces format, kontejner, rezoluciju, odnos stranica, FPS, broj frejmova, protok, audio i trajanje.
    - ako `ffprobe` ne moze da procita fajl, obrada moze da se nastavi, ali detalji i procena mogu ostati prazni.
 10. Ako treba ozbiljniji pregled ili trim, izaberi fajl i klikni `Open Player` ili ga otvori duplim klikom u tabeli.
@@ -54,14 +54,11 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - Polja `Left`, `Top`, `Right` i `Bottom` su rucna pixel korekcija kada hoces finije da pomeris granice.
    - `Crop overlay` pokazuje aktivni crop preko preview slike da odmah vidis koliko se sece sa svake strane.
    - `Save to Queue` vraca trim izmene nazad u glavni batch, bez posebnog exporta iz tog prozora.
-12. Ako ti treba samo brzi pregled ili sitna korekcija bez posebnog prozora, koristi desni `Preview / Properties` panel:
-   - `Trim selected file` je pri vrhu desnog panela.
-   - `Preview Frame` pravi jednu sliku iz videa na zadatom vremenu.
-   - `Crop overlay` pokazuje aktivni crop za izabrani fajl, sa vrednostima `Left`, `Top`, `Right`, `Bottom`.
-   - `Open Video` otvara originalni fajl u Windows player-u.
-   - `Start` i `End` primaju `HH:MM:SS`, `MM:SS` ili sekunde.
-   - `Apply Trim` pamti trim samo za izabrani fajl, a `Clear Trim` ga brise.
-   - kolone `Range` i `Crop` pokazuju koji fajlovi imaju trim i da li je crop `Auto` ili `Manual`.
+12. Glavni batch ekran sada ostaje cist:
+   - prikazuje queue, batch komande i `Properties` pregled za izabrani fajl
+   - ne drzi stalno otvoren preview/trimming panel
+   - pravi pregled, timeline, trim, crop i aspect rade samo u posebnom `Player / Trim` prozoru
+   - kolone `Range`, `Crop` i `Aspect` i dalje pokazuju sta je vec upisano za svaki fajl
 13. Ako snimak treba tehnicki popraviti, klikni `Show Advanced` pa koristi red `Video filters`:
    - `Deinterlace` za nazubljene linije kod VHS/DVD interlaced snimaka.
    - `Denoise` za blago smanjenje suma.
@@ -92,7 +89,7 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - `Clear Completed` cisti `done`, `skipped` i `stopped` stavke
    - `Save Queue` i `Load Queue` cuvaju ceo batch plan sa trim/crop/aspect stanjem
 22. Prati `Total progress` za ceo posao i `File progress` za trenutni fajl, procenat i ETA.
-   - Donji workspace je sada podeljen na `Status`, `Progress` i `Log`, tako da pregled batch-a ne guta preview prostor.
+   - Donji workspace je podeljen na `Status`, `Progress` i `Log`, a preview vise nije naguran u glavni ekran.
 23. Kada zavrsi, program pravi `IZVESTAJ.txt`, pusti kratak Windows signal i prikaze obavestenje.
 24. Klikni `Open Output` i prebaci gotove `.mp4` fajlove na USB ili cloud.
 25. U meniju `Help` imas `About VHS MP4 Optimizer`, `Check for Updates` i `Open User Guide`.
@@ -107,24 +104,18 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
 
 Ovo nije obicno secenje fajla na bajtove, nego FFmpeg pravi validne video delove koji mogu da se puste pojedinacno. Vrednost `3.8` je prakticna za FAT32 USB zato sto ostavlja malo rezerve ispod 4 GB.
 
-## Preview / trim
-
-Desni panel `Preview / Properties` sluzi za proveru i rucno secenje pojedinacnog fajla pre batch obrade. Deo `Trim selected file` je pri vrhu desnog panela.
-
-- `Preview Frame` ne menja originalni fajl; samo pravi sliku za proveru kadra.
-- `Open Video` otvara originalni fajl u podrazumevanom Windows player-u.
-- `Start` i `End` su opcioni. Mozes uneti samo `Start`, samo `End`, ili oba.
-- `Apply Trim` upisuje trim samo za izabrani red u tabeli.
-- `Clear Trim` brise trim za izabrani red.
-
-Kada kliknes `Start Conversion`, trim se primenjuje samo na fajlove koji u koloni `Range` imaju opseg. `IZVESTAJ.txt` belezi trim za te fajlove.
-
 ## Player / Trim prozor
 
-Ako kliknes `Open Player` ili uradis dupli klik na red u tabeli, otvara se poseban prozor `Player / Trim`.
+Ako kliknes `Open Player` ili uradis dupli klik na red u tabeli, otvara se poseban floating prozor `Player / Trim`. To je glavni editor za rad nad jednim fajlom i moze da stoji pored batch prozora.
 
 - `Playback mode` daje pravi video pregled za `.mp4`, `.mov` i `.mkv`.
 - `Preview mode` koristi isti precizan trim workflow i FFmpeg frame preview za `.avi`, MSDV, `.mpg` i slicne problematicke fajlove.
+- veliki preview je levo, timeline je ispod preview-a, a trim/crop/aspect/properties alati su u desnoj koloni
+- `Preview Frame` ne menja originalni fajl; samo pravi sliku za proveru kadra
+- `Open Video` otvara originalni fajl u podrazumevanom Windows player-u
+- `Start`, `End` i `CUT` oznake su stalno vidljive iznad trim sekcije, tako da se lako prati aktivan opseg
+- `Apply Trim` upisuje jedan trim opseg, a `Add Segment` / `Remove` / `Clear Seg` rade multi-cut tok
+- `Clear Trim` brise aktivni trim za taj fajl
 - `Aspect / Pixel shape` sekcija u istom prozoru drzi lokalni `Aspect mode` za taj fajl:
   - `Auto` koristi metadata + PAL/DV ili NTSC/DV heuristiku.
   - `Keep Original` cuva isti prikaz izvora, ali po potrebi pravi square-pixel izlaz.
@@ -239,7 +230,7 @@ Procena velicine je orijentaciona, jer realna velicina zavisi od sadrzaja snimka
 
 ## Media info / Properties
 
-`Scan Files` koristi `ffprobe` iz FFmpeg paketa da procita tehnicke podatke o svakom ulaznom fajlu. U tabeli se vide kratke vrednosti, a desni `Properties` panel prikazuje detalje za izabrani fajl:
+`Scan Files` koristi `ffprobe` iz FFmpeg paketa da procita tehnicke podatke o svakom ulaznom fajlu. U tabeli se vide kratke vrednosti, a `Properties` panel na glavnom batch ekranu prikazuje detalje za izabrani fajl:
 
 - kontejner i format
 - trajanje i velicina

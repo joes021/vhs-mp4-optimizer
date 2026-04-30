@@ -1,10 +1,10 @@
 {
     "AppName":  "VHS MP4 Optimizer",
-    "Version":  "2026.04.30-0701e27",
-    "GitRef":  "0701e27",
-    "ReleaseTag":  "vhs-mp4-optimizer-2026.04.30-0701e27",
+    "Version":  "2026.04.30-8695f34",
+    "GitRef":  "8695f34",
+    "ReleaseTag":  "vhs-mp4-optimizer-2026.04.30-8695f34",
     "Repository":  "joes021/vhs-mp4-optimizer",
     "LatestReleaseApi":  "https://api.github.com/repos/joes021/vhs-mp4-optimizer/releases/latest",
     "ReleasesPage":  "https://github.com/joes021/vhs-mp4-optimizer/releases",
-    "BuiltAtUtc":  "2026-04-29T22:23:09.4742571Z"
+    "BuiltAtUtc":  "2026-04-30T00:25:34.3815132Z"
 }

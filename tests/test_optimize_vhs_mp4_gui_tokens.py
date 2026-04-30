@@ -113,7 +113,7 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
         "Frames",
         "Properties",
         "Media info",
-        "Preview / Properties",
+        "Selected file / Properties",
         "previewPictureBox",
         "previewTimeTextBox",
         "previewFrameButton",
@@ -175,7 +175,7 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
         script,
     )
     assert top_row, "missing fixed top configuration row"
-    assert int(top_row.group(1)) <= 190
+    assert int(top_row.group(1)) <= 220
 
     for token in [
         "$topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel",
@@ -197,68 +197,49 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
     assert "$configLayout.AutoScroll = $true" in script
 
 
-def test_vhs_gui_uses_split_editor_with_always_visible_preview_and_trim() -> None:
+def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_editor_entrypoint() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$rightPanel.RowCount = 2",
-        "$rightWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer",
-        "$rightWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
-        "$rightWorkspaceSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
-        "$rightWorkspaceSplit.Panel1.Controls.Add($previewWorkspaceLayout)",
-        "$rightEditorTabControl = New-Object System.Windows.Forms.TabControl",
-        '$trimTabPage.Text = "Trim"',
-        '$propertiesTabPage.Text = "Properties"',
-        "$rightEditorTabControl.TabPages.Add($trimTabPage)",
-        "$rightEditorTabControl.TabPages.Add($propertiesTabPage)",
-        "$rightWorkspaceSplit.Panel2.Controls.Add($rightEditorTabControl)",
-        "$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)",
-        "$trimTabPage.Controls.Add($trimGroupBox)",
-        "$propertiesTabPage.Controls.Add($infoBox)",
-        "$previewWorkspaceLayout.Controls.Add($previewPictureBox, 0, 0)",
-        "$previewWorkspaceLayout.Controls.Add($previewControlsPanel, 0, 1)",
+        "$rightPanel.RowCount = 3",
+        '$previewStatusLabel.Text = "Selected file"',
+        "$selectedFileSummaryLabel = New-Object System.Windows.Forms.Label",
+        "$propertiesGroupBox = New-Object System.Windows.Forms.GroupBox",
+        '$propertiesGroupBox.Text = "Properties / Media info"',
+        "$propertiesGroupBox.Controls.Add($infoBox)",
+        "function Open-SelectedPlayerTrimEditor",
+        "$grid.Add_CellDoubleClick({",
+        "$openPlayerButton.Add_Click({",
+        "Open-SelectedPlayerTrimEditor",
     ]:
-        assert token in script, f"missing split editor token: {token}"
+        assert token in script, f"missing batch/properties/floating-editor token: {token}"
 
-    assert "$rightTabControl = New-Object System.Windows.Forms.TabControl" not in script
-    assert '$previewTabPage.Text = "Preview"' not in script
+    assert "$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)" not in script
 
 
-def test_vhs_gui_reserves_readable_right_panel_width_and_stable_trim_layout() -> None:
+def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_state() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$script:RightPanelTargetWidth = 620",
+        "$script:RightPanelTargetWidth = 440",
         "$mainSplit.Panel2MinSize = $script:RightPanelTargetWidth",
         "$mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
         "function Set-MainSplitLayout",
+        "$script:PlayerTrimEditorWindow = $null",
+        '$script:PlayerTrimEditorSourcePath = ""',
+        "$script:PlayerTrimEditorBounds = $null",
         "$form.Add_Shown({",
         "Set-MainSplitLayout",
-        "$previewStartMarkerLabel = New-Object System.Windows.Forms.Label",
-        "$previewEndMarkerLabel = New-Object System.Windows.Forms.Label",
-        "$previewTrimSummaryLabel = New-Object System.Windows.Forms.Label",
-        "$trimLayout = New-Object System.Windows.Forms.TableLayoutPanel",
-        "$trimLayout.ColumnCount = 4",
-        "$trimLayout.RowCount = 4",
-        "$trimGroupBox.Controls.Add($trimLayout)",
-        "$trimLayout.Controls.Add($trimStartLabel, 0, 0)",
-        "$trimLayout.Controls.Add($trimStartTextBox, 1, 0)",
-        "$trimLayout.Controls.Add($trimEndLabel, 2, 0)",
-        "$trimLayout.Controls.Add($trimEndTextBox, 3, 0)",
-        "$trimButtonsFlow = New-Object System.Windows.Forms.FlowLayoutPanel",
-        "$trimLayout.Controls.Add($trimButtonsFlow, 0, 1)",
-        "$trimButtonsFlow.Controls.Add($applyTrimButton)",
-        "$trimButtonsFlow.Controls.Add($addSegmentButton)",
-        "$trimButtonsFlow.Controls.Add($removeSegmentButton)",
-        "$trimButtonsFlow.Controls.Add($clearSegmentsButton)",
-        "$trimButtonsFlow.Controls.Add($clearTrimButton)",
-        "$trimLayout.Controls.Add($trimSegmentsListBox, 0, 2)",
-        "$trimLayout.Controls.Add($cutRangeLabel, 0, 3)",
+        "[switch]$Modeless",
+        "[scriptblock]$OnSave",
+        '$cancelPlayerButton.Text = if ($Modeless) { "Close" } else { "Cancel" }',
+        "Save-PlayerTrimChanges -CloseAfterSave",
+        "$dialog.Add_FormClosed({",
     ]:
-        assert token in script, f"missing stable right-panel UI token: {token}"
+        assert token in script, f"missing sidebar/editor-state token: {token}"
 
 
-def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
+def test_vhs_gui_reserves_vertical_space_for_batch_workspace_and_properties_sidebar() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     root_fixed_rows = [
@@ -268,8 +249,8 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
             script,
         )
     ]
-    assert root_fixed_rows == [184, 128]
-    assert sum(root_fixed_rows) <= 320
+    assert root_fixed_rows == [208, 128]
+    assert sum(root_fixed_rows) <= 340
 
     for token in [
         "$rootLayout.RowCount = 3",
@@ -290,23 +271,14 @@ def test_vhs_gui_reserves_vertical_space_for_preview_panel() -> None:
         r"\$rightPanel\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
         script,
     )
-    assert right_rows[:2] == [
+    assert right_rows[:3] == [
         ("Absolute", "24"),
+        ("Absolute", "48"),
         ("Percent", "100"),
     ]
 
-    preview_rows = re.findall(
-        r"\$previewWorkspaceLayout\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
-        script,
-    )
-    assert preview_rows[:3] == [
-        ("Percent", "100"),
-        ("Absolute", "132"),
-        ("Absolute", "28"),
-    ]
 
-
-def test_vhs_gui_main_workspace_keeps_quick_actions_and_trim_controls_visible(tmp_path: Path) -> None:
+def test_vhs_gui_main_workspace_keeps_quick_actions_and_properties_visible(tmp_path: Path) -> None:
     source = tmp_path / "clip.mp4"
     source.write_text("source", encoding="utf-8")
     output_dir = tmp_path / "out"
@@ -325,7 +297,7 @@ function Test-ControlReachableOnForm {{
         [System.Windows.Forms.Form]$OwnerForm
     )
 
-    if ($null -eq $Control -or $null -eq $OwnerForm -or -not $Control.Visible) {{
+    if ($null -eq $Control -or $null -eq $OwnerForm -or -not $Control.Visible -or $null -eq $Control.Parent) {{
         return $false
     }}
 
@@ -373,21 +345,17 @@ Set-GridRows -Plan @($item)
 Update-PreviewTrimPanel
 $form.Show()
 [System.Windows.Forms.Application]::DoEvents()
-$trimStartTextBox.Text = '00:00:10'
-$trimEndTextBox.Text = '00:00:20'
-Update-CutRangeDisplay
 Write-Output 'JSON_START'
 [pscustomobject]@{{
     SavePresetVisible = Test-ControlReachableOnForm $savePresetButton $form
     StartConversionVisible = Test-ControlReachableOnForm $startButton $form
     OpenReportVisible = Test-ControlReachableOnForm $openReportButton $form
-    ApplyTrimVisible = Test-ControlReachableOnForm $applyTrimButton $form
-    StartMarkerVisible = Test-ControlReachableOnForm $previewStartMarkerLabel $form
-    EndMarkerVisible = Test-ControlReachableOnForm $previewEndMarkerLabel $form
-    TrimSummaryVisible = Test-ControlReachableOnForm $previewTrimSummaryLabel $form
-    StartMarkerText = $previewStartMarkerLabel.Text
-    EndMarkerText = $previewEndMarkerLabel.Text
-    TrimSummaryText = $previewTrimSummaryLabel.Text
+    OpenPlayerVisible = Test-ControlReachableOnForm $openPlayerButton $form
+    PropertiesVisible = Test-ControlReachableOnForm $propertiesGroupBox $form
+    SummaryVisible = Test-ControlReachableOnForm $selectedFileSummaryLabel $form
+    PreviewReachable = Test-ControlReachableOnForm $previewPictureBox $form
+    TrimReachable = Test-ControlReachableOnForm $trimGroupBox $form
+    SummaryText = $selectedFileSummaryLabel.Text
 }} | ConvertTo-Json -Depth 6
 try {{ $form.Close() }} catch {{}}
 try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
@@ -420,13 +388,12 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["SavePresetVisible"] is True
     assert payload["StartConversionVisible"] is True
     assert payload["OpenReportVisible"] is True
-    assert payload["ApplyTrimVisible"] is True
-    assert payload["StartMarkerVisible"] is True
-    assert payload["EndMarkerVisible"] is True
-    assert payload["TrimSummaryVisible"] is True
-    assert payload["StartMarkerText"] == "Start: 00:00:10"
-    assert payload["EndMarkerText"] == "End: 00:00:20"
-    assert "CUT:" in payload["TrimSummaryText"]
+    assert payload["OpenPlayerVisible"] is True
+    assert payload["PropertiesVisible"] is True
+    assert payload["SummaryVisible"] is True
+    assert payload["PreviewReachable"] is False
+    assert payload["TrimReachable"] is False
+    assert "Open Player" in payload["SummaryText"]
 
 
 def test_vhs_gui_has_manual_timeline_frame_and_cut_controls() -> None:
@@ -2200,13 +2167,13 @@ Update-SelectedTrimGridRow -Item $itemTwo
 $rowOne.Selected = $true
 $grid.CurrentCell = $rowOne.Cells['SourceName']
 Update-PreviewTrimPanel
-$manualStatus = $previewStatusLabel.Text
+$manualStatus = $selectedFileSummaryLabel.Text
 $manualOverlay = $previewCropOverlayLabel.Text
 
 $rowTwo.Selected = $true
 $grid.CurrentCell = $rowTwo.Cells['SourceName']
 Update-PreviewTrimPanel
-$noneStatus = $previewStatusLabel.Text
+$noneStatus = $selectedFileSummaryLabel.Text
 $noneOverlay = $previewCropOverlayLabel.Text
 
 Write-Output 'JSON_START'
@@ -3607,3 +3574,50 @@ def test_vhs_gui_update_handles_application_control_policy_block_with_fallback()
         "Start-Process -FilePath ([string]$LatestRelease.HtmlUrl)",
     ]:
         assert token in script, f"missing update policy fallback token: {token}"
+
+
+def test_vhs_gui_floating_editor_layout_uses_large_preview_left_and_tools_right() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "$playerRootLayout.ColumnCount = 2",
+        "$playerRootLayout.RowCount = 2",
+        "$playerWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        "$playerWorkspaceLayout.RowCount = 5",
+        "$timelineInfoLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        "$playerTimelineTrackBar = New-Object System.Windows.Forms.TrackBar",
+        "$playerMarkersLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        "$playerStartMarkerLabel = New-Object System.Windows.Forms.Label",
+        "$playerEndMarkerLabel = New-Object System.Windows.Forms.Label",
+        "$playerTimelineSummaryLabel = New-Object System.Windows.Forms.Label",
+        "$toolColumnLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        '$playerTrimGroupBox.Text = "Trim"',
+        '$cropGroupBox.Text = "Crop / Overscan"',
+        '$aspectGroupBox.Text = "Aspect / Pixel shape"',
+        '$playerPropertiesGroupBox.Text = "Properties"',
+        "$playerPreviewTimeTextBox = New-Object System.Windows.Forms.TextBox",
+        "$playerOpenVideoButton = New-Object System.Windows.Forms.Button",
+        "$clearPlayerTrimButton = New-Object System.Windows.Forms.Button",
+    ]:
+        assert token in script, f"missing floating editor layout token: {token}"
+
+
+def test_vhs_gui_modeless_editor_reuses_single_window_tokens() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "function Open-SelectedPlayerTrimEditor",
+        "$existingWindow = $script:PlayerTrimEditorWindow",
+        'if ([string]$script:PlayerTrimEditorSourcePath -eq $itemSourcePath)',
+        "$existingWindow.Activate()",
+        "$existingWindow.Focus()",
+        "$existingWindow.Close()",
+        "$script:PlayerTrimEditorWindow = $editorWindow",
+        "$script:PlayerTrimEditorSourcePath = $itemSourcePath",
+        "$editorWindow.Show($form)",
+        "$editorWindow.Activate()",
+        "$dialog.Add_FormClosed({",
+        "$script:PlayerTrimEditorWindow = $null",
+        '$script:PlayerTrimEditorSourcePath = ""',
+    ]:
+        assert token in script, f"missing modeless editor reuse token: {token}"
