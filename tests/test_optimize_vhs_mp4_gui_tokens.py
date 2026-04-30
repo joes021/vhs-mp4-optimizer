@@ -228,18 +228,23 @@ def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_st
         "$script:PlayerTrimEditorWindow = $null",
         '$script:PlayerTrimEditorSourcePath = ""',
         "$script:PlayerTrimEditorBounds = $null",
+        "$runtimeState = [pscustomobject]@{",
+        "$playerRuntimeContext = [pscustomobject]@{",
+        "$playerRuntime = New-Module -AsCustomObject -ArgumentList $playerRuntimeContext -ScriptBlock {",
         "$form.Add_Shown({",
         "Set-MainSplitLayout",
         "[switch]$Modeless",
         "[scriptblock]$OnSave",
         '$cancelPlayerButton.Text = if ($Modeless) { "Close" } else { "Cancel" }',
-        "Save-PlayerTrimChanges -CloseAfterSave",
-        "$dialog.Add_FormClosed({",
+        "$dialog.Add_FormClosing(({",
+        "$playerRuntime.'Save-PlayerTrimChanges'($true)",
+        "}).GetNewClosure())",
+        "$dialog.Add_FormClosed(({",
     ]:
         assert token in script, f"missing sidebar/editor-state token: {token}"
 
 
-def test_vhs_gui_reserves_vertical_space_for_batch_workspace_and_properties_sidebar() -> None:
+def test_vhs_gui_uses_resizable_horizontal_split_between_workspace_and_status_tabs() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     root_fixed_rows = [
@@ -249,11 +254,18 @@ def test_vhs_gui_reserves_vertical_space_for_batch_workspace_and_properties_side
             script,
         )
     ]
-    assert root_fixed_rows == [208, 128]
-    assert sum(root_fixed_rows) <= 340
+    assert root_fixed_rows == [208]
+    assert sum(root_fixed_rows) <= 240
 
     for token in [
-        "$rootLayout.RowCount = 3",
+        "$rootLayout.RowCount = 2",
+        "$workspaceSplit = New-Object System.Windows.Forms.SplitContainer",
+        "$workspaceSplit.Dock = \"Fill\"",
+        "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
+        "$workspaceSplit.Panel1.Controls.Add($mainSplit)",
+        "$workspaceSplit.Panel2.Controls.Add($activityTabControl)",
+        "$split.Panel2MinSize = 180",
+        "function Set-WorkspaceSplitLayout",
         "$activityTabControl = New-Object System.Windows.Forms.TabControl",
         '$statusTabPage.Text = "Status"',
         '$progressTabPage.Text = "Progress"',
@@ -276,6 +288,28 @@ def test_vhs_gui_reserves_vertical_space_for_batch_workspace_and_properties_side
         ("Absolute", "48"),
         ("Percent", "100"),
     ]
+
+
+def test_vhs_gui_status_panel_allocates_readable_message_space() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    status_rows = re.findall(
+        r"\$statusPanel\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
+        script,
+    )
+    assert status_rows[:3] == [
+        ("Absolute", "24"),
+        ("Percent", "100"),
+        ("Absolute", "28"),
+    ]
+
+    for token in [
+        '$statusValueLabel.Dock = "Fill"',
+        '$statusValueLabel.TextAlign = "TopLeft"',
+        "$statusValueLabel.AutoSize = $false",
+        "$workspaceSplit.SplitterDistance = 520",
+    ]:
+        assert token in script, f"missing readable status layout token: {token}"
 
 
 def test_vhs_gui_main_workspace_keeps_quick_actions_and_properties_visible(tmp_path: Path) -> None:
@@ -3616,7 +3650,7 @@ def test_vhs_gui_modeless_editor_reuses_single_window_tokens() -> None:
         "$script:PlayerTrimEditorSourcePath = $itemSourcePath",
         "$editorWindow.Show($form)",
         "$editorWindow.Activate()",
-        "$dialog.Add_FormClosed({",
+        "$dialog.Add_FormClosed(({",
         "$script:PlayerTrimEditorWindow = $null",
         '$script:PlayerTrimEditorSourcePath = ""',
     ]:

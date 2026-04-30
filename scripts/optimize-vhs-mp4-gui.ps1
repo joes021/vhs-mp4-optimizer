@@ -136,19 +136,20 @@ function Set-MainSplitLayout {
     }
 }
 
-function Set-RightWorkspaceLayout {
-    if (-not (Get-Variable -Name "rightWorkspaceSplit" -ErrorAction SilentlyContinue)) {
+function Set-WorkspaceSplitLayout {
+    $splitVariable = Get-Variable -Name workspaceSplit -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $splitVariable) {
         return
     }
 
-    $split = $rightWorkspaceSplit
+    $split = $splitVariable.Value
     if ($null -eq $split -or $split.Height -le 0) {
         return
     }
 
-    $desiredBottomHeight = 190
-    $split.Panel1MinSize = 250
-    $split.Panel2MinSize = 184
+    $desiredBottomHeight = 220
+    $split.Panel1MinSize = 320
+    $split.Panel2MinSize = 180
     $desiredDistance = $split.Height - $desiredBottomHeight - $split.SplitterWidth
     $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
     $distance = [Math]::Max($split.Panel1MinSize, $desiredDistance)
@@ -4551,6 +4552,94 @@ function Open-PlayerTrimWindow {
 
     $playbackTimer = New-Object System.Windows.Forms.Timer
     $playbackTimer.Interval = 200
+    $runtimeState = [pscustomobject]@{
+        DurationSeconds = $durationSeconds
+        FrameRate = $frameRate
+        DialogResult = $dialogResult
+        ClosingAfterSave = $closingAfterSave
+        PlaybackReady = $playbackReady
+    }
+
+    $playerRuntimeContext = [pscustomobject]@{
+        Dialog = $dialog
+        Item = $Item
+        MediaInfo = $mediaInfo
+        LocalState = $localState
+        RuntimeState = $runtimeState
+        Modeless = [bool]$Modeless
+        OnSave = $OnSave
+        MediaElement = $mediaElement
+        PlaybackHost = $playbackHost
+        PlayerModeLabel = $playerModeLabel
+        PlayerPreviewPictureBox = $playerPreviewPictureBox
+        PlayPauseButton = $playPauseButton
+        StopPlaybackButton = $stopPlaybackButton
+        PlayerPreviewFrameButton = $playerPreviewFrameButton
+        PlayerSegmentsListBox = $playerSegmentsListBox
+        RemovePlayerSegmentButton = $removePlayerSegmentButton
+        ClearPlayerSegmentsButton = $clearPlayerSegmentsButton
+        PlayerTrimStartTextBox = $playerTrimStartTextBox
+        PlayerTrimEndTextBox = $playerTrimEndTextBox
+        PlayerCutRangeLabel = $playerCutRangeLabel
+        PlayerTimelineSummaryLabel = $playerTimelineSummaryLabel
+        PlayerStartMarkerLabel = $playerStartMarkerLabel
+        PlayerEndMarkerLabel = $playerEndMarkerLabel
+        PlayerCropLeftTextBox = $playerCropLeftTextBox
+        PlayerCropTopTextBox = $playerCropTopTextBox
+        PlayerCropRightTextBox = $playerCropRightTextBox
+        PlayerCropBottomTextBox = $playerCropBottomTextBox
+        PlayerCropStateLabel = $playerCropStateLabel
+        PlayerAspectModeComboBox = $playerAspectModeComboBox
+        PlayerAspectDetailsLabel = $playerAspectDetailsLabel
+        PlayerAspectGeometryLabel = $playerAspectGeometryLabel
+        PlayerPositionLabel = $playerPositionLabel
+        PlayerPreviewTimeTextBox = $playerPreviewTimeTextBox
+        PlayerTimelineTrackBar = $playerTimelineTrackBar
+        PlaybackTimer = $playbackTimer
+        ResolvedFfmpegPath = $script:ResolvedFfmpegPath
+        PreviewTimelineScale = $script:PreviewTimelineScale
+    }
+
+    $playerRuntime = New-Module -AsCustomObject -ArgumentList $playerRuntimeContext -ScriptBlock {
+        param($ctx)
+
+        $dialog = $ctx.Dialog
+        $Item = $ctx.Item
+        $mediaInfo = $ctx.MediaInfo
+        $localState = $ctx.LocalState
+        $runtimeState = $ctx.RuntimeState
+        $Modeless = [bool]$ctx.Modeless
+        $OnSave = $ctx.OnSave
+        $mediaElement = $ctx.MediaElement
+        $playbackHost = $ctx.PlaybackHost
+        $playerModeLabel = $ctx.PlayerModeLabel
+        $playerPreviewPictureBox = $ctx.PlayerPreviewPictureBox
+        $playPauseButton = $ctx.PlayPauseButton
+        $stopPlaybackButton = $ctx.StopPlaybackButton
+        $playerPreviewFrameButton = $ctx.PlayerPreviewFrameButton
+        $playerSegmentsListBox = $ctx.PlayerSegmentsListBox
+        $removePlayerSegmentButton = $ctx.RemovePlayerSegmentButton
+        $clearPlayerSegmentsButton = $ctx.ClearPlayerSegmentsButton
+        $playerTrimStartTextBox = $ctx.PlayerTrimStartTextBox
+        $playerTrimEndTextBox = $ctx.PlayerTrimEndTextBox
+        $playerCutRangeLabel = $ctx.PlayerCutRangeLabel
+        $playerTimelineSummaryLabel = $ctx.PlayerTimelineSummaryLabel
+        $playerStartMarkerLabel = $ctx.PlayerStartMarkerLabel
+        $playerEndMarkerLabel = $ctx.PlayerEndMarkerLabel
+        $playerCropLeftTextBox = $ctx.PlayerCropLeftTextBox
+        $playerCropTopTextBox = $ctx.PlayerCropTopTextBox
+        $playerCropRightTextBox = $ctx.PlayerCropRightTextBox
+        $playerCropBottomTextBox = $ctx.PlayerCropBottomTextBox
+        $playerCropStateLabel = $ctx.PlayerCropStateLabel
+        $playerAspectModeComboBox = $ctx.PlayerAspectModeComboBox
+        $playerAspectDetailsLabel = $ctx.PlayerAspectDetailsLabel
+        $playerAspectGeometryLabel = $ctx.PlayerAspectGeometryLabel
+        $playerPositionLabel = $ctx.PlayerPositionLabel
+        $playerPreviewTimeTextBox = $ctx.PlayerPreviewTimeTextBox
+        $playerTimelineTrackBar = $ctx.PlayerTimelineTrackBar
+        $playbackTimer = $ctx.PlaybackTimer
+        $resolvedFfmpegPath = [string]$ctx.ResolvedFfmpegPath
+        $previewTimelineScale = [int]$ctx.PreviewTimelineScale
 
     function Set-PlayerTrimDialogDirty {
         param([bool]$Value = $true)
@@ -4589,7 +4678,7 @@ function Open-PlayerTrimWindow {
             $playerPreviewPictureBox.Visible = $true
             $playPauseButton.Enabled = $false
             $stopPlaybackButton.Enabled = $false
-            $playerPreviewFrameButton.Enabled = -not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)
+            $playerPreviewFrameButton.Enabled = -not [string]::IsNullOrWhiteSpace($resolvedFfmpegPath)
             try {
                 $mediaElement.Stop()
             }
@@ -4617,7 +4706,7 @@ function Open-PlayerTrimWindow {
     }
 
     function Update-PlayerCutDisplay {
-        $cutText = Format-CutTimelineMarkerText -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -DurationSeconds $durationSeconds
+        $cutText = Format-CutTimelineMarkerText -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -DurationSeconds $runtimeState.DurationSeconds
         $playerCutRangeLabel.Text = $cutText
         $playerTimelineSummaryLabel.Text = $cutText
         $playerStartMarkerLabel.Text = if ([string]::IsNullOrWhiteSpace($playerTrimStartTextBox.Text)) { "Start: --" } else { "Start: " + $playerTrimStartTextBox.Text }
@@ -4979,8 +5068,8 @@ function Open-PlayerTrimWindow {
         )
 
         $position = [Math]::Max(0.0, $Seconds)
-        if ($durationSeconds -gt 0) {
-            $position = [Math]::Min($durationSeconds, $position)
+        if ($runtimeState.DurationSeconds -gt 0) {
+            $position = [Math]::Min($runtimeState.DurationSeconds, $position)
         }
 
         $localState.PreviewPositionSeconds = $position
@@ -4989,16 +5078,16 @@ function Open-PlayerTrimWindow {
             $positionText = "00:00:00"
         }
 
-        $totalText = if ($durationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $durationSeconds } else { "--:--:--" }
+        $totalText = if ($runtimeState.DurationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $runtimeState.DurationSeconds } else { "--:--:--" }
         $playerPositionLabel.Text = $positionText + " / " + $totalText
         $playerPreviewTimeTextBox.Text = $positionText
 
-        $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
+        $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $previewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
         if ($playerTimelineTrackBar.Value -ne $timelineValue) {
             $playerTimelineTrackBar.Value = $timelineValue
         }
 
-        if ($SyncPlayer -and $localState.Mode -eq "Playback mode" -and $playbackReady) {
+        if ($SyncPlayer -and $localState.Mode -eq "Playback mode" -and $runtimeState.PlaybackReady) {
             try {
                 $mediaElement.Position = [TimeSpan]::FromSeconds($position)
             }
@@ -5006,10 +5095,10 @@ function Open-PlayerTrimWindow {
             }
         }
 
-        if ($RequestPreview -and $localState.Mode -eq "Preview mode" -and -not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) {
+        if ($RequestPreview -and $localState.Mode -eq "Preview mode" -and -not [string]::IsNullOrWhiteSpace($resolvedFfmpegPath)) {
             $previewPath = Get-PreviewFramePath -Item $Item
             try {
-                $result = New-VhsMp4PreviewFrame -SourcePath $Item.SourcePath -OutputPath $previewPath -FfmpegPath $script:ResolvedFfmpegPath -PreviewTime $positionText
+                $result = New-VhsMp4PreviewFrame -SourcePath $Item.SourcePath -OutputPath $previewPath -FfmpegPath $resolvedFfmpegPath -PreviewTime $positionText
                 if ($result.Success) {
                     $bytes = [System.IO.File]::ReadAllBytes($previewPath)
                     $stream = New-Object System.IO.MemoryStream(,$bytes)
@@ -5037,7 +5126,7 @@ function Open-PlayerTrimWindow {
 
     function Move-PlayerFrame {
         param([int]$Direction)
-        Set-PlayerPositionSeconds -Seconds ($localState.PreviewPositionSeconds + ($Direction * (1.0 / $frameRate))) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
+        Set-PlayerPositionSeconds -Seconds ($localState.PreviewPositionSeconds + ($Direction * (1.0 / $runtimeState.FrameRate))) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
     }
 
     function Set-PlayerTrimPoint {
@@ -5209,7 +5298,7 @@ function Open-PlayerTrimWindow {
                 $localState.TrimDurationSeconds = $window.DurationSeconds
             }
 
-            $dialogResult = [pscustomobject]@{
+            $runtimeState.DialogResult = [pscustomobject]@{
                 Saved = $true
                 Mode = [string]$localState.Mode
                 AspectState = [pscustomobject]@{
@@ -5233,16 +5322,16 @@ function Open-PlayerTrimWindow {
             Set-PlayerTrimDialogDirty -Value $false
             if ($Modeless) {
                 if ($null -ne $OnSave) {
-                    & $OnSave $Item $dialogResult
+                    & $OnSave $Item $runtimeState.DialogResult
                 }
                 if ($CloseAfterSave) {
-                    $closingAfterSave = $true
+                    $runtimeState.ClosingAfterSave = $true
                     $dialog.Close()
                 }
                 return
             }
 
-            $closingAfterSave = $true
+            $runtimeState.ClosingAfterSave = $true
             $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
             $dialog.Close()
         }
@@ -5250,118 +5339,227 @@ function Open-PlayerTrimWindow {
             [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Save to Queue", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
         }
     }
+        Export-ModuleMember -Function *
+    }
 
-    $mediaElement.Add_MediaOpened({
-        $playbackReady = $true
+    function Set-PlayerTrimDialogDirty {
+        param([bool]$Value = $true)
+        $playerRuntime.'Set-PlayerTrimDialogDirty'($Value)
+    }
+
+    function Set-PlayerTrimDialogMode {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Mode,
+            [string]$Reason = ""
+        )
+        $playerRuntime.'Set-PlayerTrimDialogMode'($Mode, $Reason)
+    }
+
+    function Sync-PlayerSegmentsList {
+        $playerRuntime.'Sync-PlayerSegmentsList'()
+    }
+
+    function Update-PlayerCutDisplay {
+        $playerRuntime.'Update-PlayerCutDisplay'()
+    }
+
+    function Load-PlayerTrimFields {
+        $playerRuntime.'Load-PlayerTrimFields'()
+    }
+
+    function Get-PlayerCropStateFromFields {
+        $playerRuntime.'Get-PlayerCropStateFromFields'()
+    }
+
+    function Load-PlayerCropFields {
+        $playerRuntime.'Load-PlayerCropFields'()
+    }
+
+    function Set-PlayerCropTextChanged {
+        $playerRuntime.'Set-PlayerCropTextChanged'()
+    }
+
+    function Apply-DetectedCropToPlayerState {
+        param(
+            [bool]$AcceptAuto = $false
+        )
+        $playerRuntime.'Apply-DetectedCropToPlayerState'($AcceptAuto)
+    }
+
+    function Clear-PlayerCropFields {
+        $playerRuntime.'Clear-PlayerCropFields'()
+    }
+
+    function Get-PlayerAspectModeFromLabel {
+        param(
+            [AllowNull()]
+            [string]$Label
+        )
+        $playerRuntime.'Get-PlayerAspectModeFromLabel'($Label)
+    }
+
+    function Sync-PlayerAspectPanel {
+        $playerRuntime.'Sync-PlayerAspectPanel'()
+    }
+
+    function Set-PlayerPositionSeconds {
+        param(
+            [double]$Seconds,
+            [bool]$SyncPlayer = $false,
+            [bool]$RequestPreview = $false
+        )
+        $playerRuntime.'Set-PlayerPositionSeconds'($Seconds, $SyncPlayer, $RequestPreview)
+    }
+
+    function Move-PlayerFrame {
+        param([int]$Direction)
+        $playerRuntime.'Move-PlayerFrame'($Direction)
+    }
+
+    function Set-PlayerTrimPoint {
+        param([ValidateSet("Start", "End")][string]$Point)
+        $playerRuntime.'Set-PlayerTrimPoint'($Point)
+    }
+
+    function Apply-PlayerTrimFields {
+        $playerRuntime.'Apply-PlayerTrimFields'()
+    }
+
+    function Add-PlayerTrimSegmentFromFields {
+        $playerRuntime.'Add-PlayerTrimSegmentFromFields'()
+    }
+
+    function Remove-PlayerTrimSegment {
+        $playerRuntime.'Remove-PlayerTrimSegment'()
+    }
+
+    function Clear-PlayerTrimSegments {
+        $playerRuntime.'Clear-PlayerTrimSegments'()
+    }
+
+    function Clear-PlayerTrimFields {
+        $playerRuntime.'Clear-PlayerTrimFields'()
+    }
+
+    function Save-PlayerTrimChanges {
+        param(
+            [switch]$CloseAfterSave
+        )
+        $playerRuntime.'Save-PlayerTrimChanges'([bool]$CloseAfterSave)
+    }
+
+    $mediaElement.Add_MediaOpened(({
+        $runtimeState.PlaybackReady = $true
         if ($mediaElement.NaturalDuration.HasTimeSpan) {
             $seconds = $mediaElement.NaturalDuration.TimeSpan.TotalSeconds
             if ($seconds -gt 0) {
-                $durationSeconds = $seconds
-                $playerTimelineTrackBar.Maximum = [Math]::Max(1, [int][Math]::Round($durationSeconds * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))
+                $runtimeState.DurationSeconds = $seconds
+                $playerTimelineTrackBar.Maximum = [Math]::Max(1, [int][Math]::Round($runtimeState.DurationSeconds * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))
             }
         }
-        Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -SyncPlayer:$false
-    })
+        $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $false)
+    }).GetNewClosure())
 
-    $mediaElement.Add_MediaEnded({
+    $mediaElement.Add_MediaEnded(({
         try {
             $mediaElement.Pause()
         }
         catch {
         }
-        Set-PlayerPositionSeconds -Seconds 0 -SyncPlayer:$false
-    })
+        $playerRuntime.'Set-PlayerPositionSeconds'(0, $false, $false)
+    }).GetNewClosure())
 
-    $mediaElement.Add_MediaFailed({
+    $mediaElement.Add_MediaFailed(({
         param($sender, $eventArgs)
-        Set-PlayerTrimDialogMode -Mode "Preview mode" -Reason "fallback"
-        Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -RequestPreview:$true
-    })
+        $playerRuntime.'Set-PlayerTrimDialogMode'("Preview mode", "fallback")
+        $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $true)
+    }).GetNewClosure())
 
-    $playbackTimer.Add_Tick({
-        if ($localState.Mode -ne "Playback mode" -or -not $playbackReady) {
+    $playbackTimer.Add_Tick(({
+        if ($localState.Mode -ne "Playback mode" -or -not $runtimeState.PlaybackReady) {
             return
         }
 
         try {
-            Set-PlayerPositionSeconds -Seconds $mediaElement.Position.TotalSeconds -SyncPlayer:$false
+            $playerRuntime.'Set-PlayerPositionSeconds'($mediaElement.Position.TotalSeconds, $false, $false)
         }
         catch {
         }
-    })
+    }).GetNewClosure())
 
-    $applyPlayerTrimButton.Add_Click({
-        Apply-PlayerTrimFields
-    })
+    $applyPlayerTrimButton.Add_Click(({
+        $playerRuntime.'Apply-PlayerTrimFields'()
+    }).GetNewClosure())
 
-    $setPlayerTrimStartButton.Add_Click({
-        Set-PlayerTrimPoint -Point Start
-    })
+    $setPlayerTrimStartButton.Add_Click(({
+        $playerRuntime.'Set-PlayerTrimPoint'("Start")
+    }).GetNewClosure())
 
-    $setPlayerTrimEndButton.Add_Click({
-        Set-PlayerTrimPoint -Point End
-    })
+    $setPlayerTrimEndButton.Add_Click(({
+        $playerRuntime.'Set-PlayerTrimPoint'("End")
+    }).GetNewClosure())
 
-    $addPlayerSegmentButton.Add_Click({
-        Add-PlayerTrimSegmentFromFields
-    })
+    $addPlayerSegmentButton.Add_Click(({
+        $playerRuntime.'Add-PlayerTrimSegmentFromFields'()
+    }).GetNewClosure())
 
-    $removePlayerSegmentButton.Add_Click({
-        Remove-PlayerTrimSegment
-    })
+    $removePlayerSegmentButton.Add_Click(({
+        $playerRuntime.'Remove-PlayerTrimSegment'()
+    }).GetNewClosure())
 
-    $clearPlayerSegmentsButton.Add_Click({
-        Clear-PlayerTrimSegments
-    })
+    $clearPlayerSegmentsButton.Add_Click(({
+        $playerRuntime.'Clear-PlayerTrimSegments'()
+    }).GetNewClosure())
 
-    $clearPlayerTrimButton.Add_Click({
-        Clear-PlayerTrimFields
-    })
+    $clearPlayerTrimButton.Add_Click(({
+        $playerRuntime.'Clear-PlayerTrimFields'()
+    }).GetNewClosure())
 
-    $playerSegmentsListBox.Add_SelectedIndexChanged({
-        Load-PlayerTrimFields
-    })
+    $playerSegmentsListBox.Add_SelectedIndexChanged(({
+        $playerRuntime.'Load-PlayerTrimFields'()
+    }).GetNewClosure())
 
-    $playerTrimStartTextBox.Add_TextChanged({
-        Update-PlayerCutDisplay
-    })
+    $playerTrimStartTextBox.Add_TextChanged(({
+        $playerRuntime.'Update-PlayerCutDisplay'()
+    }).GetNewClosure())
 
-    $playerTrimEndTextBox.Add_TextChanged({
-        Update-PlayerCutDisplay
-    })
+    $playerTrimEndTextBox.Add_TextChanged(({
+        $playerRuntime.'Update-PlayerCutDisplay'()
+    }).GetNewClosure())
 
-    $playerCropLeftTextBox.Add_TextChanged({
-        Set-PlayerCropTextChanged
-    })
+    $playerCropLeftTextBox.Add_TextChanged(({
+        $playerRuntime.'Set-PlayerCropTextChanged'()
+    }).GetNewClosure())
 
-    $playerCropTopTextBox.Add_TextChanged({
-        Set-PlayerCropTextChanged
-    })
+    $playerCropTopTextBox.Add_TextChanged(({
+        $playerRuntime.'Set-PlayerCropTextChanged'()
+    }).GetNewClosure())
 
-    $playerCropRightTextBox.Add_TextChanged({
-        Set-PlayerCropTextChanged
-    })
+    $playerCropRightTextBox.Add_TextChanged(({
+        $playerRuntime.'Set-PlayerCropTextChanged'()
+    }).GetNewClosure())
 
-    $playerCropBottomTextBox.Add_TextChanged({
-        Set-PlayerCropTextChanged
-    })
+    $playerCropBottomTextBox.Add_TextChanged(({
+        $playerRuntime.'Set-PlayerCropTextChanged'()
+    }).GetNewClosure())
 
-    $playerAspectModeComboBox.Add_SelectedIndexChanged({
+    $playerAspectModeComboBox.Add_SelectedIndexChanged(({
         if ($localState.AspectModeControlSync) {
             return
         }
 
-        $localState.AspectMode = Get-PlayerAspectModeFromLabel -Label ([string]$playerAspectModeComboBox.SelectedItem)
-        Sync-PlayerAspectPanel
-        Set-PlayerTrimDialogDirty
-    })
+        $localState.AspectMode = $playerRuntime.'Get-PlayerAspectModeFromLabel'([string]$playerAspectModeComboBox.SelectedItem)
+        $playerRuntime.'Sync-PlayerAspectPanel'()
+        $playerRuntime.'Set-PlayerTrimDialogDirty'()
+    }).GetNewClosure())
 
-    $playerTimelineTrackBar.Add_Scroll({
+    $playerTimelineTrackBar.Add_Scroll(({
         $requestPreview = $localState.Mode -eq "Preview mode"
-        Set-PlayerPositionSeconds -Seconds ([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:$requestPreview
-    })
+        $playerRuntime.'Set-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale), ($localState.Mode -eq "Playback mode"), $requestPreview)
+    }).GetNewClosure())
 
-    $playerPreviewTimeTextBox.Add_Leave({
+    $playerPreviewTimeTextBox.Add_Leave(({
         $seconds = $localState.PreviewPositionSeconds
         try {
             $parsed = Convert-VhsMp4TimeTextToSeconds -Value $playerPreviewTimeTextBox.Text
@@ -5373,10 +5571,10 @@ function Open-PlayerTrimWindow {
             $seconds = $localState.PreviewPositionSeconds
         }
 
-        Set-PlayerPositionSeconds -Seconds $seconds -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
-    })
+        $playerRuntime.'Set-PlayerPositionSeconds'($seconds, ($localState.Mode -eq "Playback mode"), ($localState.Mode -eq "Preview mode"))
+    }).GetNewClosure())
 
-    $playPauseButton.Add_Click({
+    $playPauseButton.Add_Click(({
         if ($localState.Mode -ne "Playback mode") {
             return
         }
@@ -5386,11 +5584,11 @@ function Open-PlayerTrimWindow {
             $playbackTimer.Start()
         }
         catch {
-            Set-PlayerTrimDialogMode -Mode "Preview mode" -Reason "fallback"
+            $playerRuntime.'Set-PlayerTrimDialogMode'("Preview mode", "fallback")
         }
-    })
+    }).GetNewClosure())
 
-    $stopPlaybackButton.Add_Click({
+    $stopPlaybackButton.Add_Click(({
         if ($localState.Mode -eq "Playback mode") {
             try {
                 $mediaElement.Stop()
@@ -5399,76 +5597,76 @@ function Open-PlayerTrimWindow {
             }
             $playbackTimer.Stop()
         }
-        Set-PlayerPositionSeconds -Seconds 0 -SyncPlayer:$false -RequestPreview:($localState.Mode -eq "Preview mode")
-    })
+        $playerRuntime.'Set-PlayerPositionSeconds'(0, $false, ($localState.Mode -eq "Preview mode"))
+    }).GetNewClosure())
 
-    $previousPlayerFrameButton.Add_Click({
-        Move-PlayerFrame -Direction -1
-    })
+    $previousPlayerFrameButton.Add_Click(({
+        $playerRuntime.'Move-PlayerFrame'(-1)
+    }).GetNewClosure())
 
-    $nextPlayerFrameButton.Add_Click({
-        Move-PlayerFrame -Direction 1
-    })
+    $nextPlayerFrameButton.Add_Click(({
+        $playerRuntime.'Move-PlayerFrame'(1)
+    }).GetNewClosure())
 
-    $playerPreviewFrameButton.Add_Click({
-        Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -RequestPreview:$true
-    })
+    $playerPreviewFrameButton.Add_Click(({
+        $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $true)
+    }).GetNewClosure())
 
-    $playerOpenVideoButton.Add_Click({
+    $playerOpenVideoButton.Add_Click(({
         try {
             Start-Process -FilePath $Item.SourcePath
         }
         catch {
             [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Open Video", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
         }
-    })
+    }).GetNewClosure())
 
-    $detectCropButton.Add_Click({
-        Apply-DetectedCropToPlayerState
-    })
+    $detectCropButton.Add_Click(({
+        $playerRuntime.'Apply-DetectedCropToPlayerState'($false)
+    }).GetNewClosure())
 
-    $autoCropButton.Add_Click({
-        Apply-DetectedCropToPlayerState -AcceptAuto:$true
-    })
+    $autoCropButton.Add_Click(({
+        $playerRuntime.'Apply-DetectedCropToPlayerState'($true)
+    }).GetNewClosure())
 
-    $clearCropButton.Add_Click({
-        Clear-PlayerCropFields
-    })
+    $clearCropButton.Add_Click(({
+        $playerRuntime.'Clear-PlayerCropFields'()
+    }).GetNewClosure())
 
-    $saveToQueueButton.Add_Click({
-        Save-PlayerTrimChanges
-    })
+    $saveToQueueButton.Add_Click(({
+        $playerRuntime.'Save-PlayerTrimChanges'($false)
+    }).GetNewClosure())
 
-    $cancelPlayerButton.Add_Click({
+    $cancelPlayerButton.Add_Click(({
         $dialog.Close()
-    })
+    }).GetNewClosure())
 
-    $dialog.Add_KeyDown({
+    $dialog.Add_KeyDown(({
         param($sender, $eventArgs)
 
         if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Left) {
-            Move-PlayerFrame -Direction -1
+            $playerRuntime.'Move-PlayerFrame'(-1)
             $eventArgs.SuppressKeyPress = $true
             $eventArgs.Handled = $true
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Right) {
-            Move-PlayerFrame -Direction 1
+            $playerRuntime.'Move-PlayerFrame'(1)
             $eventArgs.SuppressKeyPress = $true
             $eventArgs.Handled = $true
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::I) {
-            Set-PlayerTrimPoint -Point Start
+            $playerRuntime.'Set-PlayerTrimPoint'("Start")
             $eventArgs.SuppressKeyPress = $true
             $eventArgs.Handled = $true
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::O) {
-            Set-PlayerTrimPoint -Point End
+            $playerRuntime.'Set-PlayerTrimPoint'("End")
             $eventArgs.SuppressKeyPress = $true
             $eventArgs.Handled = $true
         }
-    })
+    }).GetNewClosure())
 
-    $dialog.Add_FormClosing({
+    $dialog.Add_FormClosing(({
         param($sender, $eventArgs)
 
         $playbackTimer.Stop()
@@ -5478,7 +5676,7 @@ function Open-PlayerTrimWindow {
         catch {
         }
 
-        if ($closingAfterSave -or -not $localState.Dirty) {
+        if ($runtimeState.ClosingAfterSave -or -not $localState.Dirty) {
             return
         }
 
@@ -5491,19 +5689,19 @@ function Open-PlayerTrimWindow {
 
         if ($response -eq [System.Windows.Forms.DialogResult]::Yes) {
             $eventArgs.Cancel = $true
-            Save-PlayerTrimChanges -CloseAfterSave
+            $playerRuntime.'Save-PlayerTrimChanges'($true)
             return
         }
 
         if ($response -eq [System.Windows.Forms.DialogResult]::Cancel) {
             $eventArgs.Cancel = $true
         }
-    })
+    }).GetNewClosure())
 
-    Set-PlayerTrimDialogMode -Mode $localState.Mode
-    Sync-PlayerSegmentsList
-    Load-PlayerTrimFields
-    Load-PlayerCropFields
+    $playerRuntime.'Set-PlayerTrimDialogMode'($localState.Mode)
+    $playerRuntime.'Sync-PlayerSegmentsList'()
+    $playerRuntime.'Load-PlayerTrimFields'()
+    $playerRuntime.'Load-PlayerCropFields'()
     $localState.AspectModeControlSync = $true
     try {
         $playerAspectModeComboBox.SelectedItem = Get-AspectModeDisplayName -AspectMode $localState.AspectMode
@@ -5511,37 +5709,37 @@ function Open-PlayerTrimWindow {
     finally {
         $localState.AspectModeControlSync = $false
     }
-    Sync-PlayerAspectPanel
-    Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -SyncPlayer:$false
+    $playerRuntime.'Sync-PlayerAspectPanel'()
+    $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $false)
 
     if ($localState.Mode -eq "Playback mode") {
         try {
             $mediaElement.Source = New-Object System.Uri ([System.IO.Path]::GetFullPath([string]$Item.SourcePath))
         }
         catch {
-            Set-PlayerTrimDialogMode -Mode "Preview mode" -Reason "fallback"
+            $playerRuntime.'Set-PlayerTrimDialogMode'("Preview mode", "fallback")
         }
     }
 
-    $dialog.Add_Shown({
+    $dialog.Add_Shown(({
         if ($localState.Mode -eq "Preview mode" -and -not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) {
-            Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -RequestPreview:$true
+            $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $true)
         }
-    })
+    }).GetNewClosure())
 
-    $dialog.Add_Move({
+    $dialog.Add_Move(({
         if ($dialog.WindowState -eq [System.Windows.Forms.FormWindowState]::Normal) {
             $script:PlayerTrimEditorBounds = $dialog.Bounds
         }
-    })
+    }).GetNewClosure())
 
-    $dialog.Add_ResizeEnd({
+    $dialog.Add_ResizeEnd(({
         if ($dialog.WindowState -eq [System.Windows.Forms.FormWindowState]::Normal) {
             $script:PlayerTrimEditorBounds = $dialog.Bounds
         }
-    })
+    }).GetNewClosure())
 
-    $dialog.Add_FormClosed({
+    $dialog.Add_FormClosed(({
         if ($dialog.WindowState -eq [System.Windows.Forms.FormWindowState]::Normal) {
             $script:PlayerTrimEditorBounds = $dialog.Bounds
         }
@@ -5549,7 +5747,7 @@ function Open-PlayerTrimWindow {
             $script:PlayerTrimEditorWindow = $null
             $script:PlayerTrimEditorSourcePath = ""
         }
-    })
+    }).GetNewClosure())
 
     if ($Modeless) {
         return $dialog
@@ -5562,7 +5760,7 @@ function Open-PlayerTrimWindow {
         [void]$dialog.ShowDialog()
     }
 
-    return $dialogResult
+    return $runtimeState.DialogResult
 }
 
 function Show-SelectedPlayerTrimWindow {
@@ -7378,10 +7576,9 @@ $helpMenuItem.DropDownItems.Add($openUserGuideMenuItem) | Out-Null
 $rootLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $rootLayout.Dock = "Fill"
 $rootLayout.ColumnCount = 1
-$rootLayout.RowCount = 3
+$rootLayout.RowCount = 2
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 208)))
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
 $shellLayout.Controls.Add($rootLayout, 0, 1)
 
 $topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
@@ -7931,8 +8128,8 @@ $statusPanel.Dock = "Fill"
 $statusPanel.ColumnCount = 1
 $statusPanel.RowCount = 3
 $statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 44)))
 $statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
 
 $statusTitleLabel = New-Object System.Windows.Forms.Label
 $statusTitleLabel.Text = "Batch status"
@@ -7942,8 +8139,10 @@ $statusPanel.Controls.Add($statusTitleLabel, 0, 0)
 
 $statusValueLabel = New-Object System.Windows.Forms.Label
 $statusValueLabel.Text = "Scan Files pregleda video fajlove u folderu i podfolderima. Split output pravi validne part001 MP4 delove i ne dira originale."
-$statusValueLabel.AutoSize = $true
-$statusValueLabel.MaximumSize = New-Object System.Drawing.Size(1050, 0)
+$statusValueLabel.AutoSize = $false
+$statusValueLabel.Dock = "Fill"
+$statusValueLabel.TextAlign = "TopLeft"
+$statusValueLabel.MaximumSize = New-Object System.Drawing.Size(0, 0)
 $statusPanel.Controls.Add($statusValueLabel, 0, 1)
 $script:LastNormalStatusText = $statusValueLabel.Text
 
@@ -7974,7 +8173,13 @@ $mainSplit = New-Object System.Windows.Forms.SplitContainer
 $mainSplit.Dock = "Fill"
 $mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2
 $mainSplit.SplitterDistance = 880
-$rootLayout.Controls.Add($mainSplit, 0, 1)
+
+$workspaceSplit = New-Object System.Windows.Forms.SplitContainer
+$workspaceSplit.Dock = "Fill"
+$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
+$workspaceSplit.SplitterDistance = 520
+$rootLayout.Controls.Add($workspaceSplit, 0, 1)
+$workspaceSplit.Panel1.Controls.Add($mainSplit)
 
 $leftWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $leftWorkspaceLayout.Dock = "Fill"
@@ -8342,7 +8547,7 @@ $grid.Add_CellDoubleClick({
 
 $activityTabControl = New-Object System.Windows.Forms.TabControl
 $activityTabControl.Dock = "Fill"
-$rootLayout.Controls.Add($activityTabControl, 0, 2)
+$workspaceSplit.Panel2.Controls.Add($activityTabControl)
 
 $statusTabPage = New-Object System.Windows.Forms.TabPage
 $statusTabPage.Text = "Status"
@@ -8957,7 +9162,7 @@ $script:PollTimer.Add_Tick({
 $form.Add_Shown({
     $mainSplit.Panel2MinSize = $script:RightPanelTargetWidth
     Set-MainSplitLayout
-    Set-RightWorkspaceLayout
+    Set-WorkspaceSplitLayout
     Set-AdvancedSettingsVisibility -Visible:$false
     Update-VhsMp4ProcessPathFromEnvironment | Out-Null
     Sync-FfmpegState
@@ -8972,7 +9177,7 @@ $form.Add_Shown({
 
 $form.Add_Resize({
     Set-MainSplitLayout
-    Set-RightWorkspaceLayout
+    Set-WorkspaceSplitLayout
 })
 
 $dragEnterHandler = {
