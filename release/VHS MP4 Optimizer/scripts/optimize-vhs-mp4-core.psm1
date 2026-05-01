@@ -1042,6 +1042,113 @@ function Get-VhsMp4DetectedCrop {
     }
 }
 
+function Get-VhsMp4CropDetectionSampleFromText {
+    param(
+        [string]$Text,
+        [Parameter(Mandatory = $true)]
+        [int]$SourceWidth,
+        [Parameter(Mandatory = $true)]
+        [int]$SourceHeight
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text) -or $SourceWidth -le 0 -or $SourceHeight -le 0) {
+        return $null
+    }
+
+    $matches = [System.Text.RegularExpressions.Regex]::Matches($Text, 'crop=(\d+):(\d+):(\d+):(\d+)')
+    if ($matches.Count -lt 1) {
+        return $null
+    }
+
+    $match = $matches[$matches.Count - 1]
+    $width = [int]$match.Groups[1].Value
+    $height = [int]$match.Groups[2].Value
+    $left = [int]$match.Groups[3].Value
+    $top = [int]$match.Groups[4].Value
+    $right = $SourceWidth - $width - $left
+    $bottom = $SourceHeight - $height - $top
+
+    if ($width -le 0 -or $height -le 0 -or $left -lt 0 -or $top -lt 0 -or $right -lt 0 -or $bottom -lt 0) {
+        return $null
+    }
+
+    return [pscustomobject]@{
+        Left = $left
+        Top = $top
+        Right = $right
+        Bottom = $bottom
+    }
+}
+
+function Get-VhsMp4DetectedCropFromSourcePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourcePath,
+        [string]$FfmpegPath = "ffmpeg",
+        [Parameter(Mandatory = $true)]
+        [double]$DurationSeconds,
+        [Parameter(Mandatory = $true)]
+        [int]$SourceWidth,
+        [Parameter(Mandatory = $true)]
+        [int]$SourceHeight,
+        [ValidateRange(1, 99)]
+        [int]$SampleCount = 5
+    )
+
+    if (-not (Test-Path -LiteralPath $SourcePath) -or $DurationSeconds -le 0 -or $SourceWidth -le 0 -or $SourceHeight -le 0) {
+        return (Get-VhsMp4DetectedCrop -InputObject ([pscustomobject]@{
+                    SourceWidth = $SourceWidth
+                    SourceHeight = $SourceHeight
+                    Samples = @()
+                }))
+    }
+
+    $sampleTimes = @(Get-VhsMp4CropDetectionSampleTimes -DurationSeconds $DurationSeconds -SampleCount $SampleCount)
+    $samples = New-Object System.Collections.Generic.List[object]
+
+    foreach ($sampleTime in $sampleTimes) {
+        $sampleText = Format-VhsMp4FfmpegTime -Seconds $sampleTime
+        if ([string]::IsNullOrWhiteSpace($sampleText)) {
+            $sampleText = "00:00:00"
+        }
+
+        $arguments = @(
+            "-hide_banner",
+            "-y",
+            "-ss", $sampleText,
+            "-i", $SourcePath,
+            "-map", "0:v:0",
+            "-frames:v", "1",
+            "-vf", "cropdetect=24:16:0",
+            "-f", "null",
+            "-"
+        )
+
+        $startInfo = New-VhsMp4ProcessStartInfo -FfmpegPath $FfmpegPath -FfmpegArguments $arguments
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+        $stdOut = $process.StandardOutput.ReadToEnd()
+        $stdErr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+
+        $sample = Get-VhsMp4CropDetectionSampleFromText -Text ($stdErr + [Environment]::NewLine + $stdOut) -SourceWidth $SourceWidth -SourceHeight $SourceHeight
+        if ($null -ne $sample) {
+            [void]$samples.Add($sample)
+        }
+        else {
+            [void]$samples.Add([pscustomobject]@{})
+        }
+    }
+
+    $sampleArray = $samples.ToArray()
+    return (Get-VhsMp4DetectedCrop -InputObject ([pscustomobject]@{
+                SourceWidth = $SourceWidth
+                SourceHeight = $SourceHeight
+                Samples = $sampleArray
+            }))
+}
+
 function New-VhsMp4MultiTrimFilterComplex {
     param(
         [Parameter(Mandatory = $true)]
@@ -4267,6 +4374,7 @@ Export-ModuleMember -Function @(
     "Get-VhsMp4CropFilter",
     "Get-VhsMp4CropDetectionSampleTimes",
     "Get-VhsMp4DetectedCrop",
+    "Get-VhsMp4DetectedCropFromSourcePath",
     "New-VhsMp4RunContext",
     "Write-VhsMp4Log",
     "Get-VhsMp4SupportedExtensions",
