@@ -27,8 +27,10 @@ $script:CurrentDurationSeconds = $null
 $script:CurrentFileStartedAt = $null
 $script:PollTimer = New-Object System.Windows.Forms.Timer
 $script:PollTimer.Interval = 250
-$script:RightPanelTargetWidth = 560
-$script:WorkspaceBottomTargetHeight = 320
+$script:WorkspaceTopSectionRatio = 0.5
+$script:WorkspaceMiddleSectionRatio = 0.6
+$script:WorkspaceVerticalSectionRatio = 0.5
+$script:LayoutStateApplying = $false
 $script:PreviewTimelineScale = 100
 $script:PreviewAutoPending = $false
 $script:PreviewAutoDelayMs = 250
@@ -122,20 +124,19 @@ function Set-MainSplitLayout {
         return
     }
 
-    $desiredDistance = $split.Width - $script:RightPanelTargetWidth - $split.SplitterWidth
-    if ($desiredDistance -lt $split.Panel1MinSize) {
+    $split.Panel1MinSize = 280
+    $split.Panel2MinSize = 280
+    $availableWidth = $split.Width - $split.SplitterWidth
+    if ($availableWidth -le 0) {
         return
     }
 
+    $desiredDistance = [int][Math]::Round($availableWidth * [double]$script:WorkspaceVerticalSectionRatio, 0, [System.MidpointRounding]::AwayFromZero)
     $maxDistance = $split.Width - $split.Panel2MinSize - $split.SplitterWidth
     $distance = [Math]::Max($split.Panel1MinSize, $desiredDistance)
     $distance = [Math]::Min($distance, $maxDistance)
     if ($distance -gt 0 -and $distance -ne $split.SplitterDistance) {
         $split.SplitterDistance = $distance
-    }
-
-    if (($split.Width - $split.SplitterDistance - $split.SplitterWidth) -ge $script:RightPanelTargetWidth) {
-        $mainSplit.Panel2MinSize = $script:RightPanelTargetWidth
     }
 }
 
@@ -150,10 +151,41 @@ function Set-WorkspaceSplitLayout {
         return
     }
 
-    $desiredBottomHeight = [Math]::Max(220, [int]$script:WorkspaceBottomTargetHeight)
+    $split.Panel1MinSize = 250
+    $split.Panel2MinSize = 240
+    $availableHeight = $split.Height - $split.SplitterWidth
+    if ($availableHeight -le 0) {
+        return
+    }
+
+    $desiredDistance = [int][Math]::Round($availableHeight * [double]$script:WorkspaceTopSectionRatio, 0, [System.MidpointRounding]::AwayFromZero)
+    $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
+    $distance = [Math]::Max($split.Panel1MinSize, $desiredDistance)
+    $distance = [Math]::Min($distance, $maxDistance)
+    if ($distance -gt 0 -and $distance -ne $split.SplitterDistance) {
+        $split.SplitterDistance = $distance
+    }
+}
+
+function Set-LowerWorkspaceSplitLayout {
+    $splitVariable = Get-Variable -Name lowerWorkspaceSplit -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $splitVariable) {
+        return
+    }
+
+    $split = $splitVariable.Value
+    if ($null -eq $split -or $split.Height -le 0) {
+        return
+    }
+
     $split.Panel1MinSize = 220
-    $split.Panel2MinSize = 220
-    $desiredDistance = $split.Height - $desiredBottomHeight - $split.SplitterWidth
+    $split.Panel2MinSize = 180
+    $availableHeight = $split.Height - $split.SplitterWidth
+    if ($availableHeight -le 0) {
+        return
+    }
+
+    $desiredDistance = [int][Math]::Round($availableHeight * [double]$script:WorkspaceMiddleSectionRatio, 0, [System.MidpointRounding]::AwayFromZero)
     $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
     $distance = [Math]::Max($split.Panel1MinSize, $desiredDistance)
     $distance = [Math]::Min($distance, $maxDistance)
@@ -199,14 +231,108 @@ function Set-AdvancedSettingsVisibility {
         $advancedToggleButton.Text = if ($Visible) { "Hide Advanced" } else { "Show Advanced" }
     }
 
-    if (Get-Variable -Name "configLayout" -ErrorAction SilentlyContinue) {
-        $advancedRowIndex = 1
-        if ($configLayout.RowStyles.Count -gt $advancedRowIndex) {
-            $configLayout.RowStyles[$advancedRowIndex].SizeType = [System.Windows.Forms.SizeType]::Absolute
-            $configLayout.RowStyles[$advancedRowIndex].Height = if ($Visible) { 124 } else { 0 }
+    if (Get-Variable -Name "controlsStackLayout" -ErrorAction SilentlyContinue) {
+        if ($controlsStackLayout.RowStyles.Count -ge 2) {
+            if ($Visible) {
+                $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
+                $controlsStackLayout.RowStyles[0].Height = 44
+                $controlsStackLayout.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Percent
+                $controlsStackLayout.RowStyles[1].Height = 56
+            }
+            else {
+                $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
+                $controlsStackLayout.RowStyles[0].Height = 100
+                $controlsStackLayout.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
+                $controlsStackLayout.RowStyles[1].Height = 0
+            }
         }
-        $configLayout.PerformLayout()
+        $controlsStackLayout.PerformLayout()
     }
+}
+
+function Get-DefaultWorkspaceLayoutState {
+    return [pscustomobject]@{
+        TopSectionRatio = 0.5
+        MiddleSectionRatio = 0.6
+        VerticalSectionRatio = 0.5
+        AdvancedVisible = $false
+    }
+}
+
+function Get-CurrentWorkspaceLayoutState {
+    return [pscustomobject]@{
+        TopSectionRatio = [double]$script:WorkspaceTopSectionRatio
+        MiddleSectionRatio = [double]$script:WorkspaceMiddleSectionRatio
+        VerticalSectionRatio = [double]$script:WorkspaceVerticalSectionRatio
+        AdvancedVisible = [bool]$script:AdvancedSettingsVisible
+    }
+}
+
+function Convert-GuiOptionalDouble {
+    param($Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $null
+    }
+
+    $result = 0.0
+    if ([double]::TryParse($text.Trim().Replace(",", "."), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$result)) {
+        return [double]$result
+    }
+
+    return $null
+}
+
+function Apply-WorkspaceLayoutState {
+    param(
+        [AllowNull()]
+        [object]$LayoutState
+    )
+
+    $defaultLayout = Get-DefaultWorkspaceLayoutState
+    $topRatio = Convert-GuiOptionalDouble -Value (Get-WorkflowPresetObjectValue -Object $LayoutState -Name "TopSectionRatio")
+    $middleRatio = Convert-GuiOptionalDouble -Value (Get-WorkflowPresetObjectValue -Object $LayoutState -Name "MiddleSectionRatio")
+    $verticalRatio = Convert-GuiOptionalDouble -Value (Get-WorkflowPresetObjectValue -Object $LayoutState -Name "VerticalSectionRatio")
+    $advancedVisible = Get-WorkflowPresetObjectValue -Object $LayoutState -Name "AdvancedVisible"
+
+    $script:WorkspaceTopSectionRatio = if ($null -ne $topRatio -and $topRatio -ge 0.25 -and $topRatio -le 0.75) { [double]$topRatio } else { [double]$defaultLayout.TopSectionRatio }
+    $script:WorkspaceMiddleSectionRatio = if ($null -ne $middleRatio -and $middleRatio -ge 0.30 -and $middleRatio -le 0.80) { [double]$middleRatio } else { [double]$defaultLayout.MiddleSectionRatio }
+    $script:WorkspaceVerticalSectionRatio = if ($null -ne $verticalRatio -and $verticalRatio -ge 0.25 -and $verticalRatio -le 0.75) { [double]$verticalRatio } else { [double]$defaultLayout.VerticalSectionRatio }
+    $resolvedAdvancedVisible = if ($null -eq $advancedVisible) { [bool]$defaultLayout.AdvancedVisible } else { [bool]$advancedVisible }
+
+    $script:LayoutStateApplying = $true
+    try {
+        Set-AdvancedSettingsVisibility -Visible:$resolvedAdvancedVisible
+        if (Get-Variable -Name form -ErrorAction SilentlyContinue) {
+            $form.PerformLayout()
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+        Set-WorkspaceSplitLayout
+        Set-LowerWorkspaceSplitLayout
+        if (Get-Variable -Name form -ErrorAction SilentlyContinue) {
+            $form.PerformLayout()
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+        Set-MainSplitLayout
+        Set-DetailsSplitLayout
+        if (Get-Variable -Name form -ErrorAction SilentlyContinue) {
+            $form.PerformLayout()
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+    }
+    finally {
+        $script:LayoutStateApplying = $false
+    }
+}
+
+function Restore-DefaultLayout {
+    Apply-WorkspaceLayoutState -LayoutState (Get-DefaultWorkspaceLayoutState)
+    Save-WorkflowPresetStartupState
 }
 
 function Format-VhsMp4KbpsText {
@@ -625,6 +751,7 @@ function Import-WorkflowAppState {
         return [pscustomobject]@{
             LastPresetName = ""
             LastGeneralSettings = $null
+            LayoutState = $null
         }
     }
 
@@ -638,12 +765,14 @@ function Import-WorkflowAppState {
         return [pscustomobject]@{
             LastPresetName = [string](Get-WorkflowPresetObjectValue -Object $parsed -Name "LastPresetName")
             LastGeneralSettings = (Get-WorkflowPresetObjectValue -Object $parsed -Name "LastGeneralSettings")
+            LayoutState = (Get-WorkflowPresetObjectValue -Object $parsed -Name "LayoutState")
         }
     }
     catch {
         return [pscustomobject]@{
             LastPresetName = ""
             LastGeneralSettings = $null
+            LayoutState = $null
         }
     }
 }
@@ -651,7 +780,8 @@ function Import-WorkflowAppState {
 function Export-WorkflowAppState {
     param(
         [string]$LastPresetName,
-        [object]$LastGeneralSettings
+        [object]$LastGeneralSettings,
+        [object]$LayoutState = $null
     )
 
     Ensure-WorkflowPresetStorageDirectory | Out-Null
@@ -659,6 +789,7 @@ function Export-WorkflowAppState {
         SchemaVersion = 1
         LastPresetName = $LastPresetName
         LastGeneralSettings = if ($null -ne $LastGeneralSettings) { New-WorkflowPresetSettingsObject -Settings $LastGeneralSettings } else { $null }
+        LayoutState = if ($null -ne $LayoutState) { $LayoutState } else { Get-CurrentWorkspaceLayoutState }
     }
 
     $json = $payload | ConvertTo-Json -Depth 8
@@ -1648,13 +1779,16 @@ function Import-WorkflowPresetFromFile {
 
 function Save-WorkflowPresetStartupState {
     $selectedName = if (Get-Variable -Name workflowPresetComboBox -ErrorAction SilentlyContinue) { [string]$workflowPresetComboBox.SelectedItem } else { $script:WorkflowPresetCustomName }
-    Export-WorkflowAppState -LastPresetName $selectedName -LastGeneralSettings (Get-CurrentWorkflowPresetSettings)
+    Export-WorkflowAppState -LastPresetName $selectedName -LastGeneralSettings (Get-CurrentWorkflowPresetSettings) -LayoutState (Get-CurrentWorkspaceLayoutState)
 }
 
 function Restore-WorkflowPresetStartupState {
     $appState = Import-WorkflowAppState
     $restoredName = [string]$appState.LastPresetName
     $settings = $appState.LastGeneralSettings
+    $layoutState = $appState.LayoutState
+
+    Apply-WorkspaceLayoutState -LayoutState $layoutState
 
     if (-not [string]::IsNullOrWhiteSpace($restoredName) -and $restoredName -ne $script:WorkflowPresetCustomName) {
         $preset = Find-WorkflowPresetByName -Name $restoredName
@@ -7945,6 +8079,14 @@ $clearCompletedMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $clearCompletedMenuItem.Text = "Clear Completed"
 $queueMenuItem.DropDownItems.Add($clearCompletedMenuItem) | Out-Null
 
+$viewMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$viewMenuItem.Text = "View"
+$menuStrip.Items.Add($viewMenuItem) | Out-Null
+
+$restoreDefaultLayoutMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$restoreDefaultLayoutMenuItem.Text = "Restore Default Layout"
+$viewMenuItem.DropDownItems.Add($restoreDefaultLayoutMenuItem) | Out-Null
+
 $helpMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $helpMenuItem.Text = "Help"
 $menuStrip.Items.Add($helpMenuItem) | Out-Null
@@ -7974,10 +8116,21 @@ $helpMenuItem.DropDownItems.Add($openUserGuideMenuItem) | Out-Null
 $rootLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $rootLayout.Dock = "Fill"
 $rootLayout.ColumnCount = 1
-$rootLayout.RowCount = 2
-$rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 208)))
+$rootLayout.RowCount = 1
 $rootLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $shellLayout.Controls.Add($rootLayout, 0, 1)
+
+$workspaceSplit = New-Object System.Windows.Forms.SplitContainer
+$workspaceSplit.Dock = "Fill"
+$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
+$workspaceSplit.IsSplitterFixed = $false
+$rootLayout.Controls.Add($workspaceSplit, 0, 0)
+
+$lowerWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer
+$lowerWorkspaceSplit.Dock = "Fill"
+$lowerWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
+$lowerWorkspaceSplit.IsSplitterFixed = $false
+$workspaceSplit.Panel2.Controls.Add($lowerWorkspaceSplit)
 
 $topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $topWorkspaceLayout.Dock = "Fill"
@@ -7986,23 +8139,22 @@ $topWorkspaceLayout.RowCount = 1
 $topWorkspaceLayout.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8)
 $topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 55)))
 $topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 45)))
-$rootLayout.Controls.Add($topWorkspaceLayout, 0, 0)
+$workspaceSplit.Panel1.Controls.Add($topWorkspaceLayout)
 
 $sourceGroupBox = New-Object System.Windows.Forms.GroupBox
-$sourceGroupBox.Text = "Source / Output / FFmpeg"
+$sourceGroupBox.Text = "Source / Output"
 $sourceGroupBox.Dock = "Fill"
 $topWorkspaceLayout.Controls.Add($sourceGroupBox, 0, 0)
 
 $sourceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $sourceLayout.Dock = "Fill"
 $sourceLayout.ColumnCount = 4
-$sourceLayout.RowCount = 3
+$sourceLayout.RowCount = 2
 $sourceLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 108)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 216)))
-$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceGroupBox.Controls.Add($sourceLayout)
@@ -8053,11 +8205,9 @@ $ffmpegLabel = New-Object System.Windows.Forms.Label
 $ffmpegLabel.Text = "FFmpeg path"
 $ffmpegLabel.Anchor = "Left"
 $ffmpegLabel.AutoSize = $true
-$sourceLayout.Controls.Add($ffmpegLabel, 0, 2)
 
 $ffmpegPathTextBox = New-Object System.Windows.Forms.TextBox
-$ffmpegPathTextBox.Dock = "Fill"
-$sourceLayout.Controls.Add($ffmpegPathTextBox, 1, 2)
+$ffmpegPathTextBox.Visible = $false
 
 $browseFfmpegButton = New-Object System.Windows.Forms.Button
 $browseFfmpegButton.Text = "Browse FFmpeg"
@@ -8070,14 +8220,12 @@ $ffmpegHelpNoteLabel.Text = "Auto-install pri startu | Help > Install FFmpeg / B
 $ffmpegHelpNoteLabel.Dock = "Fill"
 $ffmpegHelpNoteLabel.TextAlign = "MiddleLeft"
 $ffmpegHelpNoteLabel.AutoEllipsis = $true
-$sourceLayout.Controls.Add($ffmpegHelpNoteLabel, 2, 2)
-$sourceLayout.SetColumnSpan($ffmpegHelpNoteLabel, 2)
 
 $controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $controlsStackLayout.Dock = "Fill"
 $controlsStackLayout.ColumnCount = 1
 $controlsStackLayout.RowCount = 2
-$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 144)))
+$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
 $topWorkspaceLayout.Controls.Add($controlsStackLayout, 1, 0)
 
@@ -8591,17 +8739,8 @@ $ffmpegStatusPanel.Controls.Add($ffmpegHintLabel)
 
 $mainSplit = New-Object System.Windows.Forms.SplitContainer
 $mainSplit.Dock = "Fill"
-$mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2
 $mainSplit.IsSplitterFixed = $false
-$mainSplit.SplitterDistance = 880
-
-$workspaceSplit = New-Object System.Windows.Forms.SplitContainer
-$workspaceSplit.Dock = "Fill"
-$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
-$workspaceSplit.IsSplitterFixed = $false
-$workspaceSplit.SplitterDistance = 520
-$rootLayout.Controls.Add($workspaceSplit, 0, 1)
-$workspaceSplit.Panel1.Controls.Add($mainSplit)
+$lowerWorkspaceSplit.Panel1.Controls.Add($mainSplit)
 
 $leftWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $leftWorkspaceLayout.Dock = "Fill"
@@ -8989,7 +9128,7 @@ $grid.Add_CellDoubleClick({
 
 $activityTabControl = New-Object System.Windows.Forms.TabControl
 $activityTabControl.Dock = "Fill"
-$workspaceSplit.Panel2.Controls.Add($activityTabControl)
+$lowerWorkspaceSplit.Panel2.Controls.Add($activityTabControl)
 
 $statusTabPage = New-Object System.Windows.Forms.TabPage
 $statusTabPage.Text = "Status"
@@ -9107,6 +9246,11 @@ $sampleButton.Add_Click({
 
 $advancedToggleButton.Add_Click({
     Set-AdvancedSettingsVisibility -Visible:(-not $script:AdvancedSettingsVisible)
+    Save-WorkflowPresetStartupState
+})
+
+$restoreDefaultLayoutMenuItem.Add_Click({
+    Restore-DefaultLayout
 })
 
 $aboutMenuItem.Add_Click({
@@ -9614,14 +9758,24 @@ $script:PollTimer.Add_Tick({
 })
 
 $form.Add_Shown({
-    $mainSplit.Panel2MinSize = $script:RightPanelTargetWidth
-    Set-MainSplitLayout
+    $script:LayoutStateApplying = $true
+    try {
+        Set-WorkspaceSplitLayout
+        Set-LowerWorkspaceSplitLayout
+        Set-MainSplitLayout
+        Set-DetailsSplitLayout
+        Set-AdvancedSettingsVisibility -Visible:$false
+        Update-VhsMp4ProcessPathFromEnvironment | Out-Null
+        Sync-FfmpegState
+        Initialize-WorkflowPresetState
+    }
+    finally {
+        $script:LayoutStateApplying = $false
+    }
     Set-WorkspaceSplitLayout
+    Set-LowerWorkspaceSplitLayout
+    Set-MainSplitLayout
     Set-DetailsSplitLayout
-    Set-AdvancedSettingsVisibility -Visible:$false
-    Update-VhsMp4ProcessPathFromEnvironment | Out-Null
-    Sync-FfmpegState
-    Initialize-WorkflowPresetState
     if (-not [string]::IsNullOrWhiteSpace($script:WorkflowPresetStorageWarning)) {
         Add-LogLine -Text $script:WorkflowPresetStorageWarning
         Set-StatusText $script:WorkflowPresetStorageWarning
@@ -9632,23 +9786,46 @@ $form.Add_Shown({
 })
 
 $form.Add_Resize({
-    Set-MainSplitLayout
     Set-WorkspaceSplitLayout
+    Set-LowerWorkspaceSplitLayout
+    Set-MainSplitLayout
     Set-DetailsSplitLayout
 })
 
 $mainSplit.Add_SplitterMoved({
-    $panel2Width = $mainSplit.Width - $mainSplit.SplitterDistance - $mainSplit.SplitterWidth
-    if ($panel2Width -ge 360) {
-        $script:RightPanelTargetWidth = $panel2Width
+    if ($script:LayoutStateApplying) {
+        return
     }
+
+    $availableWidth = $mainSplit.Width - $mainSplit.SplitterWidth
+    if ($availableWidth -gt 0) {
+        $script:WorkspaceVerticalSectionRatio = [Math]::Round(($mainSplit.SplitterDistance / $availableWidth), 4)
+    }
+    Save-WorkflowPresetStartupState
 })
 
 $workspaceSplit.Add_SplitterMoved({
-    $bottomPanelHeight = $workspaceSplit.Height - $workspaceSplit.SplitterDistance - $workspaceSplit.SplitterWidth
-    if ($bottomPanelHeight -ge 220) {
-        $script:WorkspaceBottomTargetHeight = $bottomPanelHeight
+    if ($script:LayoutStateApplying) {
+        return
     }
+
+    $availableHeight = $workspaceSplit.Height - $workspaceSplit.SplitterWidth
+    if ($availableHeight -gt 0) {
+        $script:WorkspaceTopSectionRatio = [Math]::Round(($workspaceSplit.SplitterDistance / $availableHeight), 4)
+    }
+    Save-WorkflowPresetStartupState
+})
+
+$lowerWorkspaceSplit.Add_SplitterMoved({
+    if ($script:LayoutStateApplying) {
+        return
+    }
+
+    $availableHeight = $lowerWorkspaceSplit.Height - $lowerWorkspaceSplit.SplitterWidth
+    if ($availableHeight -gt 0) {
+        $script:WorkspaceMiddleSectionRatio = [Math]::Round(($lowerWorkspaceSplit.SplitterDistance / $availableHeight), 4)
+    }
+    Save-WorkflowPresetStartupState
 })
 
 $dragEnterHandler = {
