@@ -176,19 +176,16 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
 def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
-    top_row = re.search(
-        r"\$rootLayout\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::Absolute, (\d+)\)\)\)",
-        script,
-    )
-    assert top_row, "missing fixed top configuration row"
-    assert int(top_row.group(1)) <= 220
-
     for token in [
+        "$rootLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        "$rootLayout.RowCount = 1",
+        "$workspaceSplit = New-Object System.Windows.Forms.SplitContainer",
+        "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel",
         "$topWorkspaceLayout.ColumnCount = 2",
         "$controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel",
         "$sourceGroupBox = New-Object System.Windows.Forms.GroupBox",
-        '$sourceGroupBox.Text = "Source / Output / FFmpeg"',
+        '$sourceGroupBox.Text = "Source / Output"',
         "$quickRunGroupBox = New-Object System.Windows.Forms.GroupBox",
         '$quickRunGroupBox.Text = "Quick Setup"',
         "$advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox",
@@ -201,6 +198,10 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
 
     assert script.count("$statusPanel.RowStyles.Add") >= 3
     assert "$configLayout.AutoScroll = $true" in script
+    assert '$sourceLayout.RowCount = 2' in script
+    assert '$sourceLayout.Controls.Add($ffmpegLabel, 0, 2)' not in script
+    assert '$sourceLayout.Controls.Add($ffmpegPathTextBox, 1, 2)' not in script
+    assert '$sourceLayout.Controls.Add($ffmpegHelpNoteLabel, 2, 2)' not in script
 
 
 def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_editor_entrypoint() -> None:
@@ -230,12 +231,20 @@ def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_st
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$script:RightPanelTargetWidth = 560",
-        "$script:WorkspaceBottomTargetHeight = 320",
-        "$mainSplit.Panel2MinSize = $script:RightPanelTargetWidth",
-        "$mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
+        "$script:WorkspaceTopSectionRatio = 0.5",
+        "$script:WorkspaceMiddleSectionRatio = 0.6",
+        "$script:WorkspaceVerticalSectionRatio = 0.5",
+        "$script:LayoutStateApplying = $false",
+        "function Get-DefaultWorkspaceLayoutState",
+        "function Get-CurrentWorkspaceLayoutState",
+        "function Apply-WorkspaceLayoutState",
+        "function Restore-DefaultLayout",
         "$mainSplit.Add_SplitterMoved({",
+        "$lowerWorkspaceSplit.Add_SplitterMoved({",
+        "$workspaceSplit.Add_SplitterMoved({",
         "function Set-MainSplitLayout",
+        "function Set-LowerWorkspaceSplitLayout",
+        "function Set-WorkspaceSplitLayout",
         "$script:PlayerTrimEditorWindow = $null",
         '$script:PlayerTrimEditorSourcePath = ""',
         "$script:PlayerTrimEditorBounds = $null",
@@ -260,27 +269,24 @@ def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_st
 def test_vhs_gui_uses_resizable_horizontal_split_between_workspace_and_status_tabs() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
-    root_fixed_rows = [
-        int(value)
-        for value in re.findall(
-            r"\$rootLayout\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::Absolute, (\d+)\)\)\)",
-            script,
-        )
-    ]
-    assert root_fixed_rows == [208]
-    assert sum(root_fixed_rows) <= 240
-
     for token in [
-        "$rootLayout.RowCount = 2",
+        "$rootLayout.RowCount = 1",
         "$workspaceSplit = New-Object System.Windows.Forms.SplitContainer",
         "$workspaceSplit.Dock = \"Fill\"",
         "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$workspaceSplit.IsSplitterFixed = $false",
-        "$workspaceSplit.Panel1.Controls.Add($mainSplit)",
-        "$workspaceSplit.Panel2.Controls.Add($activityTabControl)",
-        "$split.Panel2MinSize = 220",
+        "$lowerWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer",
+        "$lowerWorkspaceSplit.Dock = \"Fill\"",
+        "$lowerWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
+        "$lowerWorkspaceSplit.IsSplitterFixed = $false",
+        "$workspaceSplit.Panel2.Controls.Add($lowerWorkspaceSplit)",
+        "$lowerWorkspaceSplit.Panel1.Controls.Add($mainSplit)",
+        "$lowerWorkspaceSplit.Panel2.Controls.Add($activityTabControl)",
+        "$mainSplit.IsSplitterFixed = $false",
         "function Set-WorkspaceSplitLayout",
+        "function Set-LowerWorkspaceSplitLayout",
         "$workspaceSplit.Add_SplitterMoved({",
+        "$lowerWorkspaceSplit.Add_SplitterMoved({",
         "$activityTabControl = New-Object System.Windows.Forms.TabControl",
         '$statusTabPage.Text = "Status"',
         '$progressTabPage.Text = "Progress"',
@@ -293,16 +299,6 @@ def test_vhs_gui_uses_resizable_horizontal_split_between_workspace_and_status_ta
         "$logTabPage.Controls.Add($logTextBox)",
     ]:
         assert token in script, f"missing bottom activity workspace token: {token}"
-
-    right_rows = re.findall(
-        r"\$rightPanel\.RowStyles\.Add\(\(New-Object System\.Windows\.Forms\.RowStyle\(\[System\.Windows\.Forms\.SizeType\]::(Absolute|Percent), (\d+)\)\)\)",
-        script,
-    )
-    assert right_rows[:3] == [
-        ("Absolute", "24"),
-        ("Absolute", "48"),
-        ("Percent", "100"),
-    ]
 
 
 def test_vhs_gui_status_panel_allocates_readable_message_space() -> None:
@@ -324,9 +320,84 @@ def test_vhs_gui_status_panel_allocates_readable_message_space() -> None:
         '$statusValueLabel.TextAlign = "TopLeft"',
         "$statusValueLabel.AutoSize = $false",
         '$statusValueLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)',
-        "$workspaceSplit.SplitterDistance = 520",
+        '$restoreDefaultLayoutMenuItem.Text = "Restore Default Layout"',
     ]:
         assert token in script, f"missing readable status layout token: {token}"
+
+
+def test_vhs_gui_default_workspace_split_layout_matches_50_30_20_and_restore(tmp_path: Path) -> None:
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = """
+$form.Size = New-Object System.Drawing.Size(1600, 1000)
+$form.Show()
+[System.Windows.Forms.Application]::DoEvents()
+Set-WorkspaceSplitLayout
+Set-LowerWorkspaceSplitLayout
+Set-MainSplitLayout
+[System.Windows.Forms.Application]::DoEvents()
+$topHeight = [double]$workspaceSplit.Panel1.Height
+$lowerHeight = [double]$workspaceSplit.Panel2.Height
+$middleHeight = [double]$lowerWorkspaceSplit.Panel1.Height
+$bottomHeight = [double]$lowerWorkspaceSplit.Panel2.Height
+$leftWidth = [double]$mainSplit.Panel1.Width
+$rightWidth = [double]$mainSplit.Panel2.Width
+$workspaceTotal = $topHeight + $lowerHeight
+$middleBottomTotal = $middleHeight + $bottomHeight
+$mainTotal = $leftWidth + $rightWidth
+
+$workspaceSplit.SplitterDistance = [Math]::Max($workspaceSplit.Panel1MinSize, [int]($workspaceTotal * 0.35))
+$lowerWorkspaceSplit.SplitterDistance = [Math]::Max($lowerWorkspaceSplit.Panel1MinSize, [int]($middleBottomTotal * 0.75))
+$mainSplit.SplitterDistance = [Math]::Max($mainSplit.Panel1MinSize, [int]($mainTotal * 0.65))
+[System.Windows.Forms.Application]::DoEvents()
+Restore-DefaultLayout
+[System.Windows.Forms.Application]::DoEvents()
+
+Write-Output 'JSON_START'
+[pscustomobject]@{
+    TopRatio = [math]::Round(($workspaceSplit.Panel1.Height / ($workspaceSplit.Panel1.Height + $workspaceSplit.Panel2.Height)), 2)
+    MiddleRatio = [math]::Round(($lowerWorkspaceSplit.Panel1.Height / ($lowerWorkspaceSplit.Panel1.Height + $lowerWorkspaceSplit.Panel2.Height)), 2)
+    VerticalRatio = [math]::Round(($mainSplit.Panel1.Width / ($mainSplit.Panel1.Width + $mainSplit.Panel2.Width)), 2)
+    AdvancedVisible = [bool]$script:AdvancedSettingsVisible
+} | ConvertTo-Json -Depth 4
+try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch {}
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-default-layout-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert abs(payload["TopRatio"] - 0.5) <= 0.08
+    assert abs(payload["MiddleRatio"] - 0.6) <= 0.08
+    assert abs(payload["VerticalRatio"] - 0.5) <= 0.08
+    assert payload["AdvancedVisible"] is False
 
 
 def test_vhs_gui_updates_planned_output_bitrate_when_video_bitrate_changes(tmp_path: Path) -> None:
