@@ -191,14 +191,15 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
         "$advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox",
         '$advancedSettingsGroupBox.Text = "Advanced Settings"',
         "$advancedToggleButton = New-Object System.Windows.Forms.Button",
-        '$advancedToggleButton.Text = "Show Advanced"',
+        '$advancedToggleButton.Text = "Hide Advanced"',
         "function Set-AdvancedSettingsVisibility",
     ]:
         assert token in script, f"missing modern top-layout token: {token}"
 
     assert script.count("$statusPanel.RowStyles.Add") >= 3
     assert "$configLayout.AutoScroll = $true" in script
-    assert '$sourceLayout.RowCount = 2' in script
+    assert '$sourceLayout.RowCount = 3' in script
+    assert '$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))' in script
     assert '$sourceLayout.Controls.Add($ffmpegLabel, 0, 2)' not in script
     assert '$sourceLayout.Controls.Add($ffmpegPathTextBox, 1, 2)' not in script
     assert '$sourceLayout.Controls.Add($ffmpegHelpNoteLabel, 2, 2)' not in script
@@ -275,14 +276,17 @@ def test_vhs_gui_uses_resizable_horizontal_split_between_workspace_and_status_ta
         "$workspaceSplit.Dock = \"Fill\"",
         "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$workspaceSplit.IsSplitterFixed = $false",
+        "$workspaceSplit.SplitterWidth = 10",
         "$lowerWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer",
         "$lowerWorkspaceSplit.Dock = \"Fill\"",
         "$lowerWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$lowerWorkspaceSplit.IsSplitterFixed = $false",
+        "$lowerWorkspaceSplit.SplitterWidth = 10",
         "$workspaceSplit.Panel2.Controls.Add($lowerWorkspaceSplit)",
         "$lowerWorkspaceSplit.Panel1.Controls.Add($mainSplit)",
         "$lowerWorkspaceSplit.Panel2.Controls.Add($activityTabControl)",
         "$mainSplit.IsSplitterFixed = $false",
+        "$mainSplit.SplitterWidth = 10",
         "function Set-WorkspaceSplitLayout",
         "function Set-LowerWorkspaceSplitLayout",
         "$workspaceSplit.Add_SplitterMoved({",
@@ -397,7 +401,7 @@ try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch 
     assert abs(payload["TopRatio"] - 0.5) <= 0.08
     assert abs(payload["MiddleRatio"] - 0.6) <= 0.08
     assert abs(payload["VerticalRatio"] - 0.5) <= 0.08
-    assert payload["AdvancedVisible"] is False
+    assert payload["AdvancedVisible"] is True
 
 
 def test_vhs_gui_updates_planned_output_bitrate_when_video_bitrate_changes(tmp_path: Path) -> None:
@@ -654,6 +658,10 @@ Write-Output 'JSON_START'
     OpenPlayerVisible = Test-ControlReachableOnForm $openPlayerButton $form
     PropertiesVisible = Test-ControlReachableOnForm $propertiesGroupBox $form
     SummaryVisible = Test-ControlReachableOnForm $selectedFileSummaryLabel $form
+    AdvancedVisible = [bool]$advancedSettingsGroupBox.Visible
+    VideoBitrateVisible = Test-ControlReachableOnForm $videoBitrateTextBox $form
+    InputBrowseHeight = [int]$browseInputButton.Height
+    OutputBrowseHeight = [int]$browseOutputButton.Height
     PreviewReachable = Test-ControlReachableOnForm $previewPictureBox $form
     TrimReachable = Test-ControlReachableOnForm $trimGroupBox $form
     SummaryText = $selectedFileSummaryLabel.Text
@@ -692,6 +700,9 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["OpenPlayerVisible"] is True
     assert payload["PropertiesVisible"] is True
     assert payload["SummaryVisible"] is True
+    assert payload["AdvancedVisible"] is True
+    assert payload["VideoBitrateVisible"] is True
+    assert abs(payload["InputBrowseHeight"] - payload["OutputBrowseHeight"]) <= 2
     assert payload["PreviewReachable"] is False
     assert payload["TrimReachable"] is False
     assert "Open Player" in payload["SummaryText"]
