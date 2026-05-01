@@ -31,6 +31,7 @@ $script:WorkspaceTopSectionRatio = 0.5
 $script:WorkspaceMiddleSectionRatio = 0.6
 $script:WorkspaceVerticalSectionRatio = 0.5
 $script:LayoutStateApplying = $false
+$script:AdvancedVisibilityUserOverride = $false
 $script:PreviewTimelineScale = 100
 $script:PreviewAutoPending = $false
 $script:PreviewAutoDelayMs = 250
@@ -218,10 +219,14 @@ function Set-DetailsSplitLayout {
 
 function Set-AdvancedSettingsVisibility {
     param(
-        [bool]$Visible
+        [bool]$Visible,
+        [switch]$UserInitiated
     )
 
     $script:AdvancedSettingsVisible = $Visible
+    if ($UserInitiated) {
+        $script:AdvancedVisibilityUserOverride = $true
+    }
 
     if (Get-Variable -Name "advancedSettingsGroupBox" -ErrorAction SilentlyContinue) {
         $advancedSettingsGroupBox.Visible = $Visible
@@ -234,10 +239,10 @@ function Set-AdvancedSettingsVisibility {
     if (Get-Variable -Name "controlsStackLayout" -ErrorAction SilentlyContinue) {
         if ($controlsStackLayout.RowStyles.Count -ge 2) {
             if ($Visible) {
-                $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
-                $controlsStackLayout.RowStyles[0].Height = 44
+                $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+                $controlsStackLayout.RowStyles[0].Height = 0
                 $controlsStackLayout.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Percent
-                $controlsStackLayout.RowStyles[1].Height = 56
+                $controlsStackLayout.RowStyles[1].Height = 100
             }
             else {
                 $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
@@ -255,7 +260,8 @@ function Get-DefaultWorkspaceLayoutState {
         TopSectionRatio = 0.5
         MiddleSectionRatio = 0.6
         VerticalSectionRatio = 0.5
-        AdvancedVisible = $false
+        AdvancedVisible = $true
+        AdvancedVisibilityUserOverride = $false
     }
 }
 
@@ -265,6 +271,7 @@ function Get-CurrentWorkspaceLayoutState {
         MiddleSectionRatio = [double]$script:WorkspaceMiddleSectionRatio
         VerticalSectionRatio = [double]$script:WorkspaceVerticalSectionRatio
         AdvancedVisible = [bool]$script:AdvancedSettingsVisible
+        AdvancedVisibilityUserOverride = [bool]$script:AdvancedVisibilityUserOverride
     }
 }
 
@@ -299,11 +306,26 @@ function Apply-WorkspaceLayoutState {
     $middleRatio = Convert-GuiOptionalDouble -Value (Get-WorkflowPresetObjectValue -Object $LayoutState -Name "MiddleSectionRatio")
     $verticalRatio = Convert-GuiOptionalDouble -Value (Get-WorkflowPresetObjectValue -Object $LayoutState -Name "VerticalSectionRatio")
     $advancedVisible = Get-WorkflowPresetObjectValue -Object $LayoutState -Name "AdvancedVisible"
+    $advancedUserOverride = Get-WorkflowPresetObjectValue -Object $LayoutState -Name "AdvancedVisibilityUserOverride"
 
     $script:WorkspaceTopSectionRatio = if ($null -ne $topRatio -and $topRatio -ge 0.25 -and $topRatio -le 0.75) { [double]$topRatio } else { [double]$defaultLayout.TopSectionRatio }
     $script:WorkspaceMiddleSectionRatio = if ($null -ne $middleRatio -and $middleRatio -ge 0.30 -and $middleRatio -le 0.80) { [double]$middleRatio } else { [double]$defaultLayout.MiddleSectionRatio }
     $script:WorkspaceVerticalSectionRatio = if ($null -ne $verticalRatio -and $verticalRatio -ge 0.25 -and $verticalRatio -le 0.75) { [double]$verticalRatio } else { [double]$defaultLayout.VerticalSectionRatio }
-    $resolvedAdvancedVisible = if ($null -eq $advancedVisible) { [bool]$defaultLayout.AdvancedVisible } else { [bool]$advancedVisible }
+    $useSavedAdvancedPreference = $false
+    if ($null -ne $advancedUserOverride) {
+        $useSavedAdvancedPreference = [bool]$advancedUserOverride
+    }
+
+    $script:AdvancedVisibilityUserOverride = $useSavedAdvancedPreference
+    $resolvedAdvancedVisible = if (-not $useSavedAdvancedPreference) {
+        [bool]$defaultLayout.AdvancedVisible
+    }
+    elseif ($null -eq $advancedVisible) {
+        [bool]$defaultLayout.AdvancedVisible
+    }
+    else {
+        [bool]$advancedVisible
+    }
 
     $script:LayoutStateApplying = $true
     try {
@@ -331,6 +353,7 @@ function Apply-WorkspaceLayoutState {
 }
 
 function Restore-DefaultLayout {
+    $script:AdvancedVisibilityUserOverride = $false
     Apply-WorkspaceLayoutState -LayoutState (Get-DefaultWorkspaceLayoutState)
     Save-WorkflowPresetStartupState
 }
@@ -8124,12 +8147,16 @@ $workspaceSplit = New-Object System.Windows.Forms.SplitContainer
 $workspaceSplit.Dock = "Fill"
 $workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
 $workspaceSplit.IsSplitterFixed = $false
+$workspaceSplit.SplitterWidth = 10
+$workspaceSplit.BackColor = [System.Drawing.Color]::Gainsboro
 $rootLayout.Controls.Add($workspaceSplit, 0, 0)
 
 $lowerWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer
 $lowerWorkspaceSplit.Dock = "Fill"
 $lowerWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
 $lowerWorkspaceSplit.IsSplitterFixed = $false
+$lowerWorkspaceSplit.SplitterWidth = 10
+$lowerWorkspaceSplit.BackColor = [System.Drawing.Color]::Gainsboro
 $workspaceSplit.Panel2.Controls.Add($lowerWorkspaceSplit)
 
 $topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
@@ -8149,14 +8176,15 @@ $topWorkspaceLayout.Controls.Add($sourceGroupBox, 0, 0)
 $sourceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $sourceLayout.Dock = "Fill"
 $sourceLayout.ColumnCount = 4
-$sourceLayout.RowCount = 2
+$sourceLayout.RowCount = 3
 $sourceLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 108)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 216)))
-$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
-$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
+$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $sourceGroupBox.Controls.Add($sourceLayout)
 
 $inputLabel = New-Object System.Windows.Forms.Label
@@ -8171,7 +8199,8 @@ $sourceLayout.Controls.Add($inputTextBox, 1, 0)
 
 $browseInputButton = New-Object System.Windows.Forms.Button
 $browseInputButton.Text = "Browse..."
-$browseInputButton.Dock = "Fill"
+$browseInputButton.Anchor = "Left"
+$browseInputButton.Size = New-Object System.Drawing.Size(120, 26)
 $sourceLayout.Controls.Add($browseInputButton, 2, 0)
 
 $inputHelpLabel = New-Object System.Windows.Forms.Label
@@ -8192,7 +8221,8 @@ $sourceLayout.Controls.Add($outputTextBox, 1, 1)
 
 $browseOutputButton = New-Object System.Windows.Forms.Button
 $browseOutputButton.Text = "Browse..."
-$browseOutputButton.Dock = "Fill"
+$browseOutputButton.Anchor = "Left"
+$browseOutputButton.Size = New-Object System.Drawing.Size(120, 26)
 $sourceLayout.Controls.Add($browseOutputButton, 2, 1)
 
 $outputHelpLabel = New-Object System.Windows.Forms.Label
@@ -8275,7 +8305,8 @@ $presetColumnLayout.Controls.Add($workflowPresetToolbar, 0, 1)
 $workflowPresetFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $workflowPresetFlow.Dock = "Fill"
 $workflowPresetFlow.WrapContents = $true
-$workflowPresetFlow.AutoSize = $false
+$workflowPresetFlow.AutoSize = $true
+$workflowPresetFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $workflowPresetFlow.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 $presetColumnLayout.Controls.Add($workflowPresetFlow, 0, 2)
 
@@ -8319,9 +8350,9 @@ $actionsColumnLayout.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.ColumnCount = 1
 $actionsColumnLayout.RowCount = 4
 $actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 16)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $quickRunLayout.Controls.Add($actionsColumnLayout, 1, 0)
 
 $quickActionsLabel = New-Object System.Windows.Forms.Label
@@ -8333,22 +8364,25 @@ $actionsColumnLayout.Controls.Add($quickActionsLabel, 0, 0)
 
 $primaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $primaryActionsFlow.Dock = "Fill"
-$primaryActionsFlow.WrapContents = $false
-$primaryActionsFlow.AutoSize = $false
+$primaryActionsFlow.WrapContents = $true
+$primaryActionsFlow.AutoSize = $true
+$primaryActionsFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $primaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.Controls.Add($primaryActionsFlow, 0, 1)
 
 $secondaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $secondaryActionsFlow.Dock = "Fill"
-$secondaryActionsFlow.WrapContents = $false
-$secondaryActionsFlow.AutoSize = $false
+$secondaryActionsFlow.WrapContents = $true
+$secondaryActionsFlow.AutoSize = $true
+$secondaryActionsFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $secondaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.Controls.Add($secondaryActionsFlow, 0, 2)
 
 $tertiaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $tertiaryActionsFlow.Dock = "Fill"
-$tertiaryActionsFlow.WrapContents = $false
-$tertiaryActionsFlow.AutoSize = $false
+$tertiaryActionsFlow.WrapContents = $true
+$tertiaryActionsFlow.AutoSize = $true
+$tertiaryActionsFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $tertiaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.Controls.Add($tertiaryActionsFlow, 0, 3)
 
@@ -8361,23 +8395,25 @@ $queueToolbar.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 $advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox
 $advancedSettingsGroupBox.Text = "Advanced Settings"
 $advancedSettingsGroupBox.Dock = "Fill"
-$advancedSettingsGroupBox.Visible = $false
+$advancedSettingsGroupBox.Visible = $true
 $configLayout.Controls.Add($advancedSettingsGroupBox, 0, 1)
 
 $advancedSettingsLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $advancedSettingsLayout.Dock = "Fill"
+$advancedSettingsLayout.AutoScroll = $true
 $advancedSettingsLayout.ColumnCount = 1
 $advancedSettingsLayout.RowCount = 3
 $advancedSettingsLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
-$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
-$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
-$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
+$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$advancedSettingsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $advancedSettingsGroupBox.Controls.Add($advancedSettingsLayout)
 
 $settingsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $settingsFlow.Dock = "Fill"
 $settingsFlow.WrapContents = $true
 $settingsFlow.AutoSize = $true
+$settingsFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $advancedSettingsLayout.Controls.Add($settingsFlow, 0, 0)
 
 $qualityModeLabel = New-Object System.Windows.Forms.Label
@@ -8476,8 +8512,9 @@ $settingsFlow.Controls.Add($maxPartGbTextBox)
 
 $encoderFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $encoderFlow.Dock = "Fill"
-$encoderFlow.WrapContents = $false
+$encoderFlow.WrapContents = $true
 $encoderFlow.AutoSize = $true
+$encoderFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $advancedSettingsLayout.Controls.Add($encoderFlow, 0, 1)
 
 $encoderModeLabel = New-Object System.Windows.Forms.Label
@@ -8505,6 +8542,7 @@ $filterFlow = New-Object System.Windows.Forms.FlowLayoutPanel
 $filterFlow.Dock = "Fill"
 $filterFlow.WrapContents = $true
 $filterFlow.AutoSize = $true
+$filterFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $advancedSettingsLayout.Controls.Add($filterFlow, 0, 2)
 
 $filterLabel = New-Object System.Windows.Forms.Label
@@ -8685,7 +8723,7 @@ $openReportButton.AutoSize = $true
 $tertiaryActionsFlow.Controls.Add($openReportButton)
 
 $advancedToggleButton = New-Object System.Windows.Forms.Button
-$advancedToggleButton.Text = "Show Advanced"
+$advancedToggleButton.Text = "Hide Advanced"
 $advancedToggleButton.AutoSize = $true
 $tertiaryActionsFlow.Controls.Add($advancedToggleButton)
 
@@ -8740,6 +8778,8 @@ $ffmpegStatusPanel.Controls.Add($ffmpegHintLabel)
 $mainSplit = New-Object System.Windows.Forms.SplitContainer
 $mainSplit.Dock = "Fill"
 $mainSplit.IsSplitterFixed = $false
+$mainSplit.SplitterWidth = 10
+$mainSplit.BackColor = [System.Drawing.Color]::Gainsboro
 $lowerWorkspaceSplit.Panel1.Controls.Add($mainSplit)
 
 $leftWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
@@ -9245,7 +9285,7 @@ $sampleButton.Add_Click({
 })
 
 $advancedToggleButton.Add_Click({
-    Set-AdvancedSettingsVisibility -Visible:(-not $script:AdvancedSettingsVisible)
+    Set-AdvancedSettingsVisibility -Visible:(-not $script:AdvancedSettingsVisible) -UserInitiated
     Save-WorkflowPresetStartupState
 })
 
@@ -9764,7 +9804,7 @@ $form.Add_Shown({
         Set-LowerWorkspaceSplitLayout
         Set-MainSplitLayout
         Set-DetailsSplitLayout
-        Set-AdvancedSettingsVisibility -Visible:$false
+        Set-AdvancedSettingsVisibility -Visible:$true
         Update-VhsMp4ProcessPathFromEnvironment | Out-Null
         Sync-FfmpegState
         Initialize-WorkflowPresetState
