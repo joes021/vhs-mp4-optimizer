@@ -88,6 +88,16 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
         "Small MP4 H.264",
         "High Quality MP4 H.264",
         "HEVC H.265 Smaller",
+        "---------------- Device presets ----------------",
+        "TV / univerzalni Smart TV",
+        "Stari TV / media player",
+        "Laptop / PC",
+        "Telefon",
+        "Tablet",
+        "YouTube upload",
+        "USB mali fajl",
+        "Arhiva / bolji kvalitet",
+        "HEVC za novije uredjaje",
         ".mov",
         ".mkv",
         ".wmv",
@@ -475,18 +485,30 @@ $videoBitrateTextBox.Text = '5500k'
 $afterBitrate = [string]$grid.Rows[0].Cells['Bitrate'].Value
 $outputPlanText = [string]$outputPlanInfoBox.Text
 $comparisonRow = $null
+$sizeRow = $null
+$usbRow = $null
 foreach ($row in @($comparisonGrid.Rows)) {{
     if ($null -ne $row -and -not $row.IsNewRow -and [string]$row.Cells['PropertyName'].Value -eq 'Video bitrate') {{
         $comparisonRow = $row
-        break
+    }}
+    if ($null -ne $row -and -not $row.IsNewRow -and [string]$row.Cells['PropertyName'].Value -eq 'Input size / estimate') {{
+        $sizeRow = $row
+    }}
+    if ($null -ne $row -and -not $row.IsNewRow -and [string]$row.Cells['PropertyName'].Value -eq 'USB note') {{
+        $usbRow = $row
     }}
 }}
 [pscustomobject]@{{
     BeforeBitrate = $beforeBitrate
     AfterBitrate = $afterBitrate
     OutputPlanText = $outputPlanText
+    EstimatedSize = [string]$script:PlanItems[0].EstimatedSize
+    UsbNote = [string]$script:PlanItems[0].UsbNote
     ComparisonInput = if ($null -ne $comparisonRow) {{ [string]$comparisonRow.Cells['InputValue'].Value }} else {{ '' }}
     ComparisonPlanned = if ($null -ne $comparisonRow) {{ [string]$comparisonRow.Cells['PlannedValue'].Value }} else {{ '' }}
+    SizeComparisonInput = if ($null -ne $sizeRow) {{ [string]$sizeRow.Cells['InputValue'].Value }} else {{ '' }}
+    SizeComparisonPlanned = if ($null -ne $sizeRow) {{ [string]$sizeRow.Cells['PlannedValue'].Value }} else {{ '' }}
+    UsbComparisonPlanned = if ($null -ne $usbRow) {{ [string]$usbRow.Cells['PlannedValue'].Value }} else {{ '' }}
 }} | ConvertTo-Json -Depth 4
 """.strip()
 
@@ -522,6 +544,9 @@ foreach ($row in @($comparisonGrid.Rows)) {{
     assert "Total bitrate:" in payload["OutputPlanText"]
     assert payload["ComparisonInput"] == "900 kbps"
     assert "5500k" in payload["ComparisonPlanned"]
+    assert payload["SizeComparisonInput"] == "1 MB"
+    assert payload["SizeComparisonPlanned"] == payload["EstimatedSize"]
+    assert payload["UsbComparisonPlanned"] == payload["UsbNote"]
 
 
 def test_vhs_gui_quality_mode_updates_video_bitrate_suggestion(tmp_path: Path) -> None:
@@ -582,6 +607,92 @@ try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch 
     assert payload["SmallBitrate"] == "3500k"
     assert payload["HighQualityBitrate"] == "9000k"
     assert payload["HevcBitrate"] == "2800k"
+
+
+def test_vhs_gui_quality_mode_supports_device_presets_and_separator(tmp_path: Path) -> None:
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = """
+$form.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$qualityItems = @($qualityModeComboBox.Items | ForEach-Object { [string]$_ })
+$qualityModeComboBox.SelectedItem = 'Telefon'
+[System.Windows.Forms.Application]::DoEvents()
+$phoneBitrate = [string]$videoBitrateTextBox.Text
+$phoneCrf = [string]$crfTextBox.Text
+$phoneAudio = [string]$audioTextBox.Text
+$phoneInternal = [string](Resolve-QualityModeSelection -QualityMode ([string]$qualityModeComboBox.SelectedItem)).InternalQualityMode
+$qualityModeComboBox.SelectedItem = $script:QualityModeSeparatorLabel
+[System.Windows.Forms.Application]::DoEvents()
+$afterSeparator = [string]$qualityModeComboBox.SelectedItem
+$qualityModeComboBox.SelectedItem = 'TV / univerzalni Smart TV'
+[System.Windows.Forms.Application]::DoEvents()
+$tvBitrate = [string]$videoBitrateTextBox.Text
+$tvInternal = [string](Resolve-QualityModeSelection -QualityMode ([string]$qualityModeComboBox.SelectedItem)).InternalQualityMode
+$qualityModeComboBox.SelectedItem = 'HEVC za novije uredjaje'
+[System.Windows.Forms.Application]::DoEvents()
+$hevcPreset = [string]$presetComboBox.SelectedItem
+$hevcInternal = [string](Resolve-QualityModeSelection -QualityMode ([string]$qualityModeComboBox.SelectedItem)).InternalQualityMode
+Write-Output 'JSON_START'
+[pscustomobject]@{
+    Items = $qualityItems
+    PhoneBitrate = $phoneBitrate
+    PhoneCrf = $phoneCrf
+    PhoneAudio = $phoneAudio
+    PhoneInternal = $phoneInternal
+    AfterSeparator = $afterSeparator
+    TvBitrate = $tvBitrate
+    TvInternal = $tvInternal
+    HevcPreset = $hevcPreset
+    HevcInternal = $hevcInternal
+} | ConvertTo-Json -Depth 6
+try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch {}
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-quality-mode-device-preset-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert "---------------- Device presets ----------------" in payload["Items"]
+    assert "TV / univerzalni Smart TV" in payload["Items"]
+    assert "Telefon" in payload["Items"]
+    assert "HEVC za novije uredjaje" in payload["Items"]
+    assert payload["PhoneBitrate"] == "2200k"
+    assert payload["PhoneCrf"] == "24"
+    assert payload["PhoneAudio"] == "128k"
+    assert payload["PhoneInternal"] == "Small MP4 H.264"
+    assert payload["AfterSeparator"] == "Telefon"
+    assert payload["TvBitrate"] == "6500k"
+    assert payload["TvInternal"] == "Universal MP4 H.264"
+    assert payload["HevcPreset"] == "medium"
+    assert payload["HevcInternal"] == "HEVC H.265 Smaller"
 
 
 def test_vhs_gui_modeless_player_editor_closes_without_playback_timer_scope_error(tmp_path: Path) -> None:

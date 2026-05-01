@@ -61,6 +61,8 @@ $script:WorkflowPresetState = $null
 $script:WorkflowPresetApplying = $false
 $script:WorkflowPresetSuppressSelection = $false
 $script:WorkflowPresetStorageWarning = ""
+$script:QualityModeSeparatorLabel = "---------------- Device presets ----------------"
+$script:QualityModeLastSelection = "Universal MP4 H.264"
 $script:EncoderInventory = $null
 $script:EncoderModeDefaultName = "Auto"
 $script:EncoderModeCpuLabel = "CPU (libx264/libx265)"
@@ -575,19 +577,236 @@ function New-WorkflowPresetObject {
     }
 }
 
+function Get-QualityModeSelectionDefinitions {
+    return @(
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "Universal MP4 H.264"
+            InternalQualityMode = "Universal MP4 H.264"
+            SuggestedCrf = 22
+            SuggestedAudioBitrate = "160k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "6000k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "Small MP4 H.264"
+            InternalQualityMode = "Small MP4 H.264"
+            SuggestedCrf = 24
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "3500k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "High Quality MP4 H.264"
+            InternalQualityMode = "High Quality MP4 H.264"
+            SuggestedCrf = 20
+            SuggestedAudioBitrate = "192k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "9000k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "HEVC H.265 Smaller"
+            InternalQualityMode = "HEVC H.265 Smaller"
+            SuggestedCrf = 26
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "medium"
+            SuggestedVideoBitrate = "2800k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "Standard VHS"
+            InternalQualityMode = "Standard VHS"
+            SuggestedCrf = 22
+            SuggestedAudioBitrate = "160k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "5000k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "Smaller File"
+            InternalQualityMode = "Smaller File"
+            SuggestedCrf = 24
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "3500k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "Better Quality"
+            InternalQualityMode = "Better Quality"
+            SuggestedCrf = 20
+            SuggestedAudioBitrate = "192k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "9000k"
+        }
+        [pscustomobject]@{
+            Group = "Base"
+            DisplayName = "Custom"
+            InternalQualityMode = "Custom"
+            SuggestedCrf = 22
+            SuggestedAudioBitrate = "160k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = ""
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "TV / univerzalni Smart TV"
+            InternalQualityMode = "Universal MP4 H.264"
+            SuggestedCrf = 22
+            SuggestedAudioBitrate = "160k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "6500k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "Stari TV / media player"
+            InternalQualityMode = "Universal MP4 H.264"
+            SuggestedCrf = 23
+            SuggestedAudioBitrate = "160k"
+            SuggestedPreset = "medium"
+            SuggestedVideoBitrate = "4500k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "Laptop / PC"
+            InternalQualityMode = "Universal MP4 H.264"
+            SuggestedCrf = 22
+            SuggestedAudioBitrate = "160k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "5500k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "Telefon"
+            InternalQualityMode = "Small MP4 H.264"
+            SuggestedCrf = 24
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "2200k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "Tablet"
+            InternalQualityMode = "Small MP4 H.264"
+            SuggestedCrf = 23
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "3200k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "YouTube upload"
+            InternalQualityMode = "High Quality MP4 H.264"
+            SuggestedCrf = 19
+            SuggestedAudioBitrate = "192k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "12000k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "USB mali fajl"
+            InternalQualityMode = "Small MP4 H.264"
+            SuggestedCrf = 25
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "medium"
+            SuggestedVideoBitrate = "3000k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "Arhiva / bolji kvalitet"
+            InternalQualityMode = "High Quality MP4 H.264"
+            SuggestedCrf = 19
+            SuggestedAudioBitrate = "192k"
+            SuggestedPreset = "slow"
+            SuggestedVideoBitrate = "10000k"
+        }
+        [pscustomobject]@{
+            Group = "Device"
+            DisplayName = "HEVC za novije uredjaje"
+            InternalQualityMode = "HEVC H.265 Smaller"
+            SuggestedCrf = 25
+            SuggestedAudioBitrate = "128k"
+            SuggestedPreset = "medium"
+            SuggestedVideoBitrate = "3200k"
+        }
+    )
+}
+
+function Resolve-QualityModeSelection {
+    param(
+        [string]$QualityMode
+    )
+
+    $normalizedQualityMode = [string]$QualityMode
+    if ([string]::IsNullOrWhiteSpace($normalizedQualityMode)) {
+        $normalizedQualityMode = "Universal MP4 H.264"
+    }
+    elseif ($normalizedQualityMode -eq $script:QualityModeSeparatorLabel) {
+        $normalizedQualityMode = if ([string]::IsNullOrWhiteSpace($script:QualityModeLastSelection)) { "Universal MP4 H.264" } else { [string]$script:QualityModeLastSelection }
+    }
+
+    foreach ($definition in @(Get-QualityModeSelectionDefinitions)) {
+        if ($normalizedQualityMode -eq [string]$definition.DisplayName -or $normalizedQualityMode -eq [string]$definition.InternalQualityMode) {
+            return $definition
+        }
+    }
+
+    return [pscustomobject]@{
+        Group = "Base"
+        DisplayName = $normalizedQualityMode
+        InternalQualityMode = $normalizedQualityMode
+        SuggestedCrf = 22
+        SuggestedAudioBitrate = "160k"
+        SuggestedPreset = "slow"
+        SuggestedVideoBitrate = "6000k"
+    }
+}
+
+function Get-QualityModeComboItems {
+    $items = New-Object System.Collections.Generic.List[string]
+    foreach ($definition in @(Get-QualityModeSelectionDefinitions | Where-Object { [string]$_.Group -eq "Base" })) {
+        $items.Add([string]$definition.DisplayName)
+    }
+    $items.Add($script:QualityModeSeparatorLabel)
+    foreach ($definition in @(Get-QualityModeSelectionDefinitions | Where-Object { [string]$_.Group -eq "Device" })) {
+        $items.Add([string]$definition.DisplayName)
+    }
+    return @($items.ToArray())
+}
+
+function Get-QualityModeSelectionDisplayName {
+    param(
+        [string]$QualityMode
+    )
+
+    return [string](Resolve-QualityModeSelection -QualityMode $QualityMode).DisplayName
+}
+
+function Get-CurrentQualityModeSelectionLabel {
+    $selection = if (Get-Variable -Name qualityModeComboBox -ErrorAction SilentlyContinue) { [string]$qualityModeComboBox.SelectedItem } else { "" }
+    if ([string]::IsNullOrWhiteSpace($selection) -or $selection -eq $script:QualityModeSeparatorLabel) {
+        if (-not [string]::IsNullOrWhiteSpace($script:QualityModeLastSelection)) {
+            return [string]$script:QualityModeLastSelection
+        }
+        return "Universal MP4 H.264"
+    }
+
+    return $selection
+}
+
+function Get-CurrentInternalQualityModeName {
+    return [string](Resolve-QualityModeSelection -QualityMode (Get-CurrentQualityModeSelectionLabel)).InternalQualityMode
+}
+
 function Get-QualityModeSuggestedVideoBitrate {
     param(
         [string]$QualityMode
     )
 
-    switch ([string]$QualityMode) {
-        { $_ -in @("Small MP4 H.264", "Smaller File") } { return "3500k" }
-        { $_ -in @("High Quality MP4 H.264", "Better Quality") } { return "9000k" }
-        "HEVC H.265 Smaller" { return "2800k" }
-        "Standard VHS" { return "5000k" }
-        "Custom" { return "" }
-        default { return "6000k" }
-    }
+    return [string](Resolve-QualityModeSelection -QualityMode $QualityMode).SuggestedVideoBitrate
 }
 
 function Get-WorkflowPresetDefinitions {
@@ -1538,7 +1757,7 @@ function Get-CurrentWorkflowPresetSettings {
     }
 
         return (New-WorkflowPresetSettingsObject -Settings @{
-            QualityMode = [string]$qualityModeComboBox.SelectedItem
+            QualityMode = Get-CurrentQualityModeSelectionLabel
             Crf = $crfValue
             Preset = [string]$presetComboBox.SelectedItem
             AudioBitrate = [string]$audioTextBox.Text
@@ -1630,7 +1849,14 @@ function Set-WorkflowPresetControlsFromSettings {
     $normalizedSettings = New-WorkflowPresetSettingsObject -Settings $Settings
     $script:WorkflowPresetApplying = $true
     try {
-        $qualityModeComboBox.SelectedItem = $normalizedSettings.QualityMode
+        $preferredQualityMode = Get-QualityModeSelectionDisplayName -QualityMode $normalizedSettings.QualityMode
+        if ($qualityModeComboBox.Items.Contains($preferredQualityMode)) {
+            $qualityModeComboBox.SelectedItem = $preferredQualityMode
+        }
+        else {
+            $qualityModeComboBox.SelectedItem = "Universal MP4 H.264"
+        }
+        $script:QualityModeLastSelection = Get-CurrentQualityModeSelectionLabel
         $crfTextBox.Text = [string]$normalizedSettings.Crf
         $presetComboBox.SelectedItem = $normalizedSettings.Preset
         $audioTextBox.Text = $normalizedSettings.AudioBitrate
@@ -3405,7 +3631,7 @@ function Get-PlanItemOutputPlanState {
 
     $mediaInfoProperty = $Item.PSObject.Properties["MediaInfo"]
     $mediaInfo = if ($mediaInfoProperty) { $mediaInfoProperty.Value } else { $null }
-    $qualityMode = [string]$qualityModeComboBox.SelectedItem
+    $qualityMode = Get-CurrentInternalQualityModeName
     if ([string]::IsNullOrWhiteSpace($qualityMode)) {
         $qualityMode = "Universal MP4 H.264"
     }
@@ -3645,6 +3871,7 @@ function Get-PlanItemComparisonRows {
     $displayOutputName = if ($Item.PSObject.Properties["DisplayOutputName"] -and -not [string]::IsNullOrWhiteSpace([string]$Item.DisplayOutputName)) { [string]$Item.DisplayOutputName } else { [System.IO.Path]::GetFileName([string]$Item.OutputPath) }
 
     $inputContainer = if ($null -ne $mediaInfo) { [string]$mediaInfo.Container } else { "--" }
+    $inputSize = if ($null -ne $mediaInfo -and -not [string]::IsNullOrWhiteSpace([string]$mediaInfo.SizeText)) { [string]$mediaInfo.SizeText } else { "--" }
     $inputResolution = if ($null -ne $mediaInfo) { [string]$mediaInfo.Resolution } else { "--" }
     $inputDuration = if ($null -ne $mediaInfo) { [string]$mediaInfo.DurationText } else { "--" }
     $inputVideoCodec = if ($null -ne $mediaInfo) { [string]$mediaInfo.VideoCodec } else { "--" }
@@ -3669,7 +3896,7 @@ function Get-PlanItemComparisonRows {
         [pscustomobject]@{ PropertyName = "Encode engine"; InputValue = "--"; PlannedValue = [string]$outputState.EncodeEngineText }
         [pscustomobject]@{ PropertyName = "Trim"; InputValue = "--"; PlannedValue = $trimSummary }
         [pscustomobject]@{ PropertyName = "Crop"; InputValue = "--"; PlannedValue = $cropSummary }
-        [pscustomobject]@{ PropertyName = "Estimate"; InputValue = "--"; PlannedValue = [string]$outputState.EstimatedSizeText }
+        [pscustomobject]@{ PropertyName = "Input size / estimate"; InputValue = $inputSize; PlannedValue = [string]$outputState.EstimatedSizeText }
         [pscustomobject]@{ PropertyName = "USB note"; InputValue = "--"; PlannedValue = [string]$outputState.UsbNoteText }
     )
 }
@@ -6465,7 +6692,7 @@ function Update-PlanItemTrimEstimate {
 
         $estimate = Get-VhsMp4EstimatedOutputInfo `
             -DurationSeconds $duration `
-            -QualityMode ([string]$qualityModeComboBox.SelectedItem) `
+            -QualityMode (Get-CurrentInternalQualityModeName) `
             -Crf ([int]$crfTextBox.Text) `
             -AudioBitrate $audioTextBox.Text `
             -VideoBitrate (Get-CurrentVideoBitrateText) `
@@ -6690,7 +6917,7 @@ function Add-PlanEstimates {
 
                     $estimate = Get-VhsMp4EstimatedOutputInfo `
                         -DurationSeconds $duration `
-                        -QualityMode ([string]$qualityModeComboBox.SelectedItem) `
+                        -QualityMode (Get-CurrentInternalQualityModeName) `
                         -Crf ([int]$crfTextBox.Text) `
                         -AudioBitrate $audioTextBox.Text `
                         -VideoBitrate (Get-CurrentVideoBitrateText) `
@@ -7061,7 +7288,7 @@ function Export-QueuePlanToFile {
             OutputDir = [string]$outputTextBox.Text
             FfmpegPath = if (-not [string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) { [string]$script:ResolvedFfmpegPath } else { [string]$ffmpegPathTextBox.Text }
             WorkflowPresetName = if ([string]::IsNullOrWhiteSpace([string]$workflowPresetComboBox.SelectedItem)) { $script:WorkflowPresetCustomName } else { [string]$workflowPresetComboBox.SelectedItem }
-            QualityMode = [string]$qualityModeComboBox.SelectedItem
+            QualityMode = Get-CurrentQualityModeSelectionLabel
             Crf = $crfValue
             Preset = [string]$presetComboBox.SelectedItem
             AudioBitrate = [string]$audioTextBox.Text
@@ -7262,7 +7489,7 @@ function Get-Settings {
     return [pscustomobject]@{
         InputDir = $inputTextBox.Text
         OutputDir = $outputTextBox.Text
-        QualityMode = [string]$qualityModeComboBox.SelectedItem
+        QualityMode = Get-CurrentInternalQualityModeName
         Crf = $crfValue
         Preset = [string]$presetComboBox.SelectedItem
         AudioBitrate = $audioTextBox.Text
@@ -8299,7 +8526,7 @@ $inputFolderPanel.RowCount = 1
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
-$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
+$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $sourceLayout.Controls.Add($inputFolderPanel, 0, 0)
 
 $inputLabel = New-Object System.Windows.Forms.Label
@@ -8310,12 +8537,14 @@ $inputFolderPanel.Controls.Add($inputLabel, 0, 0)
 
 $inputTextBox = New-Object System.Windows.Forms.TextBox
 $inputTextBox.Dock = "Fill"
+$inputTextBox.Margin = New-Object System.Windows.Forms.Padding(0)
 $inputFolderPanel.Controls.Add($inputTextBox, 1, 0)
 
 $browseInputButton = New-Object System.Windows.Forms.Button
 $browseInputButton.Text = "Browse..."
-$browseInputButton.Anchor = "Left"
-$browseInputButton.Size = New-Object System.Drawing.Size(104, 24)
+$browseInputButton.Anchor = "Left,Top"
+$browseInputButton.Margin = New-Object System.Windows.Forms.Padding(0)
+$browseInputButton.Size = New-Object System.Drawing.Size(104, 20)
 $inputFolderPanel.Controls.Add($browseInputButton, 2, 0)
 
 $inputHelpLabel = New-Object System.Windows.Forms.Label
@@ -8330,7 +8559,7 @@ $outputFolderPanel.RowCount = 1
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
-$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
+$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $sourceLayout.Controls.Add($outputFolderPanel, 1, 0)
 
 $outputLabel = New-Object System.Windows.Forms.Label
@@ -8341,12 +8570,14 @@ $outputFolderPanel.Controls.Add($outputLabel, 0, 0)
 
 $outputTextBox = New-Object System.Windows.Forms.TextBox
 $outputTextBox.Dock = "Fill"
+$outputTextBox.Margin = New-Object System.Windows.Forms.Padding(0)
 $outputFolderPanel.Controls.Add($outputTextBox, 1, 0)
 
 $browseOutputButton = New-Object System.Windows.Forms.Button
 $browseOutputButton.Text = "Browse..."
-$browseOutputButton.Anchor = "Left"
-$browseOutputButton.Size = New-Object System.Drawing.Size(104, 24)
+$browseOutputButton.Anchor = "Left,Top"
+$browseOutputButton.Margin = New-Object System.Windows.Forms.Padding(0)
+$browseOutputButton.Size = New-Object System.Drawing.Size(104, 20)
 $outputFolderPanel.Controls.Add($browseOutputButton, 2, 0)
 
 $outputHelpLabel = New-Object System.Windows.Forms.Label
@@ -8534,11 +8765,53 @@ $qualityModeLabel.TextAlign = "MiddleLeft"
 $settingsFlow.Controls.Add($qualityModeLabel)
 
 $qualityModeComboBox = New-Object System.Windows.Forms.ComboBox
-$qualityModeComboBox.Width = 185
+$qualityModeComboBox.Width = 235
 $qualityModeComboBox.DropDownStyle = "DropDownList"
-[void]$qualityModeComboBox.Items.AddRange(@("Universal MP4 H.264", "Small MP4 H.264", "High Quality MP4 H.264", "HEVC H.265 Smaller", "Standard VHS", "Smaller File", "Better Quality", "Custom"))
+$qualityModeComboBox.DrawMode = [System.Windows.Forms.DrawMode]::OwnerDrawFixed
+$qualityModeComboBox.ItemHeight = 20
+$qualityModeComboBox.DropDownWidth = 280
+[void]$qualityModeComboBox.Items.AddRange((Get-QualityModeComboItems))
 $qualityModeComboBox.SelectedItem = "Universal MP4 H.264"
+$script:QualityModeLastSelection = "Universal MP4 H.264"
 $settingsFlow.Controls.Add($qualityModeComboBox)
+$qualityModeComboBox.Add_DrawItem({
+    param($sender, $e)
+
+    if ($e.Index -lt 0) {
+        return
+    }
+
+    $itemText = [string]$sender.Items[$e.Index]
+    $e.DrawBackground()
+
+    if ($itemText -eq $script:QualityModeSeparatorLabel) {
+        $lineY = $e.Bounds.Top + [int]($e.Bounds.Height / 2)
+        $separatorPen = New-Object System.Drawing.Pen([System.Drawing.Color]::Silver)
+        try {
+            $e.Graphics.DrawLine($separatorPen, $e.Bounds.Left + 6, $lineY, $e.Bounds.Right - 6, $lineY)
+        }
+        finally {
+            $separatorPen.Dispose()
+        }
+    }
+    else {
+        $textColor = if (($e.State -band [System.Windows.Forms.DrawItemState]::Selected) -eq [System.Windows.Forms.DrawItemState]::Selected) {
+            [System.Drawing.SystemColors]::HighlightText
+        }
+        else {
+            [System.Drawing.SystemColors]::ControlText
+        }
+        $textBrush = New-Object System.Drawing.SolidBrush($textColor)
+        try {
+            $e.Graphics.DrawString($itemText, $e.Font, $textBrush, [float]($e.Bounds.Left + 4), [float]($e.Bounds.Top + 2))
+        }
+        finally {
+            $textBrush.Dispose()
+        }
+    }
+
+    $e.DrawFocusRectangle()
+})
 
 $crfLabel = New-Object System.Windows.Forms.Label
 $crfLabel.Text = "CRF"
@@ -8984,7 +9257,7 @@ $comparisonGrid.BorderStyle = [System.Windows.Forms.BorderStyle]::None
 [void]$comparisonGrid.Columns.Add("InputValue", "Input")
 [void]$comparisonGrid.Columns.Add("PlannedValue", "Planned output")
 $comparisonGrid.Columns["PropertyName"].AutoSizeMode = [System.Windows.Forms.DataGridViewAutoSizeColumnMode]::None
-$comparisonGrid.Columns["PropertyName"].Width = 132
+$comparisonGrid.Columns["PropertyName"].Width = 152
 $comparisonGrid.Columns['InputValue'].FillWeight = 50
 $comparisonGrid.Columns['PlannedValue'].FillWeight = 50
 $outputPlanGroupBox.Controls.Add($comparisonGrid)
@@ -9761,30 +10034,23 @@ $qualityModeComboBox.Add_SelectedIndexChanged({
     }
 
     $selectedQualityMode = [string]$qualityModeComboBox.SelectedItem
-    switch ($selectedQualityMode) {
-        { $_ -in @("Small MP4 H.264", "Smaller File") } {
-            $crfTextBox.Text = "24"
-            $audioTextBox.Text = "128k"
-            $presetComboBox.SelectedItem = "slow"
+    if ($selectedQualityMode -eq $script:QualityModeSeparatorLabel) {
+        $script:WorkflowPresetApplying = $true
+        try {
+            $qualityModeComboBox.SelectedItem = Get-CurrentQualityModeSelectionLabel
         }
-        { $_ -in @("High Quality MP4 H.264", "Better Quality") } {
-            $crfTextBox.Text = "20"
-            $audioTextBox.Text = "192k"
-            $presetComboBox.SelectedItem = "slow"
+        finally {
+            $script:WorkflowPresetApplying = $false
         }
-        "HEVC H.265 Smaller" {
-            $crfTextBox.Text = "26"
-            $audioTextBox.Text = "128k"
-            $presetComboBox.SelectedItem = "medium"
-        }
-        default {
-            $crfTextBox.Text = "22"
-            $audioTextBox.Text = "160k"
-            $presetComboBox.SelectedItem = "slow"
-        }
+        return
     }
 
-    $videoBitrateTextBox.Text = Get-QualityModeSuggestedVideoBitrate -QualityMode $selectedQualityMode
+    $resolvedQualityMode = Resolve-QualityModeSelection -QualityMode $selectedQualityMode
+    $script:QualityModeLastSelection = [string]$resolvedQualityMode.DisplayName
+    $crfTextBox.Text = [string]$resolvedQualityMode.SuggestedCrf
+    $audioTextBox.Text = [string]$resolvedQualityMode.SuggestedAudioBitrate
+    $presetComboBox.SelectedItem = [string]$resolvedQualityMode.SuggestedPreset
+    $videoBitrateTextBox.Text = [string]$resolvedQualityMode.SuggestedVideoBitrate
 
     Invoke-WorkflowPresetFieldChanged
 })
