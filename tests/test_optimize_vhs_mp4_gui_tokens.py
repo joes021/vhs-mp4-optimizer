@@ -893,6 +893,115 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["AfterFrameText"] == "00:00:00.04"
 
 
+def test_vhs_gui_player_trim_manual_navigation_switches_playback_mode_to_preview(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    modeless_return_pattern = re.compile(r"(?ms)^\s*if \(\$Modeless\) \{\s*return \$dialog\s*\}\s*")
+    modeless_return_replacement = """
+    if ($Modeless) {
+        $script:TestPlayerRuntime = $playerRuntime
+        $script:TestPlayerRuntimeLocalState = $localState
+        $script:TestPlayerRuntimeState = $runtimeState
+        $script:TestPlayerModeLabel = $playerModeLabel
+        $script:TestPlayerPreviewTimeTextBox = $playerPreviewTimeTextBox
+        return $dialog
+    }
+"""
+    gui_script, modeless_replacements = modeless_return_pattern.subn(modeless_return_replacement, gui_script, count=1)
+    assert modeless_replacements == 1
+
+    probe = f"""
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mov,mp4,m4a,3gp,3g2,mj2'
+    ContainerLongName = 'QuickTime / MOV'
+    DurationSeconds = 180.0
+    DurationText = '00:03:00'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '720x576'
+    DisplayAspectRatio = '4:3'
+    SampleAspectRatio = '1:1'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 4500
+    VideoBitrateText = '900 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+}}
+$dialog = @(Open-PlayerTrimWindow -Item $item -Modeless) | Where-Object {{ $null -ne $_ -and $_ -is [System.Windows.Forms.Form] }} | Select-Object -Last 1
+$dialog.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$initialMode = [string]$script:TestPlayerRuntimeLocalState.Mode
+$script:TestPlayerRuntimeState.PlaybackActive = $false
+$script:TestPlayerRuntime.'Navigate-PlayerPositionSeconds'(12.5)
+$modeAfterNavigate = [string]$script:TestPlayerRuntimeLocalState.Mode
+$labelAfterNavigate = [string]$script:TestPlayerModeLabel.Text
+$timeAfterNavigate = [string]$script:TestPlayerPreviewTimeTextBox.Text
+$script:TestPlayerRuntime.'Move-PlayerFrame'(1)
+$timeAfterFrame = [string]$script:TestPlayerPreviewTimeTextBox.Text
+$dialog.Close()
+[System.Windows.Forms.Application]::DoEvents()
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    InitialMode = $initialMode
+    ModeAfterNavigate = $modeAfterNavigate
+    LabelAfterNavigate = $labelAfterNavigate
+    TimeAfterNavigate = $timeAfterNavigate
+    TimeAfterFrame = $timeAfterFrame
+}} | ConvertTo-Json -Depth 4
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-player-navigation-preview-switch-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["InitialMode"] == "Playback mode"
+    assert payload["ModeAfterNavigate"] == "Preview mode"
+    assert payload["LabelAfterNavigate"].startswith("Preview mode")
+    assert payload["TimeAfterNavigate"] == "00:00:12.5"
+    assert payload["TimeAfterFrame"] == "00:00:12.54"
+
+
 def test_vhs_gui_main_workspace_keeps_quick_actions_and_properties_visible(tmp_path: Path) -> None:
     source = tmp_path / "clip.mp4"
     source.write_text("source", encoding="utf-8")
