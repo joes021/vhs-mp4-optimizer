@@ -6128,6 +6128,7 @@ function Open-PlayerTrimWindow {
             $localState.TimelineSyncActive = $true
             try {
                 $playerTimelineTrackBar.Value = $timelineValue
+                $playerTimelineTrackBar.Refresh()
             }
             finally {
                 $localState.TimelineSyncActive = $false
@@ -6188,6 +6189,21 @@ function Open-PlayerTrimWindow {
         Set-PlayerPositionSeconds -Seconds $Seconds -SyncPlayer $false -RequestPreview $true
     }
 
+    function Commit-PlayerPreviewTimeText {
+        $seconds = $localState.PreviewPositionSeconds
+        try {
+            $parsed = Convert-VhsMp4TimeTextToSeconds -Value $playerPreviewTimeTextBox.Text
+            if ($null -ne $parsed) {
+                $seconds = [double]$parsed
+            }
+        }
+        catch {
+            $seconds = $localState.PreviewPositionSeconds
+        }
+
+        Navigate-PlayerPositionSeconds -Seconds $seconds
+    }
+
     function Move-PlayerFrame {
         param([int]$Direction)
         $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $localState.PreviewPositionSeconds -Default 0.0
@@ -6201,6 +6217,8 @@ function Open-PlayerTrimWindow {
 
     function Set-PlayerTrimPoint {
         param([ValidateSet("Start", "End")][string]$Point)
+
+        Commit-PlayerPreviewTimeText
 
         $positionText = Format-VhsMp4FfmpegTime -Seconds $localState.PreviewPositionSeconds
         if ([string]::IsNullOrWhiteSpace($positionText)) {
@@ -6644,19 +6662,24 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
     }).GetNewClosure())
 
-    $playerPreviewTimeTextBox.Add_Leave(({
-        $seconds = $localState.PreviewPositionSeconds
-        try {
-            $parsed = Convert-VhsMp4TimeTextToSeconds -Value $playerPreviewTimeTextBox.Text
-            if ($null -ne $parsed) {
-                $seconds = [double]$parsed
-            }
+    $playerTimelineTrackBar.Add_MouseUp(({
+        if ($localState.TimelineSyncActive) {
+            return
         }
-        catch {
-            $seconds = $localState.PreviewPositionSeconds
-        }
+        $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
+    }).GetNewClosure())
 
-        $playerRuntime.'Navigate-PlayerPositionSeconds'($seconds)
+    $playerPreviewTimeTextBox.Add_Leave(({
+        $playerRuntime.'Commit-PlayerPreviewTimeText'()
+    }).GetNewClosure())
+
+    $playerPreviewTimeTextBox.Add_KeyDown(({
+        param($sender, $eventArgs)
+        if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+            $playerRuntime.'Commit-PlayerPreviewTimeText'()
+            $eventArgs.SuppressKeyPress = $true
+            $eventArgs.Handled = $true
+        }
     }).GetNewClosure())
 
     $playPauseButton.Add_Click(({
