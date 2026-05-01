@@ -3941,6 +3941,9 @@ function Start-VhsMp4FileProcess {
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
         [switch]$AudioNormalize,
+        [string]$AspectMode = "Auto",
+        [object]$VideoInfo,
+        [object]$CropState,
         [string]$EncoderMode = "Auto",
         [object]$EncoderInventory,
         [hashtable]$SharedState
@@ -3969,6 +3972,9 @@ function Start-VhsMp4FileProcess {
         -RotateFlip $RotateFlip `
         -ScaleMode $ScaleMode `
         -AudioNormalize:$AudioNormalize `
+        -AspectMode $AspectMode `
+        -VideoInfo $VideoInfo `
+        -CropState $CropState `
         -EncoderMode $EncoderMode `
         -EncoderInventory $EncoderInventory
 
@@ -4081,6 +4087,9 @@ function Invoke-VhsMp4File {
         [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
         [string]$ScaleMode = "Original",
         [switch]$AudioNormalize,
+        [string]$AspectMode = "Auto",
+        [object]$VideoInfo,
+        [object]$CropState,
         [string]$EncoderMode = "Auto",
         [object]$EncoderInventory,
         [hashtable]$SharedState
@@ -4107,6 +4116,9 @@ function Invoke-VhsMp4File {
         -RotateFlip $RotateFlip `
         -ScaleMode $ScaleMode `
         -AudioNormalize:$AudioNormalize `
+        -AspectMode $AspectMode `
+        -VideoInfo $VideoInfo `
+        -CropState $CropState `
         -EncoderMode $EncoderMode `
         -EncoderInventory $EncoderInventory `
         -SharedState $SharedState

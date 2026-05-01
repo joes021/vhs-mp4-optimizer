@@ -17,6 +17,7 @@ $script:WingetPackageId = "Gyan.FFmpeg.Essentials"
 $script:PlanItems = @()
 $script:LastLogPath = $null
 $script:LastReportPath = $null
+$script:LastSamplePath = $null
 $script:ResolvedFfmpegPath = $null
 $script:BatchContext = $null
 $script:CurrentBatchIndex = -1
@@ -2772,6 +2773,9 @@ function Update-ActionButtons {
     $openOutputButton.Enabled = $hasOutput -and (Test-Path -LiteralPath $outputTextBox.Text)
     $openLogButton.Enabled = -not [string]::IsNullOrWhiteSpace($script:LastLogPath) -and (Test-Path -LiteralPath $script:LastLogPath)
     $openReportButton.Enabled = -not [string]::IsNullOrWhiteSpace($script:LastReportPath) -and (Test-Path -LiteralPath $script:LastReportPath)
+    if (Get-Variable -Name "openSampleButton" -ErrorAction SilentlyContinue) {
+        $openSampleButton.Enabled = -not [string]::IsNullOrWhiteSpace($script:LastSamplePath) -and (Test-Path -LiteralPath $script:LastSamplePath)
+    }
 
     if (Get-Variable -Name "previewFrameButton" -ErrorAction SilentlyContinue) {
         $hasTimelineDuration = $false
@@ -5677,7 +5681,7 @@ function Open-PlayerTrimWindow {
             catch {
             }
             try {
-                $mediaElement.Stop()
+                $mediaElement.Pause()
             }
             catch {
             }
@@ -6189,7 +6193,49 @@ function Open-PlayerTrimWindow {
         Set-PlayerPositionSeconds -Seconds $Seconds -SyncPlayer $false -RequestPreview $true
     }
 
+    function Sync-PlayerTimelineValue {
+        param([int]$TimelineValue)
+
+        if ($localState.TimelineSyncActive) {
+            return
+        }
+
+        $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
+        Navigate-PlayerPositionSeconds -Seconds ([double]$TimelineValue / [double]$timelineScale)
+    }
+
+    function Set-PlayerTimelineFromPointerX {
+        param([int]$PointerX)
+
+        $clientWidth = [Math]::Max(1, [int]$playerTimelineTrackBar.ClientSize.Width - 1)
+        $clampedX = [Math]::Min($clientWidth, [Math]::Max(0, [int]$PointerX))
+        $range = [int]($playerTimelineTrackBar.Maximum - $playerTimelineTrackBar.Minimum)
+        $timelineValue = if ($range -le 0) {
+            [int]$playerTimelineTrackBar.Minimum
+        }
+        else {
+            [int]$playerTimelineTrackBar.Minimum + [int][Math]::Round(($clampedX / [double]$clientWidth) * [double]$range, 0, [System.MidpointRounding]::AwayFromZero)
+        }
+
+        $localState.TimelineSyncActive = $true
+        try {
+            if ($playerTimelineTrackBar.Value -ne $timelineValue) {
+                $playerTimelineTrackBar.Value = $timelineValue
+            }
+            $playerTimelineTrackBar.Refresh()
+        }
+        finally {
+            $localState.TimelineSyncActive = $false
+        }
+
+        Sync-PlayerTimelineValue -TimelineValue $timelineValue
+    }
+
     function Commit-PlayerPreviewTimeText {
+        param(
+            [bool]$RequestPreview = $true
+        )
+
         $seconds = $localState.PreviewPositionSeconds
         try {
             $parsed = Convert-VhsMp4TimeTextToSeconds -Value $playerPreviewTimeTextBox.Text
@@ -6201,11 +6247,21 @@ function Open-PlayerTrimWindow {
             $seconds = $localState.PreviewPositionSeconds
         }
 
-        Navigate-PlayerPositionSeconds -Seconds $seconds
+        if ($localState.Mode -eq "Playback mode") {
+            if ($runtimeState.PlaybackReady -and $runtimeState.PlaybackActive) {
+                Set-PlayerPositionSeconds -Seconds $seconds -SyncPlayer $true -RequestPreview $false
+                return
+            }
+
+            Set-PlayerTrimDialogMode "Preview mode" "manual trim"
+        }
+
+        Set-PlayerPositionSeconds -Seconds $seconds -SyncPlayer $false -RequestPreview $RequestPreview
     }
 
     function Move-PlayerFrame {
         param([int]$Direction)
+        Commit-PlayerPreviewTimeText -RequestPreview $false
         $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $localState.PreviewPositionSeconds -Default 0.0
         $frameRate = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.FrameRate -Default 25.0
         if ($frameRate -le 0) {
@@ -6505,6 +6561,16 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Navigate-PlayerPositionSeconds'($Seconds)
     }
 
+    function Sync-PlayerTimelineValue {
+        param([int]$TimelineValue)
+        $playerRuntime.'Sync-PlayerTimelineValue'($TimelineValue)
+    }
+
+    function Set-PlayerTimelineFromPointerX {
+        param([int]$PointerX)
+        $playerRuntime.'Set-PlayerTimelineFromPointerX'($PointerX)
+    }
+
     function Move-PlayerFrame {
         param([int]$Direction)
         $playerRuntime.'Move-PlayerFrame'($Direction)
@@ -6649,24 +6715,35 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $playerTimelineTrackBar.Add_Scroll(({
-        if ($localState.TimelineSyncActive) {
-            return
-        }
-        $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
+        $playerRuntime.'Sync-PlayerTimelineValue'([int]$playerTimelineTrackBar.Value)
     }).GetNewClosure())
 
     $playerTimelineTrackBar.Add_ValueChanged(({
-        if ($localState.TimelineSyncActive) {
-            return
+        $playerRuntime.'Sync-PlayerTimelineValue'([int]$playerTimelineTrackBar.Value)
+    }).GetNewClosure())
+
+    $playerTimelineTrackBar.Add_MouseDown(({
+        param($sender, $eventArgs)
+        if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+            $playerRuntime.'Set-PlayerTimelineFromPointerX'([int]$eventArgs.X)
         }
-        $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
+    }).GetNewClosure())
+
+    $playerTimelineTrackBar.Add_MouseMove(({
+        param($sender, $eventArgs)
+        if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+            $playerRuntime.'Set-PlayerTimelineFromPointerX'([int]$eventArgs.X)
+        }
     }).GetNewClosure())
 
     $playerTimelineTrackBar.Add_MouseUp(({
-        if ($localState.TimelineSyncActive) {
-            return
+        param($sender, $eventArgs)
+        if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+            $playerRuntime.'Set-PlayerTimelineFromPointerX'([int]$eventArgs.X)
         }
-        $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
+        else {
+            $playerRuntime.'Sync-PlayerTimelineValue'([int]$playerTimelineTrackBar.Value)
+        }
     }).GetNewClosure())
 
     $playerPreviewTimeTextBox.Add_Leave(({
@@ -6702,7 +6779,7 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $playerPreviewFrameButton.Add_Click(({
-        $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $true)
+        $playerRuntime.'Commit-PlayerPreviewTimeText'($true)
     }).GetNewClosure())
 
     $playerOpenVideoButton.Add_Click(({
@@ -8487,10 +8564,15 @@ function Invoke-TestSample {
             -Denoise $settings.Denoise `
             -RotateFlip $settings.RotateFlip `
             -ScaleMode $settings.ScaleMode `
-            -AudioNormalize:([bool]$settings.AudioNormalize)
+            -AudioNormalize:([bool]$settings.AudioNormalize) `
+            -EncoderMode ([string]$settings.EncoderMode) `
+            -EncoderInventory $script:EncoderInventory
 
         $script:LastLogPath = $context.LogPath
+        $script:LastSamplePath = $null
         $samplePath = Get-VhsMp4SampleOutputPath -OutputDir $context.OutputDir -SourceName $item.SourceName
+        $sampleCropState = Copy-PlanItemCropState -Item $item
+        $sampleAspectMode = Get-PlanItemPropertyText -Item $item -Name "AspectMode" -Default "Auto"
         Add-LogLine ("Test Sample: " + $item.SourcePath + " -> " + $samplePath)
         Set-StatusText ("Pravim Test Sample od 120 sekundi: " + $item.SourceName)
 
@@ -8508,7 +8590,11 @@ function Invoke-TestSample {
             -Denoise $context.Denoise `
             -RotateFlip $context.RotateFlip `
             -ScaleMode $context.ScaleMode `
-            -AudioNormalize:([bool]$context.AudioNormalize)
+            -AudioNormalize:([bool]$context.AudioNormalize) `
+            -AspectMode $sampleAspectMode `
+            -VideoInfo $item.MediaInfo `
+            -CropState $sampleCropState `
+            -EncoderMode ([string]$context.EncoderMode)
 
         foreach ($line in (($result.StdOut + [Environment]::NewLine + $result.StdErr) -split "\r?\n")) {
             if (-not [string]::IsNullOrWhiteSpace($line)) {
@@ -8521,12 +8607,13 @@ function Invoke-TestSample {
         }
 
         Add-LogLine ("OK Test Sample: " + $samplePath)
+        $script:LastSamplePath = $samplePath
         Set-StatusText ("Test Sample gotov: " + [System.IO.Path]::GetFileName($samplePath))
         Show-CompletionNotice -Text "Test Sample je gotov."
-        Invoke-Item -LiteralPath (Split-Path -Path $samplePath -Parent)
     }
     catch {
         $message = Get-VhsMp4ErrorMessage -ErrorObject $_
+        $script:LastSamplePath = $null
         Add-LogLine ("Test Sample error: " + $message)
         Set-StatusText ("Test Sample greska: " + $message)
         [System.Windows.Forms.MessageBox]::Show($message, "Test Sample", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
@@ -8837,6 +8924,8 @@ function Start-NextQueuedItem {
             $trimSegmentsProperty = $item.PSObject.Properties["TrimSegments"]
             $trimSegmentsForItem = if ($trimSegmentsProperty -and $null -ne $trimSegmentsProperty.Value) { @($trimSegmentsProperty.Value) } else { @() }
             $itemHasAudio = $true
+            $itemCropState = Copy-PlanItemCropState -Item $item
+            $itemAspectMode = Get-PlanItemPropertyText -Item $item -Name "AspectMode" -Default "Auto"
             $mediaInfoProperty = $item.PSObject.Properties["MediaInfo"]
             if ($mediaInfoProperty -and $null -ne $mediaInfoProperty.Value) {
                 $itemHasAudio = -not [string]::IsNullOrWhiteSpace([string]$mediaInfoProperty.Value.AudioCodec)
@@ -8863,6 +8952,9 @@ function Start-NextQueuedItem {
                 -RotateFlip $script:BatchContext.Context.RotateFlip `
                 -ScaleMode $script:BatchContext.Context.ScaleMode `
                 -AudioNormalize:([bool]$script:BatchContext.Context.AudioNormalize) `
+                -AspectMode $itemAspectMode `
+                -VideoInfo $item.MediaInfo `
+                -CropState $itemCropState `
                 -EncoderMode ([string]$script:BatchContext.Context.EncoderMode) `
                 -EncoderInventory $script:BatchContext.Context.EncoderInventory `
                 -SharedState $script:SharedState
@@ -9827,6 +9919,11 @@ $openReportButton.Text = "Open Report"
 $openReportButton.AutoSize = $true
 $tertiaryActionsFlow.Controls.Add($openReportButton)
 
+$openSampleButton = New-Object System.Windows.Forms.Button
+$openSampleButton.Text = "Open Sample"
+$openSampleButton.AutoSize = $true
+$tertiaryActionsFlow.Controls.Add($openSampleButton)
+
 $advancedToggleButton = New-Object System.Windows.Forms.Button
 $advancedToggleButton.Text = "Hide Advanced"
 $advancedToggleButton.AutoSize = $true
@@ -10618,6 +10715,12 @@ $openLogButton.Add_Click({
 $openReportButton.Add_Click({
     if (-not [string]::IsNullOrWhiteSpace($script:LastReportPath) -and (Test-Path -LiteralPath $script:LastReportPath)) {
         Invoke-Item -LiteralPath $script:LastReportPath
+    }
+})
+
+$openSampleButton.Add_Click({
+    if (-not [string]::IsNullOrWhiteSpace($script:LastSamplePath) -and (Test-Path -LiteralPath $script:LastSamplePath)) {
+        Invoke-Item -LiteralPath $script:LastSamplePath
     }
 })
 
