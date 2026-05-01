@@ -1,4 +1,4 @@
-﻿Option Explicit
+Option Explicit
 
 Dim shell
 Dim fileSystem

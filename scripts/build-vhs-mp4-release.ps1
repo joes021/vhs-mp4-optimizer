@@ -136,7 +136,8 @@ setlocal
 wscript.exe "%~dp0VHS MP4 Optimizer.vbs"
 endlocal
 "@
-Set-Content -LiteralPath (Join-Path $releaseRootFull "VHS MP4 Optimizer.bat") -Value $launcher -Encoding UTF8
+[string]$launcher = $launcher.TrimStart([char]0xFEFF)
+[System.IO.File]::WriteAllText((Join-Path $releaseRootFull "VHS MP4 Optimizer.bat"), $launcher, $utf8NoBom)
 
 $hiddenLauncher = @"
 Option Explicit
@@ -155,7 +156,8 @@ shell.CurrentDirectory = rootDir
 command = "powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File " & Chr(34) & rootDir & "\scripts\optimize-vhs-mp4-gui.ps1" & Chr(34)
 shell.Run command, 0, False
 "@
-Set-Content -LiteralPath (Join-Path $releaseRootFull "VHS MP4 Optimizer.vbs") -Value $hiddenLauncher -Encoding UTF8
+[string]$hiddenLauncher = $hiddenLauncher.TrimStart([char]0xFEFF)
+[System.IO.File]::WriteAllText((Join-Path $releaseRootFull "VHS MP4 Optimizer.vbs"), $hiddenLauncher, $utf8NoBom)
 
 $shortcutLauncher = @"
 @echo off
@@ -164,7 +166,8 @@ powershell -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0scripts\install-
 pause
 endlocal
 "@
-Set-Content -LiteralPath (Join-Path $releaseRootFull "Install Desktop Shortcut.bat") -Value $shortcutLauncher -Encoding UTF8
+[string]$shortcutLauncher = $shortcutLauncher.TrimStart([char]0xFEFF)
+[System.IO.File]::WriteAllText((Join-Path $releaseRootFull "Install Desktop Shortcut.bat"), $shortcutLauncher, $utf8NoBom)
 
 $readme = @"
 Video Converter / VHS MP4 Optimizer

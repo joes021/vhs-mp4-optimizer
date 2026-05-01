@@ -159,6 +159,16 @@ def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
         assert token in checklist, f"missing checklist token: {token}"
 
 
+def test_vhs_release_launchers_are_written_without_utf8_bom() -> None:
+    for launcher_path in [
+        RELEASE_ROOT / "VHS MP4 Optimizer.vbs",
+        RELEASE_ROOT / "VHS MP4 Optimizer.bat",
+        RELEASE_ROOT / "Install Desktop Shortcut.bat",
+    ]:
+        data = launcher_path.read_bytes()
+        assert not data.startswith(b"\xef\xbb\xbf"), f"launcher should not have UTF-8 BOM: {launcher_path}"
+
+
 def test_vhs_release_builder_documents_all_packaged_files() -> None:
     builder = read(ROOT / "scripts" / "build-vhs-mp4-release.ps1")
 
