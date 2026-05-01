@@ -119,6 +119,128 @@ $result = Get-VhsMp4TrimSegments -TrimSegments $segments
     assert payload["OverlapRejected"] is True
 
 
+def test_core_supports_copy_only_split_and_join_tools(tmp_path: Path) -> None:
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+
+    split_source = source_dir / "snimak.mp4"
+    join_source_a = source_dir / "video1.mp4"
+    join_source_b = source_dir / "video2.mp4"
+    split_source.write_text("split-source", encoding="utf-8")
+    join_source_a.write_text("join-a", encoding="utf-8")
+    join_source_b.write_text("join-b", encoding="utf-8")
+
+    fake_ffmpeg = tmp_path / "fake_ffmpeg_tools.ps1"
+    fake_ffmpeg.write_text(
+        """
+param(
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$Args
+)
+
+$logPath = $env:FAKE_FFMPEG_LOG
+if ($logPath) {
+  Add-Content -LiteralPath $logPath -Value ($Args -join "`n") -Encoding UTF8
+  Add-Content -LiteralPath $logPath -Value "`n---" -Encoding UTF8
+}
+
+$outputPath = $Args[-1]
+if ($Args -contains 'segment') {
+  $segmentTimesIndex = [Array]::IndexOf($Args, '-segment_times')
+  $segmentTimes = if ($segmentTimesIndex -ge 0 -and ($segmentTimesIndex + 1) -lt $Args.Count) { $Args[$segmentTimesIndex + 1] } else { '' }
+  $partCount = 1
+  if (-not [string]::IsNullOrWhiteSpace($segmentTimes)) {
+    $partCount = ($segmentTimes -split ',').Count + 1
+  }
+
+  for ($index = 1; $index -le $partCount; $index++) {
+    $candidate = if ($outputPath -match '%03d') {
+      $outputPath -replace '%03d', ('{0:D3}' -f $index)
+    }
+    else {
+      [string]::Format($outputPath, $index)
+    }
+    Set-Content -LiteralPath $candidate -Value ('split-part-' + $index) -Encoding UTF8
+  }
+}
+else {
+  Set-Content -LiteralPath $outputPath -Value 'joined-output' -Encoding UTF8
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    fake_ffmpeg_log = tmp_path / "fake-ffmpeg-tools.log"
+    env = os.environ.copy()
+    env["FAKE_FFMPEG_LOG"] = str(fake_ffmpeg_log)
+
+    split_pattern = tmp_path / "snimak-part{0:D3}.mp4"
+    join_output = tmp_path / "video1plus2.mp4"
+
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$split = Invoke-VhsMp4CopySplit -SourcePath '{split_source}' -OutputPattern '{split_pattern}' -PartCount 3 -DurationSeconds 90 -FfmpegPath '{fake_ffmpeg}'
+$join = Invoke-VhsMp4CopyJoin -SourcePaths @('{join_source_a}', '{join_source_b}') -OutputPath '{join_output}' -FfmpegPath '{fake_ffmpeg}'
+[pscustomobject]@{{
+  SplitSuccess = $split.Success
+  SplitExitCode = $split.ExitCode
+  SplitPartCount = $split.PartCount
+  SplitOutputs = @($split.OutputPaths)
+  SplitTimes = @($split.SegmentTimes)
+  JoinSuccess = $join.Success
+  JoinExitCode = $join.ExitCode
+  JoinOutputPath = $join.OutputPath
+}} | ConvertTo-Json -Depth 6 -Compress
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+
+    assert payload["SplitSuccess"] is True
+    assert payload["SplitExitCode"] == 0
+    assert payload["SplitPartCount"] == 3
+    assert len(payload["SplitOutputs"]) == 3
+    assert payload["SplitOutputs"][0].endswith("snimak-part001.mp4")
+    assert payload["SplitOutputs"][1].endswith("snimak-part002.mp4")
+    assert payload["SplitOutputs"][2].endswith("snimak-part003.mp4")
+    assert payload["SplitTimes"] == ["00:00:30", "00:01:00"]
+    assert split_pattern.with_name("snimak-part001.mp4").exists()
+    assert split_pattern.with_name("snimak-part002.mp4").exists()
+    assert split_pattern.with_name("snimak-part003.mp4").exists()
+
+    assert payload["JoinSuccess"] is True
+    assert payload["JoinExitCode"] == 0
+    assert payload["JoinOutputPath"].endswith("video1plus2.mp4")
+    assert join_output.exists()
+
+    fake_invocation = fake_ffmpeg_log.read_text(encoding="utf-8")
+    assert "-segment_times" in fake_invocation
+    assert "00:00:30,00:01:00" in fake_invocation
+    assert "-c" in fake_invocation
+    assert "copy" in fake_invocation
+    assert "-f" in fake_invocation
+    assert "concat" in fake_invocation
+    assert str(join_output) in fake_invocation
+
+
 def test_core_scans_mp4_avi_and_mpeg_files_applies_quality_modes_and_runs_batch(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"

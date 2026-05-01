@@ -3558,6 +3558,242 @@ function New-VhsMp4PreviewFrame {
     }
 }
 
+function Get-VhsMp4CopyContainerOptions {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath
+    )
+
+    $extension = [System.IO.Path]::GetExtension($OutputPath).ToLowerInvariant()
+    switch ($extension) {
+        ".mp4" { return [pscustomobject]@{ SegmentFormat = "mp4"; UseFastStart = $true } }
+        ".m4v" { return [pscustomobject]@{ SegmentFormat = "mp4"; UseFastStart = $true } }
+        ".mov" { return [pscustomobject]@{ SegmentFormat = "mov"; UseFastStart = $false } }
+        ".mkv" { return [pscustomobject]@{ SegmentFormat = "matroska"; UseFastStart = $false } }
+        ".avi" { return [pscustomobject]@{ SegmentFormat = "avi"; UseFastStart = $false } }
+        ".mpg" { return [pscustomobject]@{ SegmentFormat = "mpeg"; UseFastStart = $false } }
+        ".mpeg" { return [pscustomobject]@{ SegmentFormat = "mpeg"; UseFastStart = $false } }
+        ".ts" { return [pscustomobject]@{ SegmentFormat = "mpegts"; UseFastStart = $false } }
+        ".m2ts" { return [pscustomobject]@{ SegmentFormat = "mpegts"; UseFastStart = $false } }
+        default { return [pscustomobject]@{ SegmentFormat = ""; UseFastStart = $false } }
+    }
+}
+
+function ConvertTo-VhsMp4CopySplitFfmpegPattern {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPattern
+    )
+
+    if ($OutputPattern -match "%0?3d") {
+        return $OutputPattern
+    }
+
+    if ($OutputPattern -match "\{0:D3\}") {
+        return ($OutputPattern -replace "\{0:D3\}", "%03d")
+    }
+
+    $directory = Split-Path -Path $OutputPattern -Parent
+    if ([string]::IsNullOrWhiteSpace($directory)) {
+        $directory = (Get-Location).Path
+    }
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($OutputPattern)
+    $extension = [System.IO.Path]::GetExtension($OutputPattern)
+    return (Join-Path $directory ($baseName + "-part%03d" + $extension))
+}
+
+function Get-VhsMp4CopySplitOutputPaths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPattern,
+        [Parameter(Mandatory = $true)]
+        [int]$PartCount
+    )
+
+    $resolvedPattern = if ($OutputPattern -match "\{0:D3\}") {
+        $OutputPattern
+    }
+    elseif ($OutputPattern -match "%0?3d") {
+        $OutputPattern -replace "%0?3d", "{0:D3}"
+    }
+    else {
+        $directory = Split-Path -Path $OutputPattern -Parent
+        if ([string]::IsNullOrWhiteSpace($directory)) {
+            $directory = (Get-Location).Path
+        }
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($OutputPattern)
+        $extension = [System.IO.Path]::GetExtension($OutputPattern)
+        Join-Path $directory ($baseName + "-part{0:D3}" + $extension)
+    }
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    for ($index = 1; $index -le $PartCount; $index++) {
+        $paths.Add([System.IO.Path]::GetFullPath(([string]::Format($resolvedPattern, $index))))
+    }
+
+    return @($paths)
+}
+
+function ConvertTo-VhsMp4ConcatFileLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourcePath
+    )
+
+    $normalizedPath = [System.IO.Path]::GetFullPath($SourcePath).Replace("\", "/")
+    $escapedPath = $normalizedPath.Replace("'", "'\''")
+    return "file '$escapedPath'"
+}
+
+function Invoke-VhsMp4CopySplit {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourcePath,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPattern,
+        [Parameter(Mandatory = $true)]
+        [int]$PartCount,
+        [string]$FfmpegPath = "ffmpeg",
+        [double]$DurationSeconds = 0
+    )
+
+    if ($PartCount -lt 2) {
+        throw "Copy split trazi najmanje 2 dela."
+    }
+
+    if ($DurationSeconds -le 0) {
+        $mediaInfo = Get-VhsMp4MediaInfo -SourcePath $SourcePath -FfmpegPath $FfmpegPath
+        if ($null -ne $mediaInfo -and $null -ne $mediaInfo.DurationSeconds) {
+            $DurationSeconds = [double]$mediaInfo.DurationSeconds
+        }
+    }
+
+    if ($DurationSeconds -le 0) {
+        throw "Trajanje izvornog fajla nije dostupno; copy split ne moze da izracuna delove."
+    }
+
+    $ffmpegPattern = ConvertTo-VhsMp4CopySplitFfmpegPattern -OutputPattern $OutputPattern
+    $containerOptions = Get-VhsMp4CopyContainerOptions -OutputPath $ffmpegPattern
+    New-VhsMp4OutputParentDirectory -OutputPath $ffmpegPattern
+
+    $segmentTimes = New-Object System.Collections.Generic.List[string]
+    for ($index = 1; $index -lt $PartCount; $index++) {
+        $cutSeconds = ($DurationSeconds * $index) / $PartCount
+        $segmentTimes.Add((Format-VhsMp4FfmpegTime -Seconds $cutSeconds))
+    }
+
+    $arguments = @(
+        "-hide_banner",
+        "-y",
+        "-i", $SourcePath,
+        "-map", "0",
+        "-c", "copy",
+        "-f", "segment",
+        "-segment_times", ($segmentTimes -join ","),
+        "-segment_start_number", "1",
+        "-reset_timestamps", "1"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace([string]$containerOptions.SegmentFormat)) {
+        $arguments += @("-segment_format", [string]$containerOptions.SegmentFormat)
+    }
+
+    if ([bool]$containerOptions.UseFastStart) {
+        $arguments += @("-segment_format_options", "movflags=+faststart")
+    }
+
+    $arguments += $ffmpegPattern
+
+    $startInfo = New-VhsMp4ProcessStartInfo -FfmpegPath $FfmpegPath -FfmpegArguments $arguments
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdOut = $process.StandardOutput.ReadToEnd()
+    $stdErr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    $outputPaths = @()
+    if ($process.ExitCode -eq 0) {
+        $outputPaths = @(Get-VhsMp4CopySplitOutputPaths -OutputPattern $OutputPattern -PartCount $PartCount | Where-Object { Test-Path -LiteralPath $_ })
+    }
+
+    return [pscustomobject]@{
+        Success = ($process.ExitCode -eq 0 -and $outputPaths.Count -gt 0)
+        ExitCode = $process.ExitCode
+        StdOut = $stdOut
+        ErrorText = $stdErr
+        SourcePath = [System.IO.Path]::GetFullPath($SourcePath)
+        OutputPattern = $ffmpegPattern
+        PartCount = $PartCount
+        DurationSeconds = $DurationSeconds
+        SegmentTimes = @($segmentTimes)
+        OutputPaths = @($outputPaths)
+    }
+}
+
+function Invoke-VhsMp4CopyJoin {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$SourcePaths,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath,
+        [string]$FfmpegPath = "ffmpeg"
+    )
+
+    $resolvedSourcePaths = @($SourcePaths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | ForEach-Object { [System.IO.Path]::GetFullPath([string]$_) })
+    if ($resolvedSourcePaths.Count -lt 2) {
+        throw "Copy join trazi najmanje 2 ulazna fajla."
+    }
+
+    New-VhsMp4OutputParentDirectory -OutputPath $OutputPath
+
+    $concatListPath = Join-Path ([System.IO.Path]::GetTempPath()) ("vhs-mp4-concat-" + [System.Guid]::NewGuid().ToString("N") + ".txt")
+    try {
+        $concatLines = foreach ($sourcePath in $resolvedSourcePaths) {
+            ConvertTo-VhsMp4ConcatFileLine -SourcePath $sourcePath
+        }
+        Set-Content -LiteralPath $concatListPath -Value $concatLines -Encoding UTF8
+
+        $containerOptions = Get-VhsMp4CopyContainerOptions -OutputPath $OutputPath
+        $arguments = @(
+            "-hide_banner",
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", $concatListPath,
+            "-c", "copy"
+        )
+
+        if ([bool]$containerOptions.UseFastStart) {
+            $arguments += @("-movflags", "+faststart")
+        }
+
+        $arguments += $OutputPath
+
+        $startInfo = New-VhsMp4ProcessStartInfo -FfmpegPath $FfmpegPath -FfmpegArguments $arguments
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+        $stdOut = $process.StandardOutput.ReadToEnd()
+        $stdErr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+
+        return [pscustomobject]@{
+            Success = ($process.ExitCode -eq 0 -and (Test-Path -LiteralPath $OutputPath))
+            ExitCode = $process.ExitCode
+            StdOut = $stdOut
+            ErrorText = $stdErr
+            OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+            SourcePaths = @($resolvedSourcePaths)
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $concatListPath) {
+            Remove-Item -LiteralPath $concatListPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Start-VhsMp4FileProcess {
     param(
         [Parameter(Mandatory = $true)]
@@ -4044,6 +4280,8 @@ Export-ModuleMember -Function @(
     "Get-VhsMp4PlanFromPaths",
     "Get-VhsMp4FfmpegArguments",
     "New-VhsMp4PreviewFrame",
+    "Invoke-VhsMp4CopySplit",
+    "Invoke-VhsMp4CopyJoin",
     "Start-VhsMp4FileProcess",
     "Complete-VhsMp4FileProcess",
     "Invoke-VhsMp4File",

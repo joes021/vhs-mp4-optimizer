@@ -7722,6 +7722,311 @@ function Show-WorkflowPresetSaveDialog {
     }
 }
 
+function Ensure-FfmpegReadyForUtilityAction {
+    param(
+        [string]$ActionName = "VHS MP4 Optimizer"
+    )
+
+    Sync-FfmpegState
+    if (-not [string]::IsNullOrWhiteSpace([string]$script:ResolvedFfmpegPath)) {
+        return $true
+    }
+
+    $response = [System.Windows.Forms.MessageBox]::Show(
+        "FFmpeg nije spreman.`r`n`r`nDa pokusam Install FFmpeg sada?",
+        $ActionName,
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($response -eq [System.Windows.Forms.DialogResult]::Yes) {
+        Install-FFmpegInteractive
+        Sync-FfmpegState
+    }
+
+    return (-not [string]::IsNullOrWhiteSpace([string]$script:ResolvedFfmpegPath))
+}
+
+function Get-DefaultCopySplitOutputPattern {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Item,
+        [string]$OutputDir = ""
+    )
+
+    $sourcePath = [string]$Item.SourcePath
+    $targetDir = $OutputDir
+    if ([string]::IsNullOrWhiteSpace($targetDir)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$outputTextBox.Text)) {
+            $targetDir = [string]$outputTextBox.Text
+        }
+        if ([string]::IsNullOrWhiteSpace($targetDir)) {
+            $targetDir = Split-Path -Path $sourcePath -Parent
+        }
+    }
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($sourcePath)
+    $extension = [System.IO.Path]::GetExtension($sourcePath)
+    return (Join-Path $targetDir ($baseName + "-part{0:D3}" + $extension))
+}
+
+function Show-CopySplitDialog {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Item
+    )
+
+    $sourcePath = [string]$Item.SourcePath
+    $initialOutputDir = if (-not [string]::IsNullOrWhiteSpace([string]$outputTextBox.Text)) { [string]$outputTextBox.Text } else { Split-Path -Path $sourcePath -Parent }
+
+    $dialog = New-Object System.Windows.Forms.Form
+    $dialog.Text = "Split Selected (Copy Only)"
+    $dialog.StartPosition = "CenterParent"
+    $dialog.FormBorderStyle = "FixedDialog"
+    $dialog.MaximizeBox = $false
+    $dialog.MinimizeBox = $false
+    $dialog.ClientSize = New-Object System.Drawing.Size(520, 220)
+    $dialog.ShowInTaskbar = $false
+
+    $layout = New-Object System.Windows.Forms.TableLayoutPanel
+    $layout.Dock = "Fill"
+    $layout.Padding = New-Object System.Windows.Forms.Padding(12)
+    $layout.ColumnCount = 3
+    $layout.RowCount = 5
+    $layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 100)))
+    $layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 90)))
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 36)))
+    $dialog.Controls.Add($layout)
+
+    $fileLabel = New-Object System.Windows.Forms.Label
+    $fileLabel.Text = "Source"
+    $fileLabel.Anchor = "Left"
+    $fileLabel.AutoSize = $true
+    $layout.Controls.Add($fileLabel, 0, 0)
+
+    $fileValueLabel = New-Object System.Windows.Forms.Label
+    $fileValueLabel.Text = [System.IO.Path]::GetFileName($sourcePath)
+    $fileValueLabel.Dock = "Fill"
+    $fileValueLabel.AutoEllipsis = $true
+    $layout.Controls.Add($fileValueLabel, 1, 0)
+    $layout.SetColumnSpan($fileValueLabel, 2)
+
+    $partsLabel = New-Object System.Windows.Forms.Label
+    $partsLabel.Text = "Broj delova"
+    $partsLabel.Anchor = "Left"
+    $partsLabel.AutoSize = $true
+    $layout.Controls.Add($partsLabel, 0, 1)
+
+    $partsNumeric = New-Object System.Windows.Forms.NumericUpDown
+    $partsNumeric.Minimum = 2
+    $partsNumeric.Maximum = 99
+    $partsNumeric.Value = 2
+    $partsNumeric.Width = 90
+    $partsNumeric.Anchor = "Left"
+    $layout.Controls.Add($partsNumeric, 1, 1)
+
+    $outputLabel = New-Object System.Windows.Forms.Label
+    $outputLabel.Text = "Output folder"
+    $outputLabel.Anchor = "Left"
+    $outputLabel.AutoSize = $true
+    $layout.Controls.Add($outputLabel, 0, 2)
+
+    $outputFolderTextBox = New-Object System.Windows.Forms.TextBox
+    $outputFolderTextBox.Dock = "Fill"
+    $outputFolderTextBox.Text = $initialOutputDir
+    $layout.Controls.Add($outputFolderTextBox, 1, 2)
+
+    $browseButton = New-Object System.Windows.Forms.Button
+    $browseButton.Text = "Browse..."
+    $browseButton.AutoSize = $true
+    $layout.Controls.Add($browseButton, 2, 2)
+
+    $patternPreviewLabel = New-Object System.Windows.Forms.Label
+    $patternPreviewLabel.Dock = "Fill"
+    $patternPreviewLabel.AutoEllipsis = $true
+    $layout.Controls.Add($patternPreviewLabel, 0, 3)
+    $layout.SetColumnSpan($patternPreviewLabel, 3)
+
+    $buttonsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+    $buttonsFlow.Dock = "Right"
+    $buttonsFlow.WrapContents = $false
+    $layout.Controls.Add($buttonsFlow, 0, 4)
+    $layout.SetColumnSpan($buttonsFlow, 3)
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = "Split"
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $buttonsFlow.Controls.Add($okButton)
+
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Text = "Cancel"
+    $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $buttonsFlow.Controls.Add($cancelButton)
+
+    $dialog.AcceptButton = $okButton
+    $dialog.CancelButton = $cancelButton
+
+    $updatePreview = {
+        $candidateOutputDir = $outputFolderTextBox.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($candidateOutputDir)) {
+            $patternPreviewLabel.Text = "Unesi output folder."
+            return
+        }
+
+        $pattern = Get-DefaultCopySplitOutputPattern -Item $Item -OutputDir $candidateOutputDir
+        $patternPreviewLabel.Text = "Bez rekompresije | pattern: " + $pattern + " | rezovi mogu malo da se pomere na najblizi keyframe."
+    }
+
+    $browseButton.Add_Click({
+        $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderDialog.Description = "Izaberi folder za copy split delove"
+        if (-not [string]::IsNullOrWhiteSpace($outputFolderTextBox.Text) -and (Test-Path -LiteralPath $outputFolderTextBox.Text)) {
+            $folderDialog.SelectedPath = $outputFolderTextBox.Text
+        }
+        if ($folderDialog.ShowDialog($dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
+            $outputFolderTextBox.Text = $folderDialog.SelectedPath
+        }
+    })
+
+    $outputFolderTextBox.Add_TextChanged($updatePreview)
+    & $updatePreview
+
+    if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+        return $null
+    }
+
+    $chosenOutputDir = $outputFolderTextBox.Text.Trim()
+    if ([string]::IsNullOrWhiteSpace($chosenOutputDir)) {
+        throw "Izaberi output folder za copy split."
+    }
+
+    return [pscustomobject]@{
+        PartCount = [int]$partsNumeric.Value
+        OutputPattern = Get-DefaultCopySplitOutputPattern -Item $Item -OutputDir $chosenOutputDir
+    }
+}
+
+function Invoke-CopySplitForSelectedItem {
+    if (Test-BatchEditLocked) {
+        return
+    }
+
+    $item = Get-SelectedPlanItem
+    if ($null -eq $item) {
+        [System.Windows.Forms.MessageBox]::Show("Izaberi jedan fajl u queue tabeli pa pokreni Split Selected (Copy Only).", "Split Selected (Copy Only)", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$item.SourcePath) -or -not (Test-Path -LiteralPath [string]$item.SourcePath)) {
+        [System.Windows.Forms.MessageBox]::Show("Izvorni fajl za split nije pronadjen.", "Split Selected (Copy Only)", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        return
+    }
+
+    if (-not (Ensure-FfmpegReadyForUtilityAction -ActionName "Split Selected (Copy Only)")) {
+        return
+    }
+
+    try {
+        $dialogResult = Show-CopySplitDialog -Item $item
+        if ($null -eq $dialogResult) {
+            return
+        }
+
+        $durationSeconds = 0.0
+        if ($null -ne $item.MediaInfo -and $null -ne $item.MediaInfo.DurationSeconds) {
+            $durationSeconds = [double]$item.MediaInfo.DurationSeconds
+        }
+
+        if ($durationSeconds -le 0) {
+            $freshMediaInfo = Get-VhsMp4MediaInfo -SourcePath [string]$item.SourcePath -FfmpegPath $script:ResolvedFfmpegPath
+            if ($null -ne $freshMediaInfo -and $null -ne $freshMediaInfo.DurationSeconds) {
+                $durationSeconds = [double]$freshMediaInfo.DurationSeconds
+            }
+        }
+
+        $form.UseWaitCursor = $true
+        Update-ActionButtons
+
+        $result = Invoke-VhsMp4CopySplit -SourcePath [string]$item.SourcePath -OutputPattern [string]$dialogResult.OutputPattern -PartCount ([int]$dialogResult.PartCount) -DurationSeconds $durationSeconds -FfmpegPath $script:ResolvedFfmpegPath
+        if (-not $result.Success) {
+            throw ("FFmpeg copy split nije uspeo (exit code: " + $result.ExitCode + ").`r`n`r`n" + [string]$result.ErrorText)
+        }
+
+        Add-LogLine ("Copy split: " + [string]$item.SourceName + " -> " + $result.OutputPaths.Count + " dela | " + ([string]::Join(", ", @($result.OutputPaths | ForEach-Object { [System.IO.Path]::GetFileName([string]$_) }))))
+        Set-StatusText ("Copy split zavrsen: " + [string]$item.SourceName + " -> " + $result.OutputPaths.Count + " dela.")
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Split Selected (Copy Only)", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+    }
+    finally {
+        $form.UseWaitCursor = $false
+        Update-ActionButtons
+    }
+}
+
+function Invoke-CopyJoinDialog {
+    if (Test-BatchEditLocked) {
+        return
+    }
+
+    if (-not (Ensure-FfmpegReadyForUtilityAction -ActionName "Join Files (Copy Only)")) {
+        return
+    }
+
+    $supportedPatterns = @(Get-VhsMp4SupportedExtensions | ForEach-Object { "*" + [string]$_ })
+    $filterPattern = $supportedPatterns -join ";"
+
+    $openDialog = New-Object System.Windows.Forms.OpenFileDialog
+    $openDialog.Filter = "Video files ($filterPattern)|$filterPattern|All files (*.*)|*.*"
+    $openDialog.Title = "Join Files (Copy Only)"
+    $openDialog.Multiselect = $true
+    if ($openDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        return
+    }
+
+    $selectedSourcePaths = @($openDialog.FileNames)
+    if ($selectedSourcePaths.Count -lt 2) {
+        [System.Windows.Forms.MessageBox]::Show("Izaberi najmanje 2 fajla za spajanje.", "Join Files (Copy Only)", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return
+    }
+
+    $firstSourcePath = [string]$selectedSourcePaths[0]
+    $defaultExtension = [System.IO.Path]::GetExtension($firstSourcePath)
+    $defaultBaseName = [System.IO.Path]::GetFileNameWithoutExtension($firstSourcePath)
+    $saveDialog = New-Object System.Windows.Forms.SaveFileDialog
+    $saveDialog.Filter = if ([string]::IsNullOrWhiteSpace($defaultExtension)) { "All files (*.*)|*.*" } else { ("Output file (*" + $defaultExtension + ")|*" + $defaultExtension + "|All files (*.*)|*.*") }
+    $saveDialog.Title = "Join Files (Copy Only)"
+    $saveDialog.InitialDirectory = Split-Path -Path $firstSourcePath -Parent
+    $saveDialog.FileName = $defaultBaseName + "-joined" + $defaultExtension
+    if ($saveDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        return
+    }
+
+    try {
+        $form.UseWaitCursor = $true
+        Update-ActionButtons
+
+        $result = Invoke-VhsMp4CopyJoin -SourcePaths $selectedSourcePaths -OutputPath $saveDialog.FileName -FfmpegPath $script:ResolvedFfmpegPath
+        if (-not $result.Success) {
+            throw ("FFmpeg copy join nije uspeo (exit code: " + $result.ExitCode + ").`r`n`r`n" + [string]$result.ErrorText + "`r`n`r`nFajlovi moraju biti kompatibilni za spajanje bez rekompresije.")
+        }
+
+        Add-LogLine ("Copy join: " + $selectedSourcePaths.Count + " fajla -> " + [string]$result.OutputPath)
+        Set-StatusText ("Copy join zavrsen: " + $selectedSourcePaths.Count + " fajla spojeno u " + [System.IO.Path]::GetFileName([string]$result.OutputPath) + ".")
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Join Files (Copy Only)", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+    }
+    finally {
+        $form.UseWaitCursor = $false
+        Update-ActionButtons
+    }
+}
+
 function Get-WorkflowPresetForExport {
     $selectedName = [string]$workflowPresetComboBox.SelectedItem
     $selectedPreset = Find-WorkflowPresetByName -Name $selectedName
@@ -8519,6 +8824,16 @@ $queueMenuItem.DropDownItems.Add($saveQueueMenuItem) | Out-Null
 $loadQueueMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $loadQueueMenuItem.Text = "Load Queue"
 $queueMenuItem.DropDownItems.Add($loadQueueMenuItem) | Out-Null
+
+$queueMenuItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+$copySplitMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$copySplitMenuItem.Text = "Split Selected (Copy Only)..."
+$queueMenuItem.DropDownItems.Add($copySplitMenuItem) | Out-Null
+
+$copyJoinMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$copyJoinMenuItem.Text = "Join Files (Copy Only)..."
+$queueMenuItem.DropDownItems.Add($copyJoinMenuItem) | Out-Null
 
 $queueMenuItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
@@ -9826,6 +10141,14 @@ $loadQueueMenuItem.Add_Click({
     catch {
         [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Load Queue", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
     }
+})
+
+$copySplitMenuItem.Add_Click({
+    [void](Invoke-CopySplitForSelectedItem)
+})
+
+$copyJoinMenuItem.Add_Click({
+    [void](Invoke-CopyJoinDialog)
 })
 
 $skipSelectedMenuItem.Add_Click({
