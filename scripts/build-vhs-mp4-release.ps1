@@ -286,6 +286,7 @@ USB PREDAJA CHECKLIST
 [ ] Bar prvi minut svakog MP4 fajla je pusten i proveren.
 [ ] Originalni veliki fajlovi ostaju kod tebe kao arhiva.
 "@
+$null = New-Item -ItemType Directory -Path $releaseRootFull -Force
 Set-Content -LiteralPath (Join-Path $releaseRootFull "USB PREDAJA CHECKLIST.txt") -Value $checklist -Encoding UTF8
 
 Write-Host "Release folder: $releaseRootFull"
