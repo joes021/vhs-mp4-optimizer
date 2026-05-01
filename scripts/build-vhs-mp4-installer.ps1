@@ -37,6 +37,26 @@ function Get-GitValue {
     }
 }
 
+function Get-ProjectVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+
+    $versionPath = Join-Path $ProjectRoot "version.json"
+    if (-not (Test-Path -LiteralPath $versionPath)) {
+        throw "version.json nije pronadjen u root-u projekta: $versionPath"
+    }
+
+    $parsed = Get-Content -LiteralPath $versionPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+    $version = [string]$parsed.Version
+    if ([string]::IsNullOrWhiteSpace($version) -or $version -notmatch '^\d+\.\d+\.\d+$') {
+        throw "version.json mora imati Version u formatu a.b.c"
+    }
+
+    return $version
+}
+
 function Get-InnoSetupCompilerPath {
     param(
         [string]$PreferredPath
@@ -70,7 +90,7 @@ function Get-VersionInfoNumber {
         [string]$Version
     )
 
-    if ($Version -match '^(\d{4})\.(\d{2})\.(\d{2})') {
+    if ($Version -match '^(\d+)\.(\d+)\.(\d+)$') {
         return ("{0}.{1}.{2}.0" -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
     }
 
@@ -92,7 +112,7 @@ if ([string]::IsNullOrWhiteSpace($GitRef)) {
     $GitRef = Get-GitValue -Arguments @("rev-parse", "--short", "HEAD")
 }
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = (Get-Date -Format "yyyy.MM.dd") + "-" + $GitRef
+    $Version = Get-ProjectVersion -ProjectRoot $projectRoot
 }
 $versionInfoVersion = Get-VersionInfoNumber -Version $Version
 

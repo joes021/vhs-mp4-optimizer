@@ -35,6 +35,26 @@ function Get-GitValue {
     }
 }
 
+function Get-ProjectVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+
+    $versionPath = Join-Path $ProjectRoot "version.json"
+    if (-not (Test-Path -LiteralPath $versionPath)) {
+        throw "version.json nije pronadjen u root-u projekta: $versionPath"
+    }
+
+    $parsed = Get-Content -LiteralPath $versionPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+    $version = [string]$parsed.Version
+    if ([string]::IsNullOrWhiteSpace($version) -or $version -notmatch '^\d+\.\d+\.\d+$') {
+        throw "version.json mora imati Version u formatu a.b.c"
+    }
+
+    return $version
+}
+
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($ReleaseRoot)) {
     $ReleaseRoot = Join-Path $projectRoot "release\VHS MP4 Optimizer"
@@ -44,7 +64,7 @@ if ([string]::IsNullOrWhiteSpace($GitRef)) {
     $GitRef = Get-GitValue -Arguments @("rev-parse", "--short", "HEAD")
 }
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = (Get-Date -Format "yyyy.MM.dd") + "-" + $GitRef
+    $Version = Get-ProjectVersion -ProjectRoot $projectRoot
 }
 if ([string]::IsNullOrWhiteSpace($ReleaseTag)) {
     $ReleaseTag = "vhs-mp4-optimizer-" + $Version

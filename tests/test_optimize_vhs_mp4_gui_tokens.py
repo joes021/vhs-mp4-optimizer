@@ -78,6 +78,7 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
         "System.Media.SystemSounds",
         "System.Windows.Forms.NotifyIcon",
         "BalloonTipTitle",
+        "version.json",
         "Format-VhsMp4Gigabytes",
         "FAT32",
         "exFAT",
@@ -177,6 +178,10 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
         "Add-VhsMp4DirectoryToUserPath",
         "Ensure-FfmpegReadyOnStartup",
         "vhs-mp4-output",
+        "Copy details",
+        "Version",
+        "Git ref",
+        "Release tag",
     ]:
         assert token in script, f"missing GUI token: {token}"
 

@@ -23,6 +23,7 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
     for token in [
         "build-vhs-mp4-release.ps1",
         "Compress-Archive",
+        "version.json",
         "VHS-MP4-Optimizer-portable-",
         "VHS-MP4-Optimizer-Setup-",
         "installer-manifest.json",
@@ -180,6 +181,46 @@ def test_vhs_release_builder_creates_app_manifest(tmp_path: Path) -> None:
         assert app_manifest["ReleaseTag"] == release_tag
         assert app_manifest["Repository"] == "joes021/vhs-mp4-optimizer"
         assert app_manifest["LatestReleaseApi"].endswith("/releases/latest")
+    finally:
+        shutil.rmtree(release_container, ignore_errors=True)
+
+
+def test_vhs_release_builder_uses_repo_version_file_by_default(tmp_path: Path) -> None:
+    release_container = ROOT / "release" / f"_pytest_version_file_{tmp_path.name}"
+    release_root = release_container / "VHS MP4 Optimizer"
+    git_ref = "ver1234"
+    expected_version = json.loads((ROOT / "version.json").read_text(encoding="utf-8"))["Version"]
+
+    try:
+        run = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ROOT / "scripts" / "build-vhs-mp4-release.ps1"),
+                "-ReleaseRoot",
+                str(release_root),
+                "-GitRef",
+                git_ref,
+                "-Repository",
+                "joes021/vhs-mp4-optimizer",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+
+        assert run.returncode == 0, run.stderr
+
+        app_manifest = json.loads((release_root / "app-manifest.json").read_text(encoding="utf-8"))
+        assert app_manifest["Version"] == expected_version
+        assert app_manifest["GitRef"] == git_ref
+        assert app_manifest["ReleaseTag"] == f"vhs-mp4-optimizer-{expected_version}"
     finally:
         shutil.rmtree(release_container, ignore_errors=True)
 
