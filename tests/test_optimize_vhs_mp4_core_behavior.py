@@ -2704,6 +2704,88 @@ $result = New-VhsMp4PreviewFrame -SourcePath '{source}' -OutputPath $previewPath
     assert "-q:v" not in fake_invocation
 
 
+def test_core_detects_crop_from_source_path_with_ffmpeg_cropdetect(tmp_path: Path) -> None:
+    source = tmp_path / "family_tape.mp4"
+    source.write_text("source", encoding="utf-8")
+
+    fake_ffmpeg = tmp_path / "fake_ffmpeg_cropdetect.ps1"
+    fake_ffmpeg.write_text(
+        """
+param(
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$Args
+)
+
+$logPath = $env:FAKE_FFMPEG_LOG
+if ($logPath) {
+  Add-Content -LiteralPath $logPath -Value ($Args -join "`n") -Encoding UTF8
+  Add-Content -LiteralPath $logPath -Value "`n---" -Encoding UTF8
+}
+
+[Console]::Error.WriteLine("[Parsed_cropdetect_0 @ 000001] x1:12 x2:705 y1:8 y2:565 w:694 h:558 x:12 y:8 pts:0 t:0.000 crop=694:558:12:8")
+""".strip(),
+        encoding="utf-8",
+    )
+
+    fake_ffmpeg_log = tmp_path / "fake-ffmpeg-cropdetect.log"
+    env = os.environ.copy()
+    env["FAKE_FFMPEG_LOG"] = str(fake_ffmpeg_log)
+
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$result = Get-VhsMp4DetectedCropFromSourcePath -SourcePath '{source}' -FfmpegPath '{fake_ffmpeg}' -DurationSeconds 180 -SourceWidth 720 -SourceHeight 576
+[pscustomobject]@{{
+  Mode = $result.Mode
+  Left = $result.Left
+  Top = $result.Top
+  Right = $result.Right
+  Bottom = $result.Bottom
+  Width = $result.Width
+  Height = $result.Height
+  SampleCount = $result.SampleCount
+  StableSampleCount = $result.StableSampleCount
+  Summary = $result.Summary
+}} | ConvertTo-Json -Compress
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+
+    assert payload["Mode"] == "Auto"
+    assert payload["Left"] == 12
+    assert payload["Top"] == 8
+    assert payload["Right"] == 14
+    assert payload["Bottom"] == 10
+    assert payload["Width"] == 694
+    assert payload["Height"] == 558
+    assert payload["SampleCount"] == 5
+    assert payload["StableSampleCount"] == 5
+    assert "Auto crop" in payload["Summary"]
+
+    fake_invocation = fake_ffmpeg_log.read_text(encoding="utf-8")
+    assert "-vf" in fake_invocation
+    assert "cropdetect" in fake_invocation
+    assert fake_invocation.count("-ss") == 5
+
+
 def test_core_customer_report_includes_trim_summary(tmp_path: Path) -> None:
     output_dir = tmp_path / "output"
     output_dir.mkdir()

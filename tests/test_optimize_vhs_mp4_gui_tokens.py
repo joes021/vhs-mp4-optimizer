@@ -834,6 +834,7 @@ $item = [pscustomobject]@{{
     DisplayOutputName = 'clip.mp4'
     MediaInfo = $mediaInfo
 }}
+$script:ResolvedFfmpegPath = ''
 $dialog = @(Open-PlayerTrimWindow -Item $item -Modeless) | Where-Object {{ $null -ne $_ -and $_ -is [System.Windows.Forms.Form] }} | Select-Object -Last 1
 $dialog.Show()
 [System.Windows.Forms.Application]::DoEvents()
@@ -912,6 +913,7 @@ def test_vhs_gui_player_trim_manual_navigation_switches_playback_mode_to_preview
         $script:TestPlayerRuntimeState = $runtimeState
         $script:TestPlayerModeLabel = $playerModeLabel
         $script:TestPlayerPreviewTimeTextBox = $playerPreviewTimeTextBox
+        $script:TestPlayerTrimStartTextBox = $playerTrimStartTextBox
         return $dialog
     }
 """
@@ -954,6 +956,8 @@ $script:TestPlayerRuntime.'Navigate-PlayerPositionSeconds'(12.5)
 $modeAfterNavigate = [string]$script:TestPlayerRuntimeLocalState.Mode
 $labelAfterNavigate = [string]$script:TestPlayerModeLabel.Text
 $timeAfterNavigate = [string]$script:TestPlayerPreviewTimeTextBox.Text
+$script:TestPlayerRuntime.'Set-PlayerTrimPoint'('Start')
+$trimStartAfterNavigate = [string]$script:TestPlayerTrimStartTextBox.Text
 $script:TestPlayerRuntime.'Move-PlayerFrame'(1)
 $timeAfterFrame = [string]$script:TestPlayerPreviewTimeTextBox.Text
 $dialog.Close()
@@ -964,6 +968,7 @@ Write-Output 'JSON_START'
     ModeAfterNavigate = $modeAfterNavigate
     LabelAfterNavigate = $labelAfterNavigate
     TimeAfterNavigate = $timeAfterNavigate
+    TrimStartAfterNavigate = $trimStartAfterNavigate
     TimeAfterFrame = $timeAfterFrame
 }} | ConvertTo-Json -Depth 4
 try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
@@ -999,7 +1004,19 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["ModeAfterNavigate"] == "Preview mode"
     assert payload["LabelAfterNavigate"].startswith("Preview mode")
     assert payload["TimeAfterNavigate"] == "00:00:12.5"
+    assert payload["TrimStartAfterNavigate"] == "00:00:12.5"
     assert payload["TimeAfterFrame"] == "00:00:12.54"
+
+
+def test_vhs_gui_player_trim_timeline_uses_value_changed_navigation_handler() -> None:
+    script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        "$playerTimelineTrackBar.Add_ValueChanged(({",
+        "if ($localState.TimelineSyncActive) {",
+        "$playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))",
+    ]:
+        assert token in script
 
 
 def test_vhs_gui_main_workspace_keeps_quick_actions_and_properties_visible(tmp_path: Path) -> None:

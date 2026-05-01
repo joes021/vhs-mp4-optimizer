@@ -3366,6 +3366,57 @@ function Get-PlanItemDetectedCropState {
         }
     }
 
+    $resolvedFfmpegPath = [string]$script:ResolvedFfmpegPath
+    if (-not [string]::IsNullOrWhiteSpace($resolvedFfmpegPath) -and -not [string]::IsNullOrWhiteSpace([string]$Item.SourcePath)) {
+        $durationSeconds = $null
+        if ($Item.PSObject.Properties["MediaInfo"] -and $null -ne $Item.MediaInfo) {
+            $durationSeconds = Convert-ToVhsMp4FiniteDouble -Value $Item.MediaInfo.DurationSeconds -Default $null
+        }
+        if ($null -eq $durationSeconds -or $durationSeconds -le 0) {
+            try {
+                $durationSeconds = Get-VhsMp4MediaDurationSeconds -SourcePath $Item.SourcePath -FfmpegPath $resolvedFfmpegPath
+            }
+            catch {
+                $durationSeconds = $null
+            }
+        }
+
+        if ($null -ne $durationSeconds -and $durationSeconds -gt 0) {
+            try {
+                $detected = Get-VhsMp4DetectedCropFromSourcePath `
+                    -SourcePath $Item.SourcePath `
+                    -FfmpegPath $resolvedFfmpegPath `
+                    -DurationSeconds ([double]$durationSeconds) `
+                    -SourceWidth ([int]$cropSource.SourceWidth) `
+                    -SourceHeight ([int]$cropSource.SourceHeight)
+
+                if ([string]$detected.Mode -eq "Auto") {
+                    $cachedDetectedCrop = [pscustomobject]@{
+                        Mode = "Auto"
+                        Left = [int]$detected.Left
+                        Top = [int]$detected.Top
+                        Right = [int]$detected.Right
+                        Bottom = [int]$detected.Bottom
+                        SourceWidth = [int]$detected.SourceWidth
+                        SourceHeight = [int]$detected.SourceHeight
+                        Summary = [string]$detected.Summary
+                    }
+                    $Item | Add-Member -NotePropertyName "DetectedCrop" -NotePropertyValue $cachedDetectedCrop -Force
+                    return [pscustomobject]@{
+                        CropMode = "Auto"
+                        CropLeft = [int]$detected.Left
+                        CropTop = [int]$detected.Top
+                        CropRight = [int]$detected.Right
+                        CropBottom = [int]$detected.Bottom
+                        CropSummary = [string]$detected.Summary
+                    }
+                }
+            }
+            catch {
+            }
+        }
+    }
+
     return $null
 }
 
@@ -5002,6 +5053,7 @@ function Open-PlayerTrimWindow {
         CropBottom = [int]$cropState.CropBottom
         CropSummary = [string]$cropState.CropSummary
         CropFieldSync = $false
+        TimelineSyncActive = $false
         AspectMode = [string]$initialAspectMode
         DetectedAspectLabel = ""
         DetectedDisplayAspectRatio = ""
@@ -6073,7 +6125,13 @@ function Open-PlayerTrimWindow {
         $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
         $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
         if ($playerTimelineTrackBar.Value -ne $timelineValue) {
-            $playerTimelineTrackBar.Value = $timelineValue
+            $localState.TimelineSyncActive = $true
+            try {
+                $playerTimelineTrackBar.Value = $timelineValue
+            }
+            finally {
+                $localState.TimelineSyncActive = $false
+            }
         }
 
         if ($SyncPlayer -and $localState.Mode -eq "Playback mode" -and $runtimeState.PlaybackReady) {
@@ -6573,6 +6631,16 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $playerTimelineTrackBar.Add_Scroll(({
+        if ($localState.TimelineSyncActive) {
+            return
+        }
+        $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
+    }).GetNewClosure())
+
+    $playerTimelineTrackBar.Add_ValueChanged(({
+        if ($localState.TimelineSyncActive) {
+            return
+        }
         $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
     }).GetNewClosure())
 
