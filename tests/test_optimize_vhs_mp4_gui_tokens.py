@@ -182,10 +182,10 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
         "$workspaceSplit = New-Object System.Windows.Forms.SplitContainer",
         "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel",
-        "$topWorkspaceLayout.ColumnCount = 2",
-        "$controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel",
+        "$topWorkspaceLayout.ColumnCount = 1",
+        "$topWorkspaceLayout.RowCount = 3",
         "$sourceGroupBox = New-Object System.Windows.Forms.GroupBox",
-        '$sourceGroupBox.Text = "Source / Output"',
+        '$sourceGroupBox.Text = "Input / Output"',
         "$quickRunGroupBox = New-Object System.Windows.Forms.GroupBox",
         '$quickRunGroupBox.Text = "Quick Setup"',
         "$advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox",
@@ -197,27 +197,31 @@ def test_vhs_gui_reserves_space_for_status_text_above_file_grid() -> None:
         assert token in script, f"missing modern top-layout token: {token}"
 
     assert script.count("$statusPanel.RowStyles.Add") >= 3
-    assert "$configLayout.AutoScroll = $true" in script
-    assert '$sourceLayout.RowCount = 3' in script
-    assert '$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))' in script
+    assert '$sourceLayout.ColumnCount = 2' in script
+    assert '$sourceLayout.RowCount = 1' in script
+    assert '$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))' in script
+    assert '$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))' in script
     assert '$sourceLayout.Controls.Add($ffmpegLabel, 0, 2)' not in script
     assert '$sourceLayout.Controls.Add($ffmpegPathTextBox, 1, 2)' not in script
     assert '$sourceLayout.Controls.Add($ffmpegHelpNoteLabel, 2, 2)' not in script
+    assert '$sourceLayout.Controls.Add($inputHelpLabel, 3, 0)' not in script
+    assert '$sourceLayout.Controls.Add($outputHelpLabel, 3, 1)' not in script
 
 
 def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_editor_entrypoint() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$rightPanel.RowCount = 3",
+        "$rightPanel.RowCount = 4",
         '$previewStatusLabel.Text = "Selected file"',
         "$selectedFileSummaryLabel = New-Object System.Windows.Forms.Label",
-        "$detailsSplit = New-Object System.Windows.Forms.SplitContainer",
         '$outputPlanGroupBox.Text = "Planned output"',
         "$outputPlanGroupBox.Controls.Add($outputPlanInfoBox)",
         "$propertiesGroupBox = New-Object System.Windows.Forms.GroupBox",
         '$propertiesGroupBox.Text = "Input / source properties"',
         "$propertiesGroupBox.Controls.Add($infoBox)",
+        "$rightPanel.Controls.Add($outputPlanGroupBox, 0, 2)",
+        "$rightPanel.Controls.Add($propertiesGroupBox, 0, 3)",
         "function Open-SelectedPlayerTrimEditor",
         "$grid.Add_CellDoubleClick({",
         "$openPlayerButton.Add_Click({",
@@ -226,6 +230,7 @@ def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_edito
         assert token in script, f"missing batch/properties/floating-editor token: {token}"
 
     assert "$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)" not in script
+    assert "$detailsSplit = New-Object System.Windows.Forms.SplitContainer" not in script
 
 
 def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_state() -> None:
@@ -277,16 +282,19 @@ def test_vhs_gui_uses_resizable_horizontal_split_between_workspace_and_status_ta
         "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$workspaceSplit.IsSplitterFixed = $false",
         "$workspaceSplit.SplitterWidth = 10",
+        "$workspaceSplit.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D",
         "$lowerWorkspaceSplit = New-Object System.Windows.Forms.SplitContainer",
         "$lowerWorkspaceSplit.Dock = \"Fill\"",
         "$lowerWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
         "$lowerWorkspaceSplit.IsSplitterFixed = $false",
         "$lowerWorkspaceSplit.SplitterWidth = 10",
+        "$lowerWorkspaceSplit.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D",
         "$workspaceSplit.Panel2.Controls.Add($lowerWorkspaceSplit)",
         "$lowerWorkspaceSplit.Panel1.Controls.Add($mainSplit)",
         "$lowerWorkspaceSplit.Panel2.Controls.Add($activityTabControl)",
         "$mainSplit.IsSplitterFixed = $false",
         "$mainSplit.SplitterWidth = 10",
+        "$mainSplit.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D",
         "function Set-WorkspaceSplitLayout",
         "function Set-LowerWorkspaceSplitLayout",
         "$workspaceSplit.Add_SplitterMoved({",
