@@ -66,6 +66,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
 Source: "{#MyReleaseRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\VHS MP4 Optimizer"; Filename: "{app}\VHS MP4 Optimizer.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\vhs-mp4-optimizer.ico"
-Name: "{autodesktop}\VHS MP4 Optimizer"; Filename: "{app}\VHS MP4 Optimizer.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\vhs-mp4-optimizer.ico"; Tasks: desktopicon
+Name: "{autoprograms}\VHS MP4 Optimizer"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\VHS MP4 Optimizer.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\vhs-mp4-optimizer.ico"
+Name: "{autodesktop}\VHS MP4 Optimizer"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\VHS MP4 Optimizer.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\vhs-mp4-optimizer.ico"; Tasks: desktopicon
 Name: "{autoprograms}\Uninstall VHS MP4 Optimizer"; Filename: "{uninstallexe}"

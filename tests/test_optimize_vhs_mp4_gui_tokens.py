@@ -4200,6 +4200,57 @@ try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch 
     assert payload["FinalStatus"] == payload["BeforeStatus"]
 
 
+def test_vhs_gui_uses_subtle_alternating_table_row_colors(tmp_path: Path) -> None:
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = """
+$gridDefault = $grid.RowsDefaultCellStyle.BackColor.ToArgb()
+$gridAlt = $grid.AlternatingRowsDefaultCellStyle.BackColor.ToArgb()
+$comparisonDefault = $comparisonGrid.RowsDefaultCellStyle.BackColor.ToArgb()
+$comparisonAlt = $comparisonGrid.AlternatingRowsDefaultCellStyle.BackColor.ToArgb()
+Write-Output 'JSON_START'
+[pscustomobject]@{
+    GridDefault = $gridDefault
+    GridAlt = $gridAlt
+    ComparisonDefault = $comparisonDefault
+    ComparisonAlt = $comparisonAlt
+} | ConvertTo-Json -Depth 4
+try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch {}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-zebra-style-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["GridDefault"] != payload["GridAlt"]
+    assert payload["ComparisonDefault"] != payload["ComparisonAlt"]
+
+
 def test_vhs_gui_contains_help_about_and_update_tokens() -> None:
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
@@ -4209,6 +4260,7 @@ def test_vhs_gui_contains_help_about_and_update_tokens() -> None:
         "About VHS MP4 Optimizer",
         "Check for Updates",
         "Open User Guide",
+        "VHS_MP4_OPTIMIZER_UPUTSTVO.html",
         "Current version",
         "Install type",
         "Install path",

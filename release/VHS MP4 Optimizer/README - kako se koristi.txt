@@ -4,7 +4,7 @@
 Ovaj folder mozes da kopiras na drugi Windows racunar i da pokrenes alat bez ostatka projekta.
 
 Brzi start:
-1. Pokreni "VHS MP4 Optimizer.bat".
+1. Pokreni "VHS MP4 Optimizer.vbs" (ili "VHS MP4 Optimizer.bat" kao fallback launcher).
 2. Ako FFmpeg nije spreman, klikni "Install FFmpeg" ili rucno izaberi ffmpeg.exe.
 3. Izaberi Input folder sa video fajlovima: .mp4, .avi, .mpg, .mpeg, .mov, .mkv, .m4v, .wmv, .ts, .m2ts ili .vob. Scan Files pregleda i podfoldere.
 4. Ako ti je lakse, prevuci folder ili direktne video fajlove pravo u prozor programa.

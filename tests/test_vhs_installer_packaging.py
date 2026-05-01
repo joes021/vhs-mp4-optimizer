@@ -72,7 +72,8 @@ def test_vhs_installer_packaging_tokens_exist() -> None:
         "OutputBaseFilename",
         "Compression=lzma",
         "CreateDesktopIcon",
-        "VHS MP4 Optimizer.bat",
+        "VHS MP4 Optimizer.vbs",
+        "wscript.exe",
         "assets\\vhs-mp4-optimizer.ico",
     ]:
         assert token in inno_script, f"missing inno setup token: {token}"
@@ -130,9 +131,11 @@ def test_vhs_installer_builder_creates_portable_zip_and_manifest(tmp_path: Path)
         with zipfile.ZipFile(portable_zip) as archive:
             names = set(archive.namelist())
         assert "VHS MP4 Optimizer/VHS MP4 Optimizer.bat" in names
+        assert "VHS MP4 Optimizer/VHS MP4 Optimizer.vbs" in names
         assert "VHS MP4 Optimizer/README - kako se koristi.txt" in names
         assert "VHS MP4 Optimizer/app-manifest.json" in names
         assert "VHS MP4 Optimizer/scripts/optimize-vhs-mp4-gui.ps1" in names
+        assert "VHS MP4 Optimizer/scripts/optimize-vhs-mp4-gui.vbs" in names
     finally:
         shutil.rmtree(release_container, ignore_errors=True)
 
@@ -284,6 +287,7 @@ def test_vhs_setup_exe_can_install_release_payload_to_custom_dir(tmp_path: Path)
 
         assert install_run.returncode == 0, install_run.stderr
         assert (install_dir / "VHS MP4 Optimizer.bat").exists()
+        assert (install_dir / "VHS MP4 Optimizer.vbs").exists()
         assert (install_dir / "app-manifest.json").exists()
         assert (install_dir / "scripts" / "optimize-vhs-mp4-gui.ps1").exists()
     finally:

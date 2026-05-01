@@ -1313,6 +1313,7 @@ function Get-VhsMp4LatestReleaseInfo {
 function Get-UserGuidePath {
     $installRoot = Get-VhsMp4InstallRoot
     foreach ($candidate in @(
+            (Join-Path $installRoot "docs\VHS_MP4_OPTIMIZER_UPUTSTVO.html"),
             (Join-Path $installRoot "README - kako se koristi.txt"),
             (Join-Path $installRoot "docs\VHS_MP4_OPTIMIZER_UPUTSTVO.md")
         )) {
@@ -2288,6 +2289,20 @@ function Set-DragDropVisualState {
     if (-not $KeepCurrentStatus) {
         $statusValueLabel.Text = $script:LastNormalStatusText
     }
+}
+
+function Set-DataGridViewSubtleAlternatingRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Windows.Forms.DataGridView]$GridView
+    )
+
+    $baseBackColor = [System.Drawing.Color]::White
+    $alternateBackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
+
+    $GridView.BackgroundColor = $baseBackColor
+    $GridView.RowsDefaultCellStyle.BackColor = $baseBackColor
+    $GridView.AlternatingRowsDefaultCellStyle.BackColor = $alternateBackColor
 }
 
 function Test-BatchRunning {
@@ -9717,6 +9732,7 @@ $grid.SelectionMode = "FullRowSelect"
 $grid.AutoSizeColumnsMode = "DisplayedCells"
 $grid.ScrollBars = "Both"
 $grid.RowHeadersVisible = $false
+Set-DataGridViewSubtleAlternatingRows -GridView $grid
 [void]$grid.Columns.Add("SourceName", "Source file")
 [void]$grid.Columns.Add("OutputName", "Output file")
 [void]$grid.Columns.Add("Container", "Container")
@@ -9785,6 +9801,7 @@ $comparisonGrid.RowHeadersVisible = $false
 $comparisonGrid.AutoSizeColumnsMode = [System.Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
 $comparisonGrid.BackgroundColor = [System.Drawing.SystemColors]::Window
 $comparisonGrid.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+Set-DataGridViewSubtleAlternatingRows -GridView $comparisonGrid
 [void]$comparisonGrid.Columns.Add("PropertyName", "Property")
 [void]$comparisonGrid.Columns.Add("InputValue", "Input")
 [void]$comparisonGrid.Columns.Add("PlannedValue", "Planned output")

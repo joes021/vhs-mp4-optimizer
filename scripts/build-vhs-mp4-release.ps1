@@ -87,14 +87,18 @@ if (Test-Path -LiteralPath $releaseRootFull) {
 
 $scriptsDir = Join-Path $releaseRootFull "scripts"
 $assetsDir = Join-Path $releaseRootFull "assets"
+$docsDir = Join-Path $releaseRootFull "docs"
+$docsMediaDir = Join-Path $docsDir "media"
 $null = New-Item -ItemType Directory -Path $scriptsDir -Force
 $null = New-Item -ItemType Directory -Path $assetsDir -Force
+$null = New-Item -ItemType Directory -Path $docsMediaDir -Force
 
 $scriptFiles = @(
     "optimize-vhs-mp4-core.psm1",
     "optimize-vhs-mp4-gui.ps1",
     "optimize-vhs-mp4.ps1",
     "optimize-vhs-mp4-gui.bat",
+    "optimize-vhs-mp4-gui.vbs",
     "install-vhs-mp4-shortcut.ps1"
 )
 
@@ -103,6 +107,11 @@ foreach ($scriptFile in $scriptFiles) {
 }
 
 Copy-Item -LiteralPath (Join-Path $projectRoot "assets\vhs-mp4-optimizer.ico") -Destination (Join-Path $assetsDir "vhs-mp4-optimizer.ico") -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "docs\VHS_MP4_OPTIMIZER_UPUTSTVO.md") -Destination (Join-Path $docsDir "VHS_MP4_OPTIMIZER_UPUTSTVO.md") -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "docs\VHS_MP4_OPTIMIZER_UPUTSTVO.html") -Destination (Join-Path $docsDir "VHS_MP4_OPTIMIZER_UPUTSTVO.html") -Force
+foreach ($mediaName in @("readme-main-overview.png", "readme-player-trim.png", "readme-batch-controls.png")) {
+    Copy-Item -LiteralPath (Join-Path $projectRoot ("docs\media\" + $mediaName)) -Destination (Join-Path $docsMediaDir $mediaName) -Force
+}
 
 $releaseApiUrl = "https://api.github.com/repos/$Repository/releases/latest"
 $releasesPageUrl = "https://github.com/$Repository/releases"
@@ -124,10 +133,29 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $launcher = @"
 @echo off
 setlocal
-call "%~dp0scripts\optimize-vhs-mp4-gui.bat"
+wscript.exe "%~dp0VHS MP4 Optimizer.vbs"
 endlocal
 "@
 Set-Content -LiteralPath (Join-Path $releaseRootFull "VHS MP4 Optimizer.bat") -Value $launcher -Encoding UTF8
+
+$hiddenLauncher = @"
+Option Explicit
+
+Dim shell
+Dim fileSystem
+Dim rootDir
+Dim command
+
+Set shell = CreateObject("WScript.Shell")
+Set fileSystem = CreateObject("Scripting.FileSystemObject")
+
+rootDir = fileSystem.GetParentFolderName(WScript.ScriptFullName)
+shell.CurrentDirectory = rootDir
+
+command = "powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File " & Chr(34) & rootDir & "\scripts\optimize-vhs-mp4-gui.ps1" & Chr(34)
+shell.Run command, 0, False
+"@
+Set-Content -LiteralPath (Join-Path $releaseRootFull "VHS MP4 Optimizer.vbs") -Value $hiddenLauncher -Encoding UTF8
 
 $shortcutLauncher = @"
 @echo off
@@ -145,7 +173,7 @@ Video Converter / VHS MP4 Optimizer
 Ovaj folder mozes da kopiras na drugi Windows racunar i da pokrenes alat bez ostatka projekta.
 
 Brzi start:
-1. Pokreni "VHS MP4 Optimizer.bat".
+1. Pokreni "VHS MP4 Optimizer.vbs" (ili "VHS MP4 Optimizer.bat" kao fallback launcher).
 2. Ako FFmpeg nije spreman, klikni "Install FFmpeg" ili rucno izaberi ffmpeg.exe.
 3. Izaberi Input folder sa video fajlovima: .mp4, .avi, .mpg, .mpeg, .mov, .mkv, .m4v, .wmv, .ts, .m2ts ili .vob. Scan Files pregleda i podfoldere.
 4. Ako ti je lakse, prevuci folder ili direktne video fajlove pravo u prozor programa.

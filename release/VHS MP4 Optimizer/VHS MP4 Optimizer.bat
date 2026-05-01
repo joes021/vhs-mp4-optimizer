@@ -1,4 +1,4 @@
 ﻿@echo off
 setlocal
-call "%~dp0scripts\optimize-vhs-mp4-gui.bat"
+wscript.exe "%~dp0VHS MP4 Optimizer.vbs"
 endlocal

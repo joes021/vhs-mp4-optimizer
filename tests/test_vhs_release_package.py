@@ -13,14 +13,20 @@ def read(path: Path) -> str:
 def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
     expected_files = [
         RELEASE_ROOT / "VHS MP4 Optimizer.bat",
+        RELEASE_ROOT / "VHS MP4 Optimizer.vbs",
         RELEASE_ROOT / "Install Desktop Shortcut.bat",
         RELEASE_ROOT / "README - kako se koristi.txt",
         RELEASE_ROOT / "USB PREDAJA CHECKLIST.txt",
         RELEASE_ROOT / "app-manifest.json",
+        RELEASE_ROOT / "docs" / "VHS_MP4_OPTIMIZER_UPUTSTVO.html",
+        RELEASE_ROOT / "docs" / "media" / "readme-main-overview.png",
+        RELEASE_ROOT / "docs" / "media" / "readme-player-trim.png",
+        RELEASE_ROOT / "docs" / "media" / "readme-batch-controls.png",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4-core.psm1",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4.ps1",
         RELEASE_ROOT / "scripts" / "optimize-vhs-mp4-gui.bat",
+        RELEASE_ROOT / "scripts" / "optimize-vhs-mp4-gui.vbs",
         RELEASE_ROOT / "scripts" / "install-vhs-mp4-shortcut.ps1",
         RELEASE_ROOT / "assets" / "vhs-mp4-optimizer.ico",
     ]
@@ -29,8 +35,13 @@ def test_vhs_release_folder_is_copyable_and_self_contained() -> None:
         assert file_path.exists(), f"missing release file: {file_path}"
 
     launcher = read(RELEASE_ROOT / "VHS MP4 Optimizer.bat")
-    assert "scripts\\optimize-vhs-mp4-gui.bat" in launcher
+    assert "wscript.exe" in launcher
+    assert "VHS MP4 Optimizer.vbs" in launcher
     assert "C:\\Users" not in launcher
+
+    hidden_launcher = read(RELEASE_ROOT / "VHS MP4 Optimizer.vbs")
+    assert "WScript.Shell" in hidden_launcher
+    assert "optimize-vhs-mp4-gui.ps1" in hidden_launcher
 
     shortcut_launcher = read(RELEASE_ROOT / "Install Desktop Shortcut.bat")
     assert "scripts\\install-vhs-mp4-shortcut.ps1" in shortcut_launcher
@@ -261,3 +272,27 @@ def test_vhs_docs_and_release_scripts_cover_aspect_workflow() -> None:
         "Get-VhsMp4AspectSnapshot",
     ]:
         assert token in packaged_core, f"missing packaged core token: {token}"
+
+
+def test_vhs_html_user_guide_is_rich_and_packaged() -> None:
+    html_guide = read(ROOT / "docs" / "VHS_MP4_OPTIMIZER_UPUTSTVO.html")
+    packaged_html_guide = read(RELEASE_ROOT / "docs" / "VHS_MP4_OPTIMIZER_UPUTSTVO.html")
+
+    for token in [
+        "<!DOCTYPE html>",
+        "<nav",
+        "Brzi start",
+        "Workflow preset",
+        "Player / Trim",
+        "Queue alati",
+        "Encode engine",
+        "Help / About / Update",
+        "readme-main-overview.png",
+        "readme-player-trim.png",
+        "readme-batch-controls.png",
+        "#brzi-start",
+        "#player-trim",
+        "#queue-alati",
+    ]:
+        assert token in html_guide, f"missing HTML guide token: {token}"
+        assert token in packaged_html_guide, f"missing packaged HTML guide token: {token}"
