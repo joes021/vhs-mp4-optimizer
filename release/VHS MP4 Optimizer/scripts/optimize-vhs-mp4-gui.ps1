@@ -5495,6 +5495,7 @@ function Open-PlayerTrimWindow {
         DialogResult = $dialogResult
         ClosingAfterSave = $closingAfterSave
         PlaybackReady = $playbackReady
+        PlaybackActive = $false
     }
 
     $playerRuntimeContext = [pscustomobject]@{
@@ -5597,6 +5598,7 @@ function Open-PlayerTrimWindow {
 
         $localState.Mode = $Mode
         if ($Mode -eq "Playback mode") {
+            $runtimeState.PlaybackActive = $false
             $playerModeLabel.Text = "Playback mode"
             $playerModeLabel.ForeColor = [System.Drawing.Color]::FromArgb(22, 78, 99)
             $playbackHost.Visible = $true
@@ -5606,6 +5608,7 @@ function Open-PlayerTrimWindow {
             $playerPreviewFrameButton.Enabled = $false
         }
         else {
+            $runtimeState.PlaybackActive = $false
             $playerModeLabel.Text = "Preview mode"
             if (-not [string]::IsNullOrWhiteSpace($Reason)) {
                 $playerModeLabel.Text += " | " + $Reason
@@ -5636,9 +5639,11 @@ function Open-PlayerTrimWindow {
 
         try {
             $mediaElement.Play()
+            $runtimeState.PlaybackActive = $true
             $playbackTimer.Start()
         }
         catch {
+            $runtimeState.PlaybackActive = $false
             try {
                 $playbackTimer.Stop()
             }
@@ -5649,6 +5654,7 @@ function Open-PlayerTrimWindow {
     }
 
     function Stop-PlayerPlayback {
+        $runtimeState.PlaybackActive = $false
         try {
             $playbackTimer.Stop()
         }
@@ -6107,6 +6113,23 @@ function Open-PlayerTrimWindow {
         }
     }
 
+    function Navigate-PlayerPositionSeconds {
+        param([double]$Seconds)
+
+        if ($localState.Mode -eq "Playback mode") {
+            if ($runtimeState.PlaybackReady -and $runtimeState.PlaybackActive) {
+                Set-PlayerPositionSeconds -Seconds $Seconds -SyncPlayer $true -RequestPreview $false
+                return
+            }
+
+            Set-PlayerTrimDialogMode "Preview mode" "manual trim"
+            Set-PlayerPositionSeconds -Seconds $Seconds -SyncPlayer $false -RequestPreview $true
+            return
+        }
+
+        Set-PlayerPositionSeconds -Seconds $Seconds -SyncPlayer $false -RequestPreview $true
+    }
+
     function Move-PlayerFrame {
         param([int]$Direction)
         $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $localState.PreviewPositionSeconds -Default 0.0
@@ -6115,7 +6138,7 @@ function Open-PlayerTrimWindow {
             $frameRate = 25.0
         }
         $runtimeState.FrameRate = $frameRate
-        Set-PlayerPositionSeconds -Seconds ($currentSeconds + ($Direction * (1.0 / $frameRate))) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
+        Navigate-PlayerPositionSeconds -Seconds ($currentSeconds + ($Direction * (1.0 / $frameRate)))
     }
 
     function Set-PlayerTrimPoint {
@@ -6401,6 +6424,11 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Set-PlayerPositionSeconds'($Seconds, $SyncPlayer, $RequestPreview)
     }
 
+    function Navigate-PlayerPositionSeconds {
+        param([double]$Seconds)
+        $playerRuntime.'Navigate-PlayerPositionSeconds'($Seconds)
+    }
+
     function Move-PlayerFrame {
         param([int]$Direction)
         $playerRuntime.'Move-PlayerFrame'($Direction)
@@ -6451,6 +6479,7 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $mediaElement.Add_MediaEnded(({
+        $runtimeState.PlaybackActive = $false
         try {
             $mediaElement.Pause()
         }
@@ -6544,8 +6573,7 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $playerTimelineTrackBar.Add_Scroll(({
-        $requestPreview = $localState.Mode -eq "Preview mode"
-        $playerRuntime.'Set-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale), ($localState.Mode -eq "Playback mode"), $requestPreview)
+        $playerRuntime.'Navigate-PlayerPositionSeconds'(([double]$playerTimelineTrackBar.Value / $script:PreviewTimelineScale))
     }).GetNewClosure())
 
     $playerPreviewTimeTextBox.Add_Leave(({
@@ -6560,7 +6588,7 @@ function Open-PlayerTrimWindow {
             $seconds = $localState.PreviewPositionSeconds
         }
 
-        $playerRuntime.'Set-PlayerPositionSeconds'($seconds, ($localState.Mode -eq "Playback mode"), ($localState.Mode -eq "Preview mode"))
+        $playerRuntime.'Navigate-PlayerPositionSeconds'($seconds)
     }).GetNewClosure())
 
     $playPauseButton.Add_Click(({
