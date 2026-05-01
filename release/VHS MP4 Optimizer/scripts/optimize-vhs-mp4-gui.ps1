@@ -2571,12 +2571,41 @@ function Format-VhsMp4Duration {
         [double]$Seconds
     )
 
+    if ([double]::IsNaN($Seconds) -or [double]::IsInfinity($Seconds)) {
+        $Seconds = 0
+    }
+
     if ($Seconds -lt 0) {
         $Seconds = 0
     }
 
     $span = [System.TimeSpan]::FromSeconds([Math]::Round($Seconds))
     return $span.ToString("hh\:mm\:ss")
+}
+
+function Convert-ToVhsMp4FiniteDouble {
+    param(
+        $Value,
+        [double]$Default = 0.0
+    )
+
+    if ($null -eq $Value) {
+        return $Default
+    }
+
+    $parsed = 0.0
+    try {
+        $parsed = [double]$Value
+    }
+    catch {
+        return $Default
+    }
+
+    if ([double]::IsNaN($parsed) -or [double]::IsInfinity($parsed)) {
+        return $Default
+    }
+
+    return $parsed
 }
 
 function Format-VhsMp4Gigabytes {
@@ -4309,8 +4338,13 @@ function Set-PreviewPositionSeconds {
     )
 
     $item = Get-SelectedPlanItem
-    $duration = Get-SelectedPreviewDurationSeconds
-    $position = [Math]::Max(0.0, $Seconds)
+    $duration = Convert-ToVhsMp4FiniteDouble -Value (Get-SelectedPreviewDurationSeconds) -Default 0.0
+    if ($duration -lt 0) {
+        $duration = 0.0
+    }
+
+    $position = Convert-ToVhsMp4FiniteDouble -Value $Seconds -Default 0.0
+    $position = [Math]::Max(0.0, $position)
     if ($duration -gt 0) {
         $position = [Math]::Min($duration, $position)
     }
@@ -4326,13 +4360,14 @@ function Set-PreviewPositionSeconds {
     }
 
     if (Get-Variable -Name "previewTimelineTrackBar" -ErrorAction SilentlyContinue) {
-        $maximum = [Math]::Max(1, [int][Math]::Round($duration * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))
+        $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $script:PreviewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
+        $maximum = [Math]::Max(1, [int][Math]::Round($duration * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero))
         if ($previewTimelineTrackBar.Maximum -ne $maximum) {
             $previewTimelineTrackBar.Maximum = $maximum
         }
         $previewTimelineTrackBar.TickFrequency = [Math]::Max(1, [int][Math]::Round($maximum / 10.0, 0, [System.MidpointRounding]::AwayFromZero))
-        $previewTimelineTrackBar.LargeChange = [Math]::Max(1, $script:PreviewTimelineScale)
-        $timelineValue = [Math]::Min($previewTimelineTrackBar.Maximum, [Math]::Max($previewTimelineTrackBar.Minimum, [int][Math]::Round($position * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
+        $previewTimelineTrackBar.LargeChange = $timelineScale
+        $timelineValue = [Math]::Min($previewTimelineTrackBar.Maximum, [Math]::Max($previewTimelineTrackBar.Minimum, [int][Math]::Round($position * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
         if ($previewTimelineTrackBar.Value -ne $timelineValue) {
             $previewTimelineTrackBar.Value = $timelineValue
         }
@@ -4358,11 +4393,11 @@ function Update-PreviewTimeline {
         return
     }
 
-    $duration = Get-SelectedPreviewDurationSeconds
+    $duration = Convert-ToVhsMp4FiniteDouble -Value (Get-SelectedPreviewDurationSeconds) -Default 0.0
     $position = $null
     $positionProperty = $item.PSObject.Properties["PreviewPositionSeconds"]
     if ($positionProperty -and $null -ne $positionProperty.Value) {
-        $position = [double]$positionProperty.Value
+        $position = Convert-ToVhsMp4FiniteDouble -Value $positionProperty.Value -Default 0.0
     }
 
     if ($null -eq $position) {
@@ -4901,12 +4936,18 @@ function Open-PlayerTrimWindow {
 
     $durationSeconds = 0.0
     if ($null -ne $mediaInfo -and $null -ne $mediaInfo.DurationSeconds) {
-        $durationSeconds = [double]$mediaInfo.DurationSeconds
+        $durationSeconds = Convert-ToVhsMp4FiniteDouble -Value $mediaInfo.DurationSeconds -Default 0.0
+    }
+    if ($durationSeconds -lt 0) {
+        $durationSeconds = 0.0
     }
 
     $frameRate = 25.0
-    if ($null -ne $mediaInfo -and $null -ne $mediaInfo.FrameRate -and [double]$mediaInfo.FrameRate -gt 0) {
-        $frameRate = [double]$mediaInfo.FrameRate
+    if ($null -ne $mediaInfo -and $null -ne $mediaInfo.FrameRate) {
+        $frameRate = Convert-ToVhsMp4FiniteDouble -Value $mediaInfo.FrameRate -Default 25.0
+    }
+    if ($frameRate -le 0) {
+        $frameRate = 25.0
     }
 
     $initialMode = if (Test-PlaybackPreferredFormat -Item $Item) { "Playback mode" } else { "Preview mode" }
@@ -4953,7 +4994,7 @@ function Open-PlayerTrimWindow {
         TrimSummary = [string]$trimState.TrimSummary
         TrimDurationSeconds = $trimState.TrimDurationSeconds
         TrimSegments = @($trimState.TrimSegments)
-        PreviewPositionSeconds = [double]$trimState.PreviewPositionSeconds
+        PreviewPositionSeconds = Convert-ToVhsMp4FiniteDouble -Value $trimState.PreviewPositionSeconds -Default 0.0
         CropMode = [string]$cropState.CropMode
         CropLeft = [int]$cropState.CropLeft
         CropTop = [int]$cropState.CropTop
@@ -6001,9 +6042,16 @@ function Open-PlayerTrimWindow {
             [bool]$RequestPreview = $false
         )
 
-        $position = [Math]::Max(0.0, $Seconds)
-        if ($runtimeState.DurationSeconds -gt 0) {
-            $position = [Math]::Min($runtimeState.DurationSeconds, $position)
+        $durationSeconds = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.DurationSeconds -Default 0.0
+        if ($durationSeconds -lt 0) {
+            $durationSeconds = 0.0
+        }
+        $runtimeState.DurationSeconds = $durationSeconds
+
+        $position = Convert-ToVhsMp4FiniteDouble -Value $Seconds -Default 0.0
+        $position = [Math]::Max(0.0, $position)
+        if ($durationSeconds -gt 0) {
+            $position = [Math]::Min($durationSeconds, $position)
         }
 
         $localState.PreviewPositionSeconds = $position
@@ -6012,11 +6060,12 @@ function Open-PlayerTrimWindow {
             $positionText = "00:00:00"
         }
 
-        $totalText = if ($runtimeState.DurationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $runtimeState.DurationSeconds } else { "--:--:--" }
+        $totalText = if ($durationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $durationSeconds } else { "--:--:--" }
         $playerPositionLabel.Text = $positionText + " / " + $totalText
         $playerPreviewTimeTextBox.Text = $positionText
 
-        $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $previewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
+        $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
+        $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
         if ($playerTimelineTrackBar.Value -ne $timelineValue) {
             $playerTimelineTrackBar.Value = $timelineValue
         }
@@ -6060,7 +6109,13 @@ function Open-PlayerTrimWindow {
 
     function Move-PlayerFrame {
         param([int]$Direction)
-        Set-PlayerPositionSeconds -Seconds ($localState.PreviewPositionSeconds + ($Direction * (1.0 / $runtimeState.FrameRate))) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
+        $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $localState.PreviewPositionSeconds -Default 0.0
+        $frameRate = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.FrameRate -Default 25.0
+        if ($frameRate -le 0) {
+            $frameRate = 25.0
+        }
+        $runtimeState.FrameRate = $frameRate
+        Set-PlayerPositionSeconds -Seconds ($currentSeconds + ($Direction * (1.0 / $frameRate))) -SyncPlayer:($localState.Mode -eq "Playback mode") -RequestPreview:($localState.Mode -eq "Preview mode")
     }
 
     function Set-PlayerTrimPoint {
@@ -6386,7 +6441,7 @@ function Open-PlayerTrimWindow {
     $mediaElement.Add_MediaOpened(({
         $runtimeState.PlaybackReady = $true
         if ($mediaElement.NaturalDuration.HasTimeSpan) {
-            $seconds = $mediaElement.NaturalDuration.TimeSpan.TotalSeconds
+            $seconds = Convert-ToVhsMp4FiniteDouble -Value $mediaElement.NaturalDuration.TimeSpan.TotalSeconds -Default 0.0
             if ($seconds -gt 0) {
                 $runtimeState.DurationSeconds = $seconds
                 $playerTimelineTrackBar.Maximum = [Math]::Max(1, [int][Math]::Round($runtimeState.DurationSeconds * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))

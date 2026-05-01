@@ -274,6 +274,7 @@ def test_vhs_setup_exe_can_install_release_payload_to_custom_dir(tmp_path: Path)
                 "/VERYSILENT",
                 "/SUPPRESSMSGBOXES",
                 "/NORESTART",
+                "/NOICONS",
                 "/SP-",
                 f"/DIR={install_dir}",
             ],

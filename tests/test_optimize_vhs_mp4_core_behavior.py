@@ -119,6 +119,42 @@ $result = Get-VhsMp4TrimSegments -TrimSegments $segments
     assert payload["OverlapRejected"] is True
 
 
+def test_core_time_formatters_reject_nan_and_infinity_values() -> None:
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$nanTime = Format-VhsMp4FfmpegTime -Seconds ([double]::NaN)
+$infTime = Format-VhsMp4FfmpegTime -Seconds ([double]::PositiveInfinity)
+[pscustomobject]@{{
+  NanTime = $nanTime
+  InfTime = $infTime
+}} | ConvertTo-Json -Compress
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+
+    assert payload["NanTime"] == ""
+    assert payload["InfTime"] == ""
+
+
 def test_core_supports_copy_only_split_and_join_tools(tmp_path: Path) -> None:
     source_dir = tmp_path / "source"
     source_dir.mkdir()
