@@ -1088,6 +1088,30 @@ function Get-AppMetadataPath {
     return (Join-Path (Split-Path $PSScriptRoot -Parent) "app-manifest.json")
 }
 
+function Get-VersionDefinitionPath {
+    return (Join-Path (Split-Path $PSScriptRoot -Parent) "version.json")
+}
+
+function Get-VhsMp4DefaultVersion {
+    $versionPath = Get-VersionDefinitionPath
+    if (-not (Test-Path -LiteralPath $versionPath)) {
+        return "0.0.0"
+    }
+
+    try {
+        $parsed = Get-Content -LiteralPath $versionPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $version = [string](Get-WorkflowPresetObjectValue -Object $parsed -Name "Version")
+        if (-not [string]::IsNullOrWhiteSpace($version) -and $version -match '^\d+\.\d+\.\d+$') {
+            return $version
+        }
+    }
+    catch {
+        Add-LogLine -Text ("Version metadata warning: " + (Get-VhsMp4ErrorMessage -ErrorObject $_))
+    }
+
+    return "0.0.0"
+}
+
 function Get-UpdateStatePath {
     return (Join-Path (Get-WorkflowPresetStorageRoot) "update-state.json")
 }
@@ -1108,7 +1132,7 @@ function Get-VhsMp4ApplicationMetadata {
     $defaultRepository = "joes021/vhs-mp4-optimizer"
     $metadata = [ordered]@{
         AppName = "VHS MP4 Optimizer"
-        Version = "dev"
+        Version = Get-VhsMp4DefaultVersion
         GitRef = "local"
         ReleaseTag = ""
         Repository = $defaultRepository
@@ -1599,12 +1623,28 @@ function Show-AboutDialog {
     $metadata = Get-VhsMp4ApplicationMetadata
     $installType = Get-VhsMp4InstallType
     $installPath = Get-VhsMp4InstallRoot
+    $versionText = [string]$metadata.Version
+    $releaseTagText = [string]$metadata.ReleaseTag
+    $gitRefText = [string]$metadata.GitRef
+    $repositoryText = [string]$metadata.Repository
+    $releasesPageText = [string]$metadata.ReleasesPage
+    $aboutText = @"
+VHS MP4 Optimizer $versionText
+
+Version: $versionText
+Release tag: $releaseTagText
+Git ref: $gitRefText
+Install type: $installType
+Install path: $installPath
+GitHub repo: $repositoryText
+Releases page: $releasesPageText
+"@.Trim()
 
     $dialog = New-Object System.Windows.Forms.Form
-    $dialog.Text = "About VHS MP4 Optimizer"
+    $dialog.Text = "About VHS MP4 Optimizer $versionText"
     $dialog.StartPosition = "CenterParent"
-    $dialog.ClientSize = New-Object System.Drawing.Size(640, 320)
-    $dialog.MinimumSize = New-Object System.Drawing.Size(640, 320)
+    $dialog.ClientSize = New-Object System.Drawing.Size(760, 420)
+    $dialog.MinimumSize = New-Object System.Drawing.Size(760, 420)
     if (Test-Path -LiteralPath $script:AppIconPath) {
         $dialog.Icon = New-Object System.Drawing.Icon $script:AppIconPath
     }
@@ -1613,40 +1653,116 @@ function Show-AboutDialog {
     $layout.Dock = "Fill"
     $layout.Padding = New-Object System.Windows.Forms.Padding(12)
     $layout.ColumnCount = 1
-    $layout.RowCount = 2
+    $layout.RowCount = 3
+    $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 58)))
     $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
     $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 40)))
     $dialog.Controls.Add($layout)
 
-    $detailsBox = New-Object System.Windows.Forms.TextBox
-    $detailsBox.Multiline = $true
-    $detailsBox.ReadOnly = $true
-    $detailsBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
-    $detailsBox.Dock = "Fill"
-    $detailsBox.Text = @"
-VHS MP4 Optimizer
+    $headerPanel = New-Object System.Windows.Forms.Panel
+    $headerPanel.Dock = "Fill"
+    $layout.Controls.Add($headerPanel, 0, 0)
 
-Current version: $([string]$metadata.Version)
-Release tag: $([string]$metadata.ReleaseTag)
-Git ref: $([string]$metadata.GitRef)
-Install type: $installType
-Install path: $installPath
-GitHub repo: $([string]$metadata.Repository)
-Releases page: $([string]$metadata.ReleasesPage)
-"@.Trim()
-    $layout.Controls.Add($detailsBox, 0, 0)
+    $titleLabel = New-Object System.Windows.Forms.Label
+    $titleLabel.Text = "VHS MP4 Optimizer $versionText"
+    $titleLabel.Font = New-Object System.Drawing.Font($dialog.Font.FontFamily, 14, [System.Drawing.FontStyle]::Bold)
+    $titleLabel.AutoSize = $true
+    $titleLabel.Location = New-Object System.Drawing.Point(0, 0)
+    $headerPanel.Controls.Add($titleLabel)
+
+    $subtitleLabel = New-Object System.Windows.Forms.Label
+    $subtitleLabel.Text = "Build $gitRefText | $installType"
+    $subtitleLabel.AutoSize = $true
+    $subtitleLabel.Location = New-Object System.Drawing.Point(2, 30)
+    $headerPanel.Controls.Add($subtitleLabel)
+
+    $detailsLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $detailsLayout.Dock = "Fill"
+    $detailsLayout.ColumnCount = 2
+    $detailsLayout.RowCount = 7
+    $detailsLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 130)))
+    $detailsLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    foreach ($rowIndex in 0..6) {
+        $detailsLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 40)))
+    }
+    $layout.Controls.Add($detailsLayout, 0, 1)
+
+    $newValueBox = {
+        param([string]$text)
+        $box = New-Object System.Windows.Forms.TextBox
+        $box.ReadOnly = $true
+        $box.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+        $box.Dock = "Fill"
+        $box.Text = $text
+        $box.Margin = New-Object System.Windows.Forms.Padding(3, 6, 3, 6)
+        return $box
+    }
+
+    $rows = @(
+        @{ Label = "Version"; Value = $versionText },
+        @{ Label = "Release tag"; Value = $releaseTagText },
+        @{ Label = "Git ref"; Value = $gitRefText },
+        @{ Label = "Install type"; Value = $installType },
+        @{ Label = "Install path"; Value = $installPath },
+        @{ Label = "GitHub repo"; Value = $repositoryText }
+    )
+
+    for ($rowIndex = 0; $rowIndex -lt $rows.Count; $rowIndex++) {
+        $row = $rows[$rowIndex]
+        $nameLabel = New-Object System.Windows.Forms.Label
+        $nameLabel.Text = [string]$row.Label
+        $nameLabel.Anchor = "Left"
+        $nameLabel.AutoSize = $true
+        $detailsLayout.Controls.Add($nameLabel, 0, $rowIndex)
+
+        $valueBox = & $newValueBox ([string]$row.Value)
+        $detailsLayout.Controls.Add($valueBox, 1, $rowIndex)
+    }
+
+    $releasesLabel = New-Object System.Windows.Forms.Label
+    $releasesLabel.Text = "Releases page"
+    $releasesLabel.Anchor = "Left"
+    $releasesLabel.AutoSize = $true
+    $detailsLayout.Controls.Add($releasesLabel, 0, 6)
+
+    $releasesLink = New-Object System.Windows.Forms.LinkLabel
+    $releasesLink.Text = $releasesPageText
+    $releasesLink.Dock = "Fill"
+    $releasesLink.Margin = New-Object System.Windows.Forms.Padding(3, 10, 3, 6)
+    $releasesLink.Add_LinkClicked({
+        try {
+            Start-Process $releasesPageText | Out-Null
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "About VHS MP4 Optimizer", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        }
+    })
+    $detailsLayout.Controls.Add($releasesLink, 1, 6)
 
     $buttonsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
     $buttonsFlow.Dock = "Fill"
     $buttonsFlow.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
     $buttonsFlow.WrapContents = $false
-    $layout.Controls.Add($buttonsFlow, 0, 1)
+    $layout.Controls.Add($buttonsFlow, 0, 2)
 
     $okButton = New-Object System.Windows.Forms.Button
     $okButton.Text = "OK"
     $okButton.AutoSize = $true
     $okButton.Add_Click({ $dialog.Close() })
     $buttonsFlow.Controls.Add($okButton)
+
+    $copyButton = New-Object System.Windows.Forms.Button
+    $copyButton.Text = "Copy details"
+    $copyButton.AutoSize = $true
+    $copyButton.Add_Click({
+        try {
+            [System.Windows.Forms.Clipboard]::SetText($aboutText)
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Copy details", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        }
+    })
+    $buttonsFlow.Controls.Add($copyButton)
 
     $checkButton = New-Object System.Windows.Forms.Button
     $checkButton.Text = "Check for Updates"
