@@ -1692,11 +1692,15 @@ function Get-VhsMp4AspectSnapshot {
         [Parameter(Mandatory = $true)]
         $InputObject,
         [string]$AspectMode = "Auto",
+        [ValidateSet("None", "90 CW", "90 CCW", "180", "Horizontal Flip", "Vertical Flip")]
+        [string]$RotateFlip = "None",
+        [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
+        [string]$ScaleMode = "Original",
         [object]$CropState
     )
 
     $aspectState = Get-VhsMp4AspectState -InputObject $InputObject -AspectMode $AspectMode
-    $geometry = Get-VhsMp4AspectTargetGeometry -InputObject $InputObject -AspectMode $AspectMode -CropState $CropState
+    $geometry = Get-VhsMp4AspectTargetGeometry -InputObject $InputObject -AspectMode $AspectMode -RotateFlip $RotateFlip -ScaleMode $ScaleMode -CropState $CropState
 
     return [pscustomobject]@{
         AspectMode = $aspectState.AspectMode
@@ -1718,10 +1722,14 @@ function Add-VhsMp4AspectSnapshotToObject {
         [Parameter(Mandatory = $true)]
         $InputObject,
         [string]$AspectMode = "Auto",
+        [ValidateSet("None", "90 CW", "90 CCW", "180", "Horizontal Flip", "Vertical Flip")]
+        [string]$RotateFlip = "None",
+        [ValidateSet("Original", "PAL 576p", "720p", "1080p")]
+        [string]$ScaleMode = "Original",
         [object]$CropState
     )
 
-    $aspectSnapshot = Get-VhsMp4AspectSnapshot -InputObject $InputObject -AspectMode $AspectMode -CropState $CropState
+    $aspectSnapshot = Get-VhsMp4AspectSnapshot -InputObject $InputObject -AspectMode $AspectMode -RotateFlip $RotateFlip -ScaleMode $ScaleMode -CropState $CropState
     foreach ($property in $aspectSnapshot.PSObject.Properties) {
         $TargetObject | Add-Member -NotePropertyName $property.Name -NotePropertyValue $property.Value -Force
     }
