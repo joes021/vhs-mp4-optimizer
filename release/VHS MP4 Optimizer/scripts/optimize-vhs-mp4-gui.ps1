@@ -236,22 +236,20 @@ function Set-AdvancedSettingsVisibility {
         $advancedToggleButton.Text = if ($Visible) { "Hide Advanced" } else { "Show Advanced" }
     }
 
-    if (Get-Variable -Name "controlsStackLayout" -ErrorAction SilentlyContinue) {
-        if ($controlsStackLayout.RowStyles.Count -ge 2) {
+    if (Get-Variable -Name "topWorkspaceLayout" -ErrorAction SilentlyContinue) {
+        if ($topWorkspaceLayout.RowStyles.Count -ge 3) {
+            $topWorkspaceLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+            $topWorkspaceLayout.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
             if ($Visible) {
-                $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
-                $controlsStackLayout.RowStyles[0].Height = 0
-                $controlsStackLayout.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Percent
-                $controlsStackLayout.RowStyles[1].Height = 100
+                $topWorkspaceLayout.RowStyles[2].SizeType = [System.Windows.Forms.SizeType]::Percent
+                $topWorkspaceLayout.RowStyles[2].Height = 100
             }
             else {
-                $controlsStackLayout.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
-                $controlsStackLayout.RowStyles[0].Height = 100
-                $controlsStackLayout.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
-                $controlsStackLayout.RowStyles[1].Height = 0
+                $topWorkspaceLayout.RowStyles[2].SizeType = [System.Windows.Forms.SizeType]::Absolute
+                $topWorkspaceLayout.RowStyles[2].Height = 0
             }
         }
-        $controlsStackLayout.PerformLayout()
+        $topWorkspaceLayout.PerformLayout()
     }
 }
 
@@ -8148,6 +8146,7 @@ $workspaceSplit.Dock = "Fill"
 $workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
 $workspaceSplit.IsSplitterFixed = $false
 $workspaceSplit.SplitterWidth = 10
+$workspaceSplit.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D
 $workspaceSplit.BackColor = [System.Drawing.Color]::Gainsboro
 $rootLayout.Controls.Add($workspaceSplit, 0, 0)
 
@@ -8156,80 +8155,95 @@ $lowerWorkspaceSplit.Dock = "Fill"
 $lowerWorkspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
 $lowerWorkspaceSplit.IsSplitterFixed = $false
 $lowerWorkspaceSplit.SplitterWidth = 10
+$lowerWorkspaceSplit.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D
 $lowerWorkspaceSplit.BackColor = [System.Drawing.Color]::Gainsboro
 $workspaceSplit.Panel2.Controls.Add($lowerWorkspaceSplit)
 
 $topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $topWorkspaceLayout.Dock = "Fill"
-$topWorkspaceLayout.ColumnCount = 2
-$topWorkspaceLayout.RowCount = 1
+$topWorkspaceLayout.ColumnCount = 1
+$topWorkspaceLayout.RowCount = 3
 $topWorkspaceLayout.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8)
-$topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 55)))
-$topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 45)))
+$topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$topWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$topWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$topWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $workspaceSplit.Panel1.Controls.Add($topWorkspaceLayout)
 
 $sourceGroupBox = New-Object System.Windows.Forms.GroupBox
-$sourceGroupBox.Text = "Source / Output"
+$sourceGroupBox.Text = "Input / Output"
 $sourceGroupBox.Dock = "Fill"
 $topWorkspaceLayout.Controls.Add($sourceGroupBox, 0, 0)
 
 $sourceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $sourceLayout.Dock = "Fill"
-$sourceLayout.ColumnCount = 4
-$sourceLayout.RowCount = 3
+$sourceLayout.ColumnCount = 2
+$sourceLayout.RowCount = 1
 $sourceLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
-$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 108)))
-$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
-$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 216)))
-$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
-$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
 $sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $sourceGroupBox.Controls.Add($sourceLayout)
+
+$inputFolderPanel = New-Object System.Windows.Forms.TableLayoutPanel
+$inputFolderPanel.Dock = "Fill"
+$inputFolderPanel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 6, 0)
+$inputFolderPanel.ColumnCount = 3
+$inputFolderPanel.RowCount = 1
+$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
+$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
+$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$sourceLayout.Controls.Add($inputFolderPanel, 0, 0)
 
 $inputLabel = New-Object System.Windows.Forms.Label
 $inputLabel.Text = "Input folder"
 $inputLabel.Anchor = "Left"
 $inputLabel.AutoSize = $true
-$sourceLayout.Controls.Add($inputLabel, 0, 0)
+$inputFolderPanel.Controls.Add($inputLabel, 0, 0)
 
 $inputTextBox = New-Object System.Windows.Forms.TextBox
 $inputTextBox.Dock = "Fill"
-$sourceLayout.Controls.Add($inputTextBox, 1, 0)
+$inputFolderPanel.Controls.Add($inputTextBox, 1, 0)
 
 $browseInputButton = New-Object System.Windows.Forms.Button
 $browseInputButton.Text = "Browse..."
-$browseInputButton.Anchor = "Left"
-$browseInputButton.Size = New-Object System.Drawing.Size(120, 26)
-$sourceLayout.Controls.Add($browseInputButton, 2, 0)
+$browseInputButton.Dock = "Fill"
+$inputFolderPanel.Controls.Add($browseInputButton, 2, 0)
 
 $inputHelpLabel = New-Object System.Windows.Forms.Label
 $inputHelpLabel.Text = "MP4 / AVI / MPG / MOV / MKV ulazi | prevuci folder ili fajlove"
-$inputHelpLabel.Anchor = "Left"
-$inputHelpLabel.AutoSize = $true
-$sourceLayout.Controls.Add($inputHelpLabel, 3, 0)
+$inputHelpLabel.Visible = $false
+
+$outputFolderPanel = New-Object System.Windows.Forms.TableLayoutPanel
+$outputFolderPanel.Dock = "Fill"
+$outputFolderPanel.Margin = New-Object System.Windows.Forms.Padding(6, 0, 0, 0)
+$outputFolderPanel.ColumnCount = 3
+$outputFolderPanel.RowCount = 1
+$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
+$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
+$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$sourceLayout.Controls.Add($outputFolderPanel, 1, 0)
 
 $outputLabel = New-Object System.Windows.Forms.Label
 $outputLabel.Text = "Output folder"
 $outputLabel.Anchor = "Left"
 $outputLabel.AutoSize = $true
-$sourceLayout.Controls.Add($outputLabel, 0, 1)
+$outputFolderPanel.Controls.Add($outputLabel, 0, 0)
 
 $outputTextBox = New-Object System.Windows.Forms.TextBox
 $outputTextBox.Dock = "Fill"
-$sourceLayout.Controls.Add($outputTextBox, 1, 1)
+$outputFolderPanel.Controls.Add($outputTextBox, 1, 0)
 
 $browseOutputButton = New-Object System.Windows.Forms.Button
 $browseOutputButton.Text = "Browse..."
-$browseOutputButton.Anchor = "Left"
-$browseOutputButton.Size = New-Object System.Drawing.Size(120, 26)
-$sourceLayout.Controls.Add($browseOutputButton, 2, 1)
+$browseOutputButton.Dock = "Fill"
+$outputFolderPanel.Controls.Add($browseOutputButton, 2, 0)
 
 $outputHelpLabel = New-Object System.Windows.Forms.Label
 $outputHelpLabel.Text = "Podrazumevano: vhs-mp4-output"
-$outputHelpLabel.Anchor = "Left"
-$outputHelpLabel.AutoSize = $true
-$sourceLayout.Controls.Add($outputHelpLabel, 3, 1)
+$outputHelpLabel.Visible = $false
 
 $ffmpegLabel = New-Object System.Windows.Forms.Label
 $ffmpegLabel.Text = "FFmpeg path"
@@ -8251,21 +8265,10 @@ $ffmpegHelpNoteLabel.Dock = "Fill"
 $ffmpegHelpNoteLabel.TextAlign = "MiddleLeft"
 $ffmpegHelpNoteLabel.AutoEllipsis = $true
 
-$controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel
-$controlsStackLayout.Dock = "Fill"
-$controlsStackLayout.ColumnCount = 1
-$controlsStackLayout.RowCount = 2
-$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$controlsStackLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 0)))
-$topWorkspaceLayout.Controls.Add($controlsStackLayout, 1, 0)
-
-$configLayout = $controlsStackLayout
-$configLayout.AutoScroll = $true
-
 $quickRunGroupBox = New-Object System.Windows.Forms.GroupBox
 $quickRunGroupBox.Text = "Quick Setup"
 $quickRunGroupBox.Dock = "Fill"
-$configLayout.Controls.Add($quickRunGroupBox, 0, 0)
+$topWorkspaceLayout.Controls.Add($quickRunGroupBox, 0, 1)
 
 $quickRunLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $quickRunLayout.Dock = "Fill"
@@ -8396,7 +8399,7 @@ $advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox
 $advancedSettingsGroupBox.Text = "Advanced Settings"
 $advancedSettingsGroupBox.Dock = "Fill"
 $advancedSettingsGroupBox.Visible = $true
-$configLayout.Controls.Add($advancedSettingsGroupBox, 0, 1)
+$topWorkspaceLayout.Controls.Add($advancedSettingsGroupBox, 0, 2)
 
 $advancedSettingsLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $advancedSettingsLayout.Dock = "Fill"
@@ -8779,6 +8782,7 @@ $mainSplit = New-Object System.Windows.Forms.SplitContainer
 $mainSplit.Dock = "Fill"
 $mainSplit.IsSplitterFixed = $false
 $mainSplit.SplitterWidth = 10
+$mainSplit.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D
 $mainSplit.BackColor = [System.Drawing.Color]::Gainsboro
 $lowerWorkspaceSplit.Panel1.Controls.Add($mainSplit)
 
@@ -8820,10 +8824,11 @@ $leftWorkspaceLayout.Controls.Add($grid, 0, 1)
 $rightPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $rightPanel.Dock = "Fill"
 $rightPanel.ColumnCount = 1
-$rightPanel.RowCount = 3
+$rightPanel.RowCount = 4
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 48)))
-$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 45)))
+$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 55)))
 $mainSplit.Panel2.Controls.Add($rightPanel)
 
 $previewStatusLabel = New-Object System.Windows.Forms.Label
@@ -8841,16 +8846,10 @@ $selectedFileSummaryLabel.AutoEllipsis = $true
 $selectedFileSummaryLabel.Text = "Izaberi fajl u queue listi pa koristi Open Player za preview, trim, crop i aspect korekciju."
 $rightPanel.Controls.Add($selectedFileSummaryLabel, 0, 1)
 
-$detailsSplit = New-Object System.Windows.Forms.SplitContainer
-$detailsSplit.Dock = "Fill"
-$detailsSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
-$detailsSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::None
-$rightPanel.Controls.Add($detailsSplit, 0, 2)
-
 $outputPlanGroupBox = New-Object System.Windows.Forms.GroupBox
 $outputPlanGroupBox.Text = "Planned output"
 $outputPlanGroupBox.Dock = "Fill"
-$detailsSplit.Panel1.Controls.Add($outputPlanGroupBox)
+$rightPanel.Controls.Add($outputPlanGroupBox, 0, 2)
 
 $outputPlanInfoBox = New-Object System.Windows.Forms.RichTextBox
 $outputPlanInfoBox.Dock = "Fill"
@@ -8864,7 +8863,7 @@ $outputPlanGroupBox.Controls.Add($outputPlanInfoBox)
 $propertiesGroupBox = New-Object System.Windows.Forms.GroupBox
 $propertiesGroupBox.Text = "Input / source properties"
 $propertiesGroupBox.Dock = "Fill"
-$detailsSplit.Panel2.Controls.Add($propertiesGroupBox)
+$rightPanel.Controls.Add($propertiesGroupBox, 0, 3)
 
 $infoBox = New-Object System.Windows.Forms.RichTextBox
 $infoBox.Dock = "Fill"
