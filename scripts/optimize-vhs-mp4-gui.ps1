@@ -801,6 +801,28 @@ function Get-CurrentInternalQualityModeName {
     return [string](Resolve-QualityModeSelection -QualityMode (Get-CurrentQualityModeSelectionLabel)).InternalQualityMode
 }
 
+function Get-CurrentRotateFlipModeName {
+    if (Get-Variable -Name rotateFlipComboBox -ErrorAction SilentlyContinue) {
+        $value = [string]$rotateFlipComboBox.SelectedItem
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+    }
+
+    return "None"
+}
+
+function Get-CurrentScaleModeName {
+    if (Get-Variable -Name scaleModeComboBox -ErrorAction SilentlyContinue) {
+        $value = [string]$scaleModeComboBox.SelectedItem
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+    }
+
+    return "Original"
+}
+
 function Get-QualityModeSuggestedVideoBitrate {
     param(
         [string]$QualityMode
@@ -3368,9 +3390,11 @@ function Get-PlanItemCurrentAspectSnapshot {
     if ([string]::IsNullOrWhiteSpace([string]$cropState.CropMode)) {
         $cropState = $null
     }
+    $rotateFlip = Get-CurrentRotateFlipModeName
+    $scaleMode = Get-CurrentScaleModeName
 
     try {
-        return (Get-VhsMp4AspectSnapshot -InputObject $Item.MediaInfo -AspectMode $aspectMode -CropState $cropState)
+        return (Get-VhsMp4AspectSnapshot -InputObject $Item.MediaInfo -AspectMode $aspectMode -RotateFlip $rotateFlip -ScaleMode $scaleMode -CropState $cropState)
     }
     catch {
         return $null
@@ -4759,7 +4783,7 @@ function Open-PlayerTrimWindow {
         $previewAspectState = $null
         try {
             if ($null -ne $mediaInfo) {
-                $previewAspectState = Get-VhsMp4AspectSnapshot -InputObject $mediaInfo -AspectMode $initialAspectMode -CropState $cropState
+                $previewAspectState = Get-VhsMp4AspectSnapshot -InputObject $mediaInfo -AspectMode $initialAspectMode -RotateFlip (Get-CurrentRotateFlipModeName) -ScaleMode (Get-CurrentScaleModeName) -CropState $cropState
             }
         }
         catch {
@@ -5806,7 +5830,7 @@ function Open-PlayerTrimWindow {
                 $cropState | Add-Member -NotePropertyName "SourceWidth" -NotePropertyValue $sourceDimensions.SourceWidth -Force
                 $cropState | Add-Member -NotePropertyName "SourceHeight" -NotePropertyValue $sourceDimensions.SourceHeight -Force
             }
-            $snapshot = if ($null -ne $mediaInfo) { Get-VhsMp4AspectSnapshot -InputObject $mediaInfo -AspectMode $localState.AspectMode -CropState $cropState } else { $null }
+            $snapshot = if ($null -ne $mediaInfo) { Get-VhsMp4AspectSnapshot -InputObject $mediaInfo -AspectMode $localState.AspectMode -RotateFlip (Get-CurrentRotateFlipModeName) -ScaleMode (Get-CurrentScaleModeName) -CropState $cropState } else { $null }
         }
         catch {
             $snapshot = $null
@@ -6729,6 +6753,83 @@ function Update-PlanItemTrimEstimate {
         Update-PlanItemOutputPresentation -Item $Item
         $Item | Add-Member -NotePropertyName "MediaDetails" -NotePropertyValue (Format-VhsMp4MediaDetails -Item $Item) -Force
     }
+}
+
+function Restore-PlanItemEditableState {
+    param(
+        [Parameter(Mandatory = $true)]
+        $SourceItem,
+        [Parameter(Mandatory = $true)]
+        $TargetItem
+    )
+
+    $trimState = Copy-PlanItemTrimState -Item $SourceItem
+    $cropState = Copy-PlanItemCropState -Item $SourceItem
+    $aspectMode = Get-PlanItemPropertyText -Item $SourceItem -Name "AspectMode" -Default "Auto"
+
+    if ($SourceItem.PSObject.Properties["MediaInfo"] -and $null -ne $SourceItem.MediaInfo) {
+        $TargetItem | Add-Member -NotePropertyName "MediaInfo" -NotePropertyValue $SourceItem.MediaInfo -Force
+    }
+    if ($SourceItem.PSObject.Properties["DetectedCrop"] -and $null -ne $SourceItem.DetectedCrop) {
+        $TargetItem | Add-Member -NotePropertyName "DetectedCrop" -NotePropertyValue $SourceItem.DetectedCrop -Force
+    }
+    if ($SourceItem.PSObject.Properties["PreviewFramePath"] -and -not [string]::IsNullOrWhiteSpace([string]$SourceItem.PreviewFramePath)) {
+        $TargetItem | Add-Member -NotePropertyName "PreviewFramePath" -NotePropertyValue ([string]$SourceItem.PreviewFramePath) -Force
+    }
+    if ($SourceItem.PSObject.Properties["PreviewPositionSeconds"] -and $null -ne $SourceItem.PreviewPositionSeconds) {
+        $TargetItem | Add-Member -NotePropertyName "PreviewPositionSeconds" -NotePropertyValue ([double]$SourceItem.PreviewPositionSeconds) -Force
+    }
+
+    Apply-PlayerTrimStateToItem -Item $TargetItem -TrimState $trimState
+    $cropSource = Get-PlanItemCropSourceDimensions -Item $TargetItem
+    $hasCropDimensions = ($null -ne $cropSource.SourceWidth) -and ($null -ne $cropSource.SourceHeight)
+    $hasCropSelection = (-not [string]::IsNullOrWhiteSpace([string]$cropState.CropMode)) -or ([int]$cropState.CropLeft -gt 0) -or ([int]$cropState.CropTop -gt 0) -or ([int]$cropState.CropRight -gt 0) -or ([int]$cropState.CropBottom -gt 0)
+    if ($hasCropDimensions -and $hasCropSelection) {
+        Apply-PlayerCropStateToItem -Item $TargetItem -CropState $cropState
+    }
+    $TargetItem | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue $aspectMode -Force
+    Sync-PlanItemAspectSnapshot -Item $TargetItem | Out-Null
+}
+
+function Refresh-PlanFromCurrentSelection {
+    if ($script:PlanItems.Count -eq 0) {
+        return $false
+    }
+
+    $sourcePaths = @($script:PlanItems | ForEach-Object { [string]$_.SourcePath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($sourcePaths.Count -eq 0) {
+        return $false
+    }
+
+    $selectedItem = Get-SelectedPlanItem
+    $selectedSourceName = if ($null -ne $selectedItem) { [string]$selectedItem.SourceName } else { "" }
+    $inputDir = [string]$inputTextBox.Text
+    if ([string]::IsNullOrWhiteSpace($inputDir)) {
+        $inputDir = Split-Path -Path $sourcePaths[0] -Parent
+    }
+
+    $currentByPath = @{}
+    foreach ($item in @($script:PlanItems)) {
+        $path = [string]$item.SourcePath
+        if (-not [string]::IsNullOrWhiteSpace($path) -and -not $currentByPath.ContainsKey($path)) {
+            $currentByPath[$path] = $item
+        }
+    }
+
+    $refreshedPlan = @(Get-VhsMp4PlanFromPaths -SourcePaths $sourcePaths -InputDir $inputDir -OutputDir $outputTextBox.Text -FfmpegPath $script:ResolvedFfmpegPath -SplitOutput:$splitOutputCheckBox.Checked)
+    foreach ($refreshedItem in @($refreshedPlan)) {
+        $path = [string]$refreshedItem.SourcePath
+        if ($currentByPath.ContainsKey($path)) {
+            Restore-PlanItemEditableState -SourceItem $currentByPath[$path] -TargetItem $refreshedItem
+        }
+    }
+
+    $refreshedPlan = @(Add-PlanEstimates -Plan $refreshedPlan)
+    Set-GridRows -Plan $refreshedPlan
+    if (-not [string]::IsNullOrWhiteSpace($selectedSourceName)) {
+        [void](Select-PlanGridRowBySourceName -SourceName $selectedSourceName)
+    }
+    return $true
 }
 
 function Apply-SelectedTrim {
@@ -10062,8 +10163,8 @@ $splitOutputCheckBox.Add_CheckedChanged({
         return
     }
 
-    if ((-not (Test-BatchRunning)) -and $script:PlanItems.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($inputTextBox.Text) -and (Test-Path -LiteralPath $inputTextBox.Text)) {
-        Scan-InputFolder
+    if (-not (Test-BatchRunning)) {
+        [void](Refresh-PlanFromCurrentSelection)
     }
 
     Invoke-WorkflowPresetFieldChanged

@@ -3894,6 +3894,69 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert "Drop import" in payload["Status"]
 
 
+def test_vhs_gui_split_toggle_keeps_explicit_single_file_selection(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    (input_dir / "alpha.mp4").write_text("source", encoding="utf-8")
+    (input_dir / "beta.avi").write_text("source", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+Import-DroppedPaths -Paths @('{ps_quote(input_dir / "alpha.mp4")}')
+$beforeNames = @($script:PlanItems | ForEach-Object {{ [string]$_.SourceName }})
+$beforeCount = $script:PlanItems.Count
+$splitOutputCheckBox.Checked = $true
+[System.Windows.Forms.Application]::DoEvents()
+$afterNames = @($script:PlanItems | ForEach-Object {{ [string]$_.SourceName }})
+$afterCount = $script:PlanItems.Count
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    BeforeCount = $beforeCount
+    AfterCount = $afterCount
+    BeforeNames = $beforeNames
+    AfterNames = $afterNames
+    OutputName = if ($grid.Rows.Count -gt 0) {{ [string]$grid.Rows[0].Cells['OutputName'].Value }} else {{ '' }}
+}} | ConvertTo-Json -Depth 6
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-single-file-split-toggle-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["BeforeCount"] == 1
+    assert payload["AfterCount"] == 1
+    assert payload["BeforeNames"] == ["alpha.mp4"]
+    assert payload["AfterNames"] == ["alpha.mp4"]
+    assert "part%03d" in payload["OutputName"]
+
+
 def test_vhs_gui_imports_dropped_folder_and_scans_supported_videos(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     nested_dir = input_dir / "Kaseta 01"
@@ -3957,6 +4020,108 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["InputDir"] == str(input_dir)
     assert payload["OutputDir"] == str(output_dir)
     assert names == {"root_video.mp4", "Kaseta 01\\rodjendan.avi"}
+
+
+def test_vhs_gui_scale_mode_updates_planned_output_resolution(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+$ffmpegPathTextBox.Text = 'X:\\ffmpeg.exe'
+$script:ResolvedFfmpegPath = 'X:\\ffmpeg.exe'
+$inputTextBox.Text = '{ps_quote(tmp_path)}'
+$outputTextBox.Text = '{ps_quote(output_dir)}'
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mp4'
+    ContainerLongName = 'MP4'
+    DurationSeconds = 120.0
+    DurationText = '00:02:00'
+    SizeText = '2 GB'
+    OverallBitrateText = '12000 kbps'
+    VideoCodec = 'h264'
+    Width = 1920
+    Height = 1080
+    Resolution = '1920x1080'
+    DisplayAspectRatio = '16:9'
+    SampleAspectRatio = '1:1'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 3000
+    VideoBitrateText = '11000 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '128 kbps'
+    VideoSummary = 'h264 | 1920x1080 | 16:9 | 25 fps'
+    AudioSummary = 'aac | 2 ch | 48000 Hz | 128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    OutputPath = '{ps_quote(output_dir / "clip.mp4")}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+    Status = 'queued'
+}}
+$script:PlanItems = @(Add-PlanEstimates -Plan @($item))
+Set-GridRows -Plan $script:PlanItems
+[void](Select-PlanGridRowBySourceName -SourceName 'clip.mp4')
+$scaleModeComboBox.SelectedItem = 'PAL 576p'
+[System.Windows.Forms.Application]::DoEvents()
+$resolutionRow = $null
+foreach ($row in @($comparisonGrid.Rows)) {{
+    if ($null -ne $row -and -not $row.IsNewRow -and [string]$row.Cells['PropertyName'].Value -eq 'Resolution') {{
+        $resolutionRow = $row
+        break
+    }}
+}}
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    GridResolution = [string]$grid.Rows[0].Cells['Resolution'].Value
+    PlannedResolution = [string]$script:PlanItems[0].PlannedResolution
+    ComparisonResolution = if ($null -ne $resolutionRow) {{ [string]$resolutionRow.Cells['PlannedValue'].Value }} else {{ '' }}
+    MediaDetails = [string]$script:PlanItems[0].MediaDetails
+}} | ConvertTo-Json -Depth 6
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-scale-planned-resolution-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["GridResolution"] == "1024x576"
+    assert payload["PlannedResolution"] == "1024x576"
+    assert payload["ComparisonResolution"] == "1024x576"
+    assert "Planned output aspect: 1024 x 576" in payload["MediaDetails"]
 
 
 def test_vhs_gui_drag_visual_state_highlights_drop_target(tmp_path: Path) -> None:
