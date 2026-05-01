@@ -533,12 +533,18 @@ function New-WorkflowPresetSettingsObject {
         [void][double]::TryParse($maxPartText, $style, $culture, [ref]$maxPartGb)
     }
 
+    $qualityMode = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "QualityMode")
+    $videoBitrate = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "VideoBitrate")
+    if ([string]::IsNullOrWhiteSpace($videoBitrate) -and -not [string]::IsNullOrWhiteSpace($qualityMode) -and $qualityMode -ne "Custom") {
+        $videoBitrate = Get-QualityModeSuggestedVideoBitrate -QualityMode $qualityMode
+    }
+
     return [pscustomobject]@{
-        QualityMode = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "QualityMode")
+        QualityMode = $qualityMode
         Crf = [Math]::Min(51, [Math]::Max(0, $crfValue))
         Preset = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "Preset")
         AudioBitrate = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "AudioBitrate")
-        VideoBitrate = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "VideoBitrate")
+        VideoBitrate = $videoBitrate
         Deinterlace = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "Deinterlace")
         Denoise = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "Denoise")
         RotateFlip = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "RotateFlip")
@@ -569,6 +575,21 @@ function New-WorkflowPresetObject {
     }
 }
 
+function Get-QualityModeSuggestedVideoBitrate {
+    param(
+        [string]$QualityMode
+    )
+
+    switch ([string]$QualityMode) {
+        { $_ -in @("Small MP4 H.264", "Smaller File") } { return "3500k" }
+        { $_ -in @("High Quality MP4 H.264", "Better Quality") } { return "9000k" }
+        "HEVC H.265 Smaller" { return "2800k" }
+        "Standard VHS" { return "5000k" }
+        "Custom" { return "" }
+        default { return "6000k" }
+    }
+}
+
 function Get-WorkflowPresetDefinitions {
     $presets = New-Object System.Collections.Generic.List[object]
     $presets.Add((New-WorkflowPresetObject -Name "USB standard" -Kind "BuiltIn" -Description "USB standard za predaju: univerzalni MP4 H.264, split ukljucen i procena prilagodjena USB radu." -Settings @{
@@ -576,6 +597,7 @@ function Get-WorkflowPresetDefinitions {
                 Crf = 22
                 Preset = "slow"
                 AudioBitrate = "160k"
+                VideoBitrate = (Get-QualityModeSuggestedVideoBitrate -QualityMode "Universal MP4 H.264")
                 Deinterlace = "Off"
                 Denoise = "Off"
                 RotateFlip = "None"
@@ -591,6 +613,7 @@ function Get-WorkflowPresetDefinitions {
                 Crf = 24
                 Preset = "slow"
                 AudioBitrate = "128k"
+                VideoBitrate = (Get-QualityModeSuggestedVideoBitrate -QualityMode "Small MP4 H.264")
                 Deinterlace = "Off"
                 Denoise = "Off"
                 RotateFlip = "None"
@@ -606,6 +629,7 @@ function Get-WorkflowPresetDefinitions {
                 Crf = 20
                 Preset = "slow"
                 AudioBitrate = "192k"
+                VideoBitrate = (Get-QualityModeSuggestedVideoBitrate -QualityMode "High Quality MP4 H.264")
                 Deinterlace = "Off"
                 Denoise = "Off"
                 RotateFlip = "None"
@@ -621,6 +645,7 @@ function Get-WorkflowPresetDefinitions {
                 Crf = 26
                 Preset = "medium"
                 AudioBitrate = "128k"
+                VideoBitrate = (Get-QualityModeSuggestedVideoBitrate -QualityMode "HEVC H.265 Smaller")
                 Deinterlace = "Off"
                 Denoise = "Off"
                 RotateFlip = "None"
@@ -636,6 +661,7 @@ function Get-WorkflowPresetDefinitions {
                 Crf = 22
                 Preset = "slow"
                 AudioBitrate = "160k"
+                VideoBitrate = (Get-QualityModeSuggestedVideoBitrate -QualityMode "Standard VHS")
                 Deinterlace = "YADIF"
                 Denoise = "Light"
                 RotateFlip = "None"
@@ -3490,12 +3516,20 @@ $usbNote
 "@
 
     return [pscustomobject]@{
+        DisplayOutputName = $displayOutputName
         Container = "MP4"
         Resolution = $plannedResolution
         DurationText = (Get-PlanItemPlannedDurationText -Item $Item -MediaInfo $mediaInfo)
+        VideoCodecLabel = $videoCodecLabel
         VideoSummary = $videoSummary
+        VideoBitrateComparisonText = if (-not [string]::IsNullOrWhiteSpace([string]$videoBitrate)) { "$videoBitrate target | $videoKbpsText" } else { $videoKbpsText }
+        AudioCodecText = "AAC"
+        AudioBitrateText = $audioKbpsText
         AudioSummary = $audioSummary
         BitrateText = $totalKbpsText
+        EncodeEngineText = [string]$encoderPlan.Summary
+        EstimatedSizeText = $estimatedSize
+        UsbNoteText = $usbNote
         Details = $details
     }
 }
@@ -3587,6 +3621,75 @@ $usbNote
 "@
 }
 
+function Get-PlanItemComparisonRows {
+    param(
+        [AllowNull()]
+        $Item
+    )
+
+    if ($null -eq $Item) {
+        return @(
+            [pscustomobject]@{
+                PropertyName = "Info"
+                InputValue = "Izaberi fajl iz tabele"
+                PlannedValue = "Ovde poredimo ulaz i planirani izlaz"
+            }
+        )
+    }
+
+    $mediaInfo = if ($Item.PSObject.Properties["MediaInfo"]) { $Item.MediaInfo } else { $null }
+    $outputState = Get-PlanItemOutputPlanState -Item $Item
+    $trimSummary = Get-PlanItemPropertyText -Item $Item -Name "TrimSummary" -Default "--"
+    $cropSummary = Get-PlanItemPropertyText -Item $Item -Name "CropSummary" -Default "--"
+    $aspectStatus = Get-PlanItemAspectStatusText -Item $Item
+    $displayOutputName = if ($Item.PSObject.Properties["DisplayOutputName"] -and -not [string]::IsNullOrWhiteSpace([string]$Item.DisplayOutputName)) { [string]$Item.DisplayOutputName } else { [System.IO.Path]::GetFileName([string]$Item.OutputPath) }
+
+    $inputContainer = if ($null -ne $mediaInfo) { [string]$mediaInfo.Container } else { "--" }
+    $inputResolution = if ($null -ne $mediaInfo) { [string]$mediaInfo.Resolution } else { "--" }
+    $inputDuration = if ($null -ne $mediaInfo) { [string]$mediaInfo.DurationText } else { "--" }
+    $inputVideoCodec = if ($null -ne $mediaInfo) { [string]$mediaInfo.VideoCodec } else { "--" }
+    $inputVideoBitrate = if ($null -ne $mediaInfo) { [string]$mediaInfo.VideoBitrateText } else { "--" }
+    $inputAudioCodec = if ($null -ne $mediaInfo) { [string]$mediaInfo.AudioCodec } else { "--" }
+    $inputAudioBitrate = if ($null -ne $mediaInfo) { [string]$mediaInfo.AudioBitrateText } else { "--" }
+    $inputFps = if ($null -ne $mediaInfo) { [string]$mediaInfo.FrameRateText } else { "--" }
+    $inputAspect = if ($null -ne $mediaInfo) { [string]$mediaInfo.DisplayAspectRatio } else { "--" }
+
+    return @(
+        [pscustomobject]@{ PropertyName = "File"; InputValue = [string]$Item.SourceName; PlannedValue = $displayOutputName }
+        [pscustomobject]@{ PropertyName = "Container"; InputValue = $inputContainer; PlannedValue = [string]$outputState.Container }
+        [pscustomobject]@{ PropertyName = "Resolution"; InputValue = $inputResolution; PlannedValue = [string]$outputState.Resolution }
+        [pscustomobject]@{ PropertyName = "Duration"; InputValue = $inputDuration; PlannedValue = [string]$outputState.DurationText }
+        [pscustomobject]@{ PropertyName = "FPS"; InputValue = $inputFps; PlannedValue = "--" }
+        [pscustomobject]@{ PropertyName = "Aspect"; InputValue = $inputAspect; PlannedValue = $aspectStatus }
+        [pscustomobject]@{ PropertyName = "Video codec"; InputValue = $inputVideoCodec; PlannedValue = [string]$outputState.VideoCodecLabel }
+        [pscustomobject]@{ PropertyName = "Video bitrate"; InputValue = $inputVideoBitrate; PlannedValue = [string]$outputState.VideoBitrateComparisonText }
+        [pscustomobject]@{ PropertyName = "Audio codec"; InputValue = $inputAudioCodec; PlannedValue = [string]$outputState.AudioCodecText }
+        [pscustomobject]@{ PropertyName = "Audio bitrate"; InputValue = $inputAudioBitrate; PlannedValue = [string]$outputState.AudioBitrateText }
+        [pscustomobject]@{ PropertyName = "Total bitrate"; InputValue = if ($null -ne $mediaInfo) { [string]$mediaInfo.OverallBitrateText } else { "--" }; PlannedValue = [string]$outputState.BitrateText }
+        [pscustomobject]@{ PropertyName = "Encode engine"; InputValue = "--"; PlannedValue = [string]$outputState.EncodeEngineText }
+        [pscustomobject]@{ PropertyName = "Trim"; InputValue = "--"; PlannedValue = $trimSummary }
+        [pscustomobject]@{ PropertyName = "Crop"; InputValue = "--"; PlannedValue = $cropSummary }
+        [pscustomobject]@{ PropertyName = "Estimate"; InputValue = "--"; PlannedValue = [string]$outputState.EstimatedSizeText }
+        [pscustomobject]@{ PropertyName = "USB note"; InputValue = "--"; PlannedValue = [string]$outputState.UsbNoteText }
+    )
+}
+
+function Update-ComparisonPanel {
+    if (-not (Get-Variable -Name "comparisonGrid" -ErrorAction SilentlyContinue)) {
+        return
+    }
+
+    $comparisonGrid.Rows.Clear()
+    foreach ($row in @(Get-PlanItemComparisonRows -Item (Get-SelectedPlanItem))) {
+        [void]$comparisonGrid.Rows.Add(
+            [string]$row.PropertyName,
+            [string]$row.InputValue,
+            [string]$row.PlannedValue
+        )
+    }
+    $comparisonGrid.ClearSelection()
+}
+
 function Update-MediaInfoPanel {
     if ($null -eq $infoBox) {
         return
@@ -3630,16 +3733,19 @@ Izaberi fajl u queue listi da ovde odmah vidis planirani izlaz:
 - video/audio bitrate
 - trim/crop/split i procenu velicine
 "@
+        Update-ComparisonPanel
         return
     }
 
     $details = Get-PlanItemPropertyText -Item $item -Name "PlannedOutputDetails" -Default ""
     if (-not [string]::IsNullOrWhiteSpace($details)) {
         $outputPlanInfoBox.Text = $details
+        Update-ComparisonPanel
         return
     }
 
     $outputPlanInfoBox.Text = (Get-PlanItemOutputPlanState -Item $item).Details
+    Update-ComparisonPanel
 }
 
 function Get-SelectedPlanItem {
@@ -8192,8 +8298,8 @@ $inputFolderPanel.ColumnCount = 3
 $inputFolderPanel.RowCount = 1
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
-$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
+$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceLayout.Controls.Add($inputFolderPanel, 0, 0)
 
 $inputLabel = New-Object System.Windows.Forms.Label
@@ -8208,7 +8314,8 @@ $inputFolderPanel.Controls.Add($inputTextBox, 1, 0)
 
 $browseInputButton = New-Object System.Windows.Forms.Button
 $browseInputButton.Text = "Browse..."
-$browseInputButton.Dock = "Fill"
+$browseInputButton.Anchor = "Left"
+$browseInputButton.Size = New-Object System.Drawing.Size(104, 24)
 $inputFolderPanel.Controls.Add($browseInputButton, 2, 0)
 
 $inputHelpLabel = New-Object System.Windows.Forms.Label
@@ -8222,8 +8329,8 @@ $outputFolderPanel.ColumnCount = 3
 $outputFolderPanel.RowCount = 1
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
-$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
+$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 26)))
 $sourceLayout.Controls.Add($outputFolderPanel, 1, 0)
 
 $outputLabel = New-Object System.Windows.Forms.Label
@@ -8238,7 +8345,8 @@ $outputFolderPanel.Controls.Add($outputTextBox, 1, 0)
 
 $browseOutputButton = New-Object System.Windows.Forms.Button
 $browseOutputButton.Text = "Browse..."
-$browseOutputButton.Dock = "Fill"
+$browseOutputButton.Anchor = "Left"
+$browseOutputButton.Size = New-Object System.Drawing.Size(104, 24)
 $outputFolderPanel.Controls.Add($browseOutputButton, 2, 0)
 
 $outputHelpLabel = New-Object System.Windows.Forms.Label
@@ -8824,11 +8932,10 @@ $leftWorkspaceLayout.Controls.Add($grid, 0, 1)
 $rightPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $rightPanel.Dock = "Fill"
 $rightPanel.ColumnCount = 1
-$rightPanel.RowCount = 4
+$rightPanel.RowCount = 3
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 48)))
-$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 45)))
-$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 55)))
+$rightPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $mainSplit.Panel2.Controls.Add($rightPanel)
 
 $previewStatusLabel = New-Object System.Windows.Forms.Label
@@ -8847,7 +8954,7 @@ $selectedFileSummaryLabel.Text = "Izaberi fajl u queue listi pa koristi Open Pla
 $rightPanel.Controls.Add($selectedFileSummaryLabel, 0, 1)
 
 $outputPlanGroupBox = New-Object System.Windows.Forms.GroupBox
-$outputPlanGroupBox.Text = "Planned output"
+$outputPlanGroupBox.Text = "Input / Planned output"
 $outputPlanGroupBox.Dock = "Fill"
 $rightPanel.Controls.Add($outputPlanGroupBox, 0, 2)
 
@@ -8858,12 +8965,33 @@ $outputPlanInfoBox.BorderStyle = "None"
 $outputPlanInfoBox.BackColor = [System.Drawing.SystemColors]::Window
 $outputPlanInfoBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $outputPlanInfoBox.Text = "Planned output`r`n`r`nIzaberi fajl u queue listi da vidis planirani izlaz."
+$outputPlanInfoBox.Visible = $false
 $outputPlanGroupBox.Controls.Add($outputPlanInfoBox)
+
+$comparisonGrid = New-Object System.Windows.Forms.DataGridView
+$comparisonGrid.Dock = "Fill"
+$comparisonGrid.AllowUserToAddRows = $false
+$comparisonGrid.AllowUserToDeleteRows = $false
+$comparisonGrid.AllowUserToResizeRows = $false
+$comparisonGrid.ReadOnly = $true
+$comparisonGrid.SelectionMode = "FullRowSelect"
+$comparisonGrid.MultiSelect = $false
+$comparisonGrid.RowHeadersVisible = $false
+$comparisonGrid.AutoSizeColumnsMode = [System.Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
+$comparisonGrid.BackgroundColor = [System.Drawing.SystemColors]::Window
+$comparisonGrid.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+[void]$comparisonGrid.Columns.Add("PropertyName", "Property")
+[void]$comparisonGrid.Columns.Add("InputValue", "Input")
+[void]$comparisonGrid.Columns.Add("PlannedValue", "Planned output")
+$comparisonGrid.Columns["PropertyName"].AutoSizeMode = [System.Windows.Forms.DataGridViewAutoSizeColumnMode]::None
+$comparisonGrid.Columns["PropertyName"].Width = 132
+$comparisonGrid.Columns['InputValue'].FillWeight = 50
+$comparisonGrid.Columns['PlannedValue'].FillWeight = 50
+$outputPlanGroupBox.Controls.Add($comparisonGrid)
 
 $propertiesGroupBox = New-Object System.Windows.Forms.GroupBox
 $propertiesGroupBox.Text = "Input / source properties"
-$propertiesGroupBox.Dock = "Fill"
-$rightPanel.Controls.Add($propertiesGroupBox, 0, 3)
+$propertiesGroupBox.Visible = $false
 
 $infoBox = New-Object System.Windows.Forms.RichTextBox
 $infoBox.Dock = "Fill"
@@ -9632,7 +9760,8 @@ $qualityModeComboBox.Add_SelectedIndexChanged({
         return
     }
 
-    switch ([string]$qualityModeComboBox.SelectedItem) {
+    $selectedQualityMode = [string]$qualityModeComboBox.SelectedItem
+    switch ($selectedQualityMode) {
         { $_ -in @("Small MP4 H.264", "Smaller File") } {
             $crfTextBox.Text = "24"
             $audioTextBox.Text = "128k"
@@ -9654,6 +9783,8 @@ $qualityModeComboBox.Add_SelectedIndexChanged({
             $presetComboBox.SelectedItem = "slow"
         }
     }
+
+    $videoBitrateTextBox.Text = Get-QualityModeSuggestedVideoBitrate -QualityMode $selectedQualityMode
 
     Invoke-WorkflowPresetFieldChanged
 })

@@ -212,16 +212,19 @@ def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_edito
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$rightPanel.RowCount = 4",
+        "$rightPanel.RowCount = 3",
         '$previewStatusLabel.Text = "Selected file"',
         "$selectedFileSummaryLabel = New-Object System.Windows.Forms.Label",
-        '$outputPlanGroupBox.Text = "Planned output"',
+        '$outputPlanGroupBox.Text = "Input / Planned output"',
+        "$comparisonGrid = New-Object System.Windows.Forms.DataGridView",
+        "[void]$comparisonGrid.Columns.Add(\"PropertyName\", \"Property\")",
+        "[void]$comparisonGrid.Columns.Add(\"InputValue\", \"Input\")",
+        "[void]$comparisonGrid.Columns.Add(\"PlannedValue\", \"Planned output\")",
+        "$comparisonGrid.Columns['InputValue'].FillWeight = 50",
+        "$comparisonGrid.Columns['PlannedValue'].FillWeight = 50",
+        "$outputPlanGroupBox.Controls.Add($comparisonGrid)",
         "$outputPlanGroupBox.Controls.Add($outputPlanInfoBox)",
-        "$propertiesGroupBox = New-Object System.Windows.Forms.GroupBox",
-        '$propertiesGroupBox.Text = "Input / source properties"',
-        "$propertiesGroupBox.Controls.Add($infoBox)",
         "$rightPanel.Controls.Add($outputPlanGroupBox, 0, 2)",
-        "$rightPanel.Controls.Add($propertiesGroupBox, 0, 3)",
         "function Open-SelectedPlayerTrimEditor",
         "$grid.Add_CellDoubleClick({",
         "$openPlayerButton.Add_Click({",
@@ -231,6 +234,7 @@ def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_edito
 
     assert "$rightPanel.Controls.Add($rightWorkspaceSplit, 0, 1)" not in script
     assert "$detailsSplit = New-Object System.Windows.Forms.SplitContainer" not in script
+    assert "$rightPanel.Controls.Add($propertiesGroupBox, 0, 3)" not in script
 
 
 def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_state() -> None:
@@ -470,10 +474,19 @@ $videoBitrateTextBox.Text = '5500k'
 [System.Windows.Forms.Application]::DoEvents()
 $afterBitrate = [string]$grid.Rows[0].Cells['Bitrate'].Value
 $outputPlanText = [string]$outputPlanInfoBox.Text
+$comparisonRow = $null
+foreach ($row in @($comparisonGrid.Rows)) {{
+    if ($null -ne $row -and -not $row.IsNewRow -and [string]$row.Cells['PropertyName'].Value -eq 'Video bitrate') {{
+        $comparisonRow = $row
+        break
+    }}
+}}
 [pscustomobject]@{{
     BeforeBitrate = $beforeBitrate
     AfterBitrate = $afterBitrate
     OutputPlanText = $outputPlanText
+    ComparisonInput = if ($null -ne $comparisonRow) {{ [string]$comparisonRow.Cells['InputValue'].Value }} else {{ '' }}
+    ComparisonPlanned = if ($null -ne $comparisonRow) {{ [string]$comparisonRow.Cells['PlannedValue'].Value }} else {{ '' }}
 }} | ConvertTo-Json -Depth 4
 """.strip()
 
@@ -507,6 +520,68 @@ $outputPlanText = [string]$outputPlanInfoBox.Text
     assert payload["BeforeBitrate"] != payload["AfterBitrate"]
     assert "Target 5500k" in payload["OutputPlanText"]
     assert "Total bitrate:" in payload["OutputPlanText"]
+    assert payload["ComparisonInput"] == "900 kbps"
+    assert "5500k" in payload["ComparisonPlanned"]
+
+
+def test_vhs_gui_quality_mode_updates_video_bitrate_suggestion(tmp_path: Path) -> None:
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = """
+$form.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$qualityModeComboBox.SelectedItem = 'Small MP4 H.264'
+[System.Windows.Forms.Application]::DoEvents()
+$smallBitrate = [string]$videoBitrateTextBox.Text
+$qualityModeComboBox.SelectedItem = 'High Quality MP4 H.264'
+[System.Windows.Forms.Application]::DoEvents()
+$hqBitrate = [string]$videoBitrateTextBox.Text
+$qualityModeComboBox.SelectedItem = 'HEVC H.265 Smaller'
+[System.Windows.Forms.Application]::DoEvents()
+$hevcBitrate = [string]$videoBitrateTextBox.Text
+Write-Output 'JSON_START'
+[pscustomobject]@{
+    SmallBitrate = $smallBitrate
+    HighQualityBitrate = $hqBitrate
+    HevcBitrate = $hevcBitrate
+} | ConvertTo-Json -Depth 4
+try { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch {}
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-quality-mode-bitrate-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["SmallBitrate"] == "3500k"
+    assert payload["HighQualityBitrate"] == "9000k"
+    assert payload["HevcBitrate"] == "2800k"
 
 
 def test_vhs_gui_modeless_player_editor_closes_without_playback_timer_scope_error(tmp_path: Path) -> None:
@@ -664,7 +739,7 @@ Write-Output 'JSON_START'
     StartConversionVisible = Test-ControlReachableOnForm $startButton $form
     OpenReportVisible = Test-ControlReachableOnForm $openReportButton $form
     OpenPlayerVisible = Test-ControlReachableOnForm $openPlayerButton $form
-    PropertiesVisible = Test-ControlReachableOnForm $propertiesGroupBox $form
+    ComparisonVisible = Test-ControlReachableOnForm $comparisonGrid $form
     SummaryVisible = Test-ControlReachableOnForm $selectedFileSummaryLabel $form
     AdvancedVisible = [bool]$advancedSettingsGroupBox.Visible
     VideoBitrateVisible = Test-ControlReachableOnForm $videoBitrateTextBox $form
@@ -706,11 +781,12 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["StartConversionVisible"] is True
     assert payload["OpenReportVisible"] is True
     assert payload["OpenPlayerVisible"] is True
-    assert payload["PropertiesVisible"] is True
+    assert payload["ComparisonVisible"] is True
     assert payload["SummaryVisible"] is True
     assert payload["AdvancedVisible"] is True
     assert payload["VideoBitrateVisible"] is True
-    assert abs(payload["InputBrowseHeight"] - payload["OutputBrowseHeight"]) <= 2
+    assert abs(payload["InputBrowseHeight"] - payload["OutputBrowseHeight"]) <= 1
+    assert payload["InputBrowseHeight"] <= 24
     assert payload["PreviewReachable"] is False
     assert payload["TrimReachable"] is False
     assert "Open Player" in payload["SummaryText"]
