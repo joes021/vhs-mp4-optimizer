@@ -46,12 +46,17 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
         "Scale",
         "PAL 576p",
         "Audio normalize",
+        "Video bitrate",
         "deinterlaceComboBox",
         "denoiseComboBox",
         "rotateFlipComboBox",
         "scaleModeComboBox",
         "audioNormalizeCheckBox",
+        "videoBitrateTextBox",
         "Get-VhsMp4FilterSummary",
+        "Get-PlanItemOutputPlanState",
+        "Update-OutputPlanPanel",
+        "Planned output",
         "FilterSummary",
         "-Deinterlace",
         "-Denoise",
@@ -160,6 +165,7 @@ def test_vhs_gui_script_contains_expected_tokens() -> None:
         "CurrentBatchIndex",
         "winget install --id Gyan.FFmpeg.Essentials",
         "Add-VhsMp4DirectoryToUserPath",
+        "Ensure-FfmpegReadyOnStartup",
         "vhs-mp4-output",
     ]:
         assert token in script, f"missing GUI token: {token}"
@@ -204,8 +210,11 @@ def test_vhs_gui_uses_batch_workspace_with_properties_sidebar_and_floating_edito
         "$rightPanel.RowCount = 3",
         '$previewStatusLabel.Text = "Selected file"',
         "$selectedFileSummaryLabel = New-Object System.Windows.Forms.Label",
+        "$detailsSplit = New-Object System.Windows.Forms.SplitContainer",
+        '$outputPlanGroupBox.Text = "Planned output"',
+        "$outputPlanGroupBox.Controls.Add($outputPlanInfoBox)",
         "$propertiesGroupBox = New-Object System.Windows.Forms.GroupBox",
-        '$propertiesGroupBox.Text = "Properties / Media info"',
+        '$propertiesGroupBox.Text = "Input / source properties"',
         "$propertiesGroupBox.Controls.Add($infoBox)",
         "function Open-SelectedPlayerTrimEditor",
         "$grid.Add_CellDoubleClick({",
@@ -221,9 +230,11 @@ def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_st
     script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
     for token in [
-        "$script:RightPanelTargetWidth = 440",
+        "$script:RightPanelTargetWidth = 560",
+        "$script:WorkspaceBottomTargetHeight = 320",
         "$mainSplit.Panel2MinSize = $script:RightPanelTargetWidth",
         "$mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2",
+        "$mainSplit.Add_SplitterMoved({",
         "function Set-MainSplitLayout",
         "$script:PlayerTrimEditorWindow = $null",
         '$script:PlayerTrimEditorSourcePath = ""',
@@ -231,6 +242,8 @@ def test_vhs_gui_reserves_readable_right_panel_width_and_tracks_single_editor_st
         "$runtimeState = [pscustomobject]@{",
         "$playerRuntimeContext = [pscustomobject]@{",
         "$playerRuntime = New-Module -AsCustomObject -ArgumentList $playerRuntimeContext -ScriptBlock {",
+        "function Start-PlayerPlayback",
+        "function Stop-PlayerPlayback",
         "$form.Add_Shown({",
         "Set-MainSplitLayout",
         "[switch]$Modeless",
@@ -262,10 +275,12 @@ def test_vhs_gui_uses_resizable_horizontal_split_between_workspace_and_status_ta
         "$workspaceSplit = New-Object System.Windows.Forms.SplitContainer",
         "$workspaceSplit.Dock = \"Fill\"",
         "$workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal",
+        "$workspaceSplit.IsSplitterFixed = $false",
         "$workspaceSplit.Panel1.Controls.Add($mainSplit)",
         "$workspaceSplit.Panel2.Controls.Add($activityTabControl)",
-        "$split.Panel2MinSize = 180",
+        "$split.Panel2MinSize = 220",
         "function Set-WorkspaceSplitLayout",
+        "$workspaceSplit.Add_SplitterMoved({",
         "$activityTabControl = New-Object System.Windows.Forms.TabControl",
         '$statusTabPage.Text = "Status"',
         '$progressTabPage.Text = "Progress"',
@@ -300,16 +315,197 @@ def test_vhs_gui_status_panel_allocates_readable_message_space() -> None:
     assert status_rows[:3] == [
         ("Absolute", "24"),
         ("Percent", "100"),
-        ("Absolute", "28"),
+        ("Absolute", "34"),
     ]
 
     for token in [
+        "$statusPanel.Padding = New-Object System.Windows.Forms.Padding(8, 6, 8, 8)",
         '$statusValueLabel.Dock = "Fill"',
         '$statusValueLabel.TextAlign = "TopLeft"',
         "$statusValueLabel.AutoSize = $false",
+        '$statusValueLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)',
         "$workspaceSplit.SplitterDistance = 520",
     ]:
         assert token in script, f"missing readable status layout token: {token}"
+
+
+def test_vhs_gui_updates_planned_output_bitrate_when_video_bitrate_changes(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+$form.Size = New-Object System.Drawing.Size(1600, 960)
+$inputTextBox.Text = '{ps_quote(tmp_path)}'
+$outputTextBox.Text = '{ps_quote(output_dir)}'
+$ffmpegPathTextBox.Text = 'X:\\ffmpeg.exe'
+$script:ResolvedFfmpegPath = 'X:\\ffmpeg.exe'
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mp4'
+    ContainerLongName = 'MP4'
+    DurationSeconds = 754.485
+    DurationText = '00:12:34'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '1920x1080'
+    DisplayAspectRatio = '16:9'
+    SampleAspectRatio = '1:1'
+    FrameRate = 30.01
+    FrameRateText = '30.01 fps'
+    FrameCount = 22643
+    VideoSummary = 'h264 | 1920x1080 | 16:9 | 30.01 fps'
+    VideoBitrateText = '900 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioSummary = 'aac | 2 ch | 48000 Hz'
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    OutputPath = '{ps_quote(output_dir / "clip.mp4")}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+    Status = 'queued'
+}}
+$script:PlanItems = @(Add-PlanEstimates -Plan @($item))
+Set-GridRows -Plan $script:PlanItems
+[void](Select-PlanGridRowBySourceName -SourceName 'clip.mp4')
+[System.Windows.Forms.Application]::DoEvents()
+$beforeBitrate = [string]$grid.Rows[0].Cells['Bitrate'].Value
+$videoBitrateTextBox.Text = '5500k'
+[System.Windows.Forms.Application]::DoEvents()
+$afterBitrate = [string]$grid.Rows[0].Cells['Bitrate'].Value
+$outputPlanText = [string]$outputPlanInfoBox.Text
+[pscustomobject]@{{
+    BeforeBitrate = $beforeBitrate
+    AfterBitrate = $afterBitrate
+    OutputPlanText = $outputPlanText
+}} | ConvertTo-Json -Depth 4
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    injected_probe = "Write-Output 'JSON_START'\n" + probe + "\ntry { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } catch {}"
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: injected_probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-planned-output-bitrate-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["BeforeBitrate"] != payload["AfterBitrate"]
+    assert "Target 5500k" in payload["OutputPlanText"]
+    assert "Total bitrate:" in payload["OutputPlanText"]
+
+
+def test_vhs_gui_modeless_player_editor_closes_without_playback_timer_scope_error(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mov,mp4,m4a,3gp,3g2,mj2'
+    ContainerLongName = 'QuickTime / MOV'
+    DurationSeconds = 180.0
+    DurationText = '00:03:00'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '1920x1080'
+    DisplayAspectRatio = '16:9'
+    SampleAspectRatio = '1:1'
+    FrameRate = 30.0
+    FrameRateText = '30 fps'
+    FrameCount = 5400
+    VideoSummary = 'h264 | 1920x1080 | 16:9 | 30 fps'
+    VideoBitrateText = '900 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioSummary = 'aac | 2 ch | 48000 Hz'
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+}}
+$editor = @(Open-PlayerTrimWindow -Item $item -Modeless) | Where-Object {{ $null -ne $_ -and $_ -is [System.Windows.Forms.Form] }} | Select-Object -Last 1
+$editor.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$editor.Close()
+[System.Windows.Forms.Application]::DoEvents()
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    Closed = $editor.IsDisposed
+    WindowCleared = ($null -eq $script:PlayerTrimEditorWindow)
+}} | ConvertTo-Json -Depth 4
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-player-modeless-close-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["Closed"] is True
 
 
 def test_vhs_gui_main_workspace_keeps_quick_actions_and_properties_visible(tmp_path: Path) -> None:

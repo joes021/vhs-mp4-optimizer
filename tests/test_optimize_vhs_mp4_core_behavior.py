@@ -2908,6 +2908,53 @@ $splitSafe = Get-VhsMp4EstimatedOutputInfo -DurationSeconds 7200 -QualityMode 'B
     assert "delova" in payload["splitSafe"]["UsbNote"]
 
 
+def test_core_honors_explicit_video_bitrate_in_estimate_and_arguments(tmp_path: Path) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$estimate = Get-VhsMp4EstimatedOutputInfo -DurationSeconds 600 -QualityMode 'Universal MP4 H.264' -AudioBitrate '160k' -VideoBitrate '5500k'
+$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "out.mp4"}' -QualityMode 'Universal MP4 H.264' -AudioBitrate '160k' -VideoBitrate '5500k'
+[pscustomobject]@{{
+  Estimate = $estimate
+  Args = $args
+}} | ConvertTo-Json -Depth 6
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+    args = payload["Args"]
+
+    assert payload["Estimate"]["VideoKbps"] == 5500
+    assert payload["Estimate"]["AudioKbps"] == 160
+    assert payload["Estimate"]["TotalKbps"] == 5660
+    assert args[args.index("-b:v") + 1] == "5500k"
+    assert args[args.index("-maxrate") + 1] == "5500k"
+    assert args[args.index("-bufsize") + 1] == "11000k"
+    assert "-crf" not in args
+
+
 def test_core_builds_test_sample_arguments_and_report(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"

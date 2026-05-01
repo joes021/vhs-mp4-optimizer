@@ -27,7 +27,8 @@ $script:CurrentDurationSeconds = $null
 $script:CurrentFileStartedAt = $null
 $script:PollTimer = New-Object System.Windows.Forms.Timer
 $script:PollTimer.Interval = 250
-$script:RightPanelTargetWidth = 440
+$script:RightPanelTargetWidth = 560
+$script:WorkspaceBottomTargetHeight = 320
 $script:PreviewTimelineScale = 100
 $script:PreviewAutoPending = $false
 $script:PreviewAutoDelayMs = 250
@@ -75,6 +76,8 @@ $script:GitHubLatestReleaseApi = "https://api.github.com/repos/joes021/vhs-mp4-o
 $script:ApplicationMetadata = $null
 $script:UpdateCheckState = $null
 $script:UpdateCheckInProgress = $false
+$script:AutoFfmpegBootstrapAttempted = $false
+$script:AutoFfmpegBootstrapInProgress = $false
 if (Test-Path -LiteralPath $script:AppIconPath) {
     $script:NotifyIcon.Icon = New-Object System.Drawing.Icon $script:AppIconPath
 }
@@ -147,12 +150,34 @@ function Set-WorkspaceSplitLayout {
         return
     }
 
-    $desiredBottomHeight = 220
-    $split.Panel1MinSize = 320
-    $split.Panel2MinSize = 180
+    $desiredBottomHeight = [Math]::Max(220, [int]$script:WorkspaceBottomTargetHeight)
+    $split.Panel1MinSize = 220
+    $split.Panel2MinSize = 220
     $desiredDistance = $split.Height - $desiredBottomHeight - $split.SplitterWidth
     $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
     $distance = [Math]::Max($split.Panel1MinSize, $desiredDistance)
+    $distance = [Math]::Min($distance, $maxDistance)
+    if ($distance -gt 0 -and $distance -ne $split.SplitterDistance) {
+        $split.SplitterDistance = $distance
+    }
+}
+
+function Set-DetailsSplitLayout {
+    $splitVariable = Get-Variable -Name detailsSplit -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $splitVariable) {
+        return
+    }
+
+    $split = $splitVariable.Value
+    if ($null -eq $split -or $split.Height -le 0) {
+        return
+    }
+
+    $split.Panel1MinSize = 180
+    $split.Panel2MinSize = 180
+    $desiredTopHeight = [Math]::Max($split.Panel1MinSize, $split.Height - 300 - $split.SplitterWidth)
+    $maxDistance = $split.Height - $split.Panel2MinSize - $split.SplitterWidth
+    $distance = [Math]::Max($split.Panel1MinSize, $desiredTopHeight)
     $distance = [Math]::Min($distance, $maxDistance)
     if ($distance -gt 0 -and $distance -ne $split.SplitterDistance) {
         $split.SplitterDistance = $distance
@@ -182,6 +207,16 @@ function Set-AdvancedSettingsVisibility {
         }
         $configLayout.PerformLayout()
     }
+}
+
+function Format-VhsMp4KbpsText {
+    param($Kbps)
+
+    if ($null -eq $Kbps -or $Kbps -le 0) {
+        return "--"
+    }
+
+    return "$Kbps kbps"
 }
 
 function Test-GuiPathEquals {
@@ -356,6 +391,7 @@ function New-WorkflowPresetSettingsObject {
         Crf = [Math]::Min(51, [Math]::Max(0, $crfValue))
         Preset = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "Preset")
         AudioBitrate = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "AudioBitrate")
+        VideoBitrate = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "VideoBitrate")
         Deinterlace = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "Deinterlace")
         Denoise = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "Denoise")
         RotateFlip = [string](Get-WorkflowPresetObjectValue -Object $Settings -Name "RotateFlip")
@@ -1328,6 +1364,7 @@ function Get-CurrentWorkflowPresetSettings {
             Crf = $crfValue
             Preset = [string]$presetComboBox.SelectedItem
             AudioBitrate = [string]$audioTextBox.Text
+            VideoBitrate = Get-CurrentVideoBitrateText
             Deinterlace = [string]$deinterlaceComboBox.SelectedItem
             Denoise = [string]$denoiseComboBox.SelectedItem
             RotateFlip = [string]$rotateFlipComboBox.SelectedItem
@@ -1352,7 +1389,7 @@ function Test-WorkflowPresetMatchesCurrentSettings {
     }
 
     $presetSettings = New-WorkflowPresetSettingsObject -Settings $Preset.Settings
-    foreach ($propertyName in @("QualityMode", "Crf", "Preset", "AudioBitrate", "Deinterlace", "Denoise", "RotateFlip", "ScaleMode", "AudioNormalize", "EncoderMode", "SplitOutput", "AutoApplyCrop", "MaxPartGb")) {
+    foreach ($propertyName in @("QualityMode", "Crf", "Preset", "AudioBitrate", "VideoBitrate", "Deinterlace", "Denoise", "RotateFlip", "ScaleMode", "AudioNormalize", "EncoderMode", "SplitOutput", "AutoApplyCrop", "MaxPartGb")) {
         $leftValue = $presetSettings.$propertyName
         $rightValue = $CurrentSettings.$propertyName
         if ($propertyName -eq "MaxPartGb") {
@@ -1419,6 +1456,9 @@ function Set-WorkflowPresetControlsFromSettings {
         $crfTextBox.Text = [string]$normalizedSettings.Crf
         $presetComboBox.SelectedItem = $normalizedSettings.Preset
         $audioTextBox.Text = $normalizedSettings.AudioBitrate
+        if (Get-Variable -Name videoBitrateTextBox -ErrorAction SilentlyContinue) {
+            $videoBitrateTextBox.Text = [string]$normalizedSettings.VideoBitrate
+        }
         $deinterlaceComboBox.SelectedItem = $normalizedSettings.Deinterlace
         $denoiseComboBox.SelectedItem = $normalizedSettings.Denoise
         $rotateFlipComboBox.SelectedItem = $normalizedSettings.RotateFlip
@@ -1882,7 +1922,7 @@ function Sync-FfmpegState {
     else {
         $script:ResolvedFfmpegPath = $null
         $ffmpegStatusValue.Text = "FFmpeg nije pronadjen"
-        $ffmpegHintLabel.Text = "Klikni Install FFmpeg ili Browse FFmpeg."
+        $ffmpegHintLabel.Text = "Auto-install pri startu | Help > Install FFmpeg / Browse FFmpeg za rucni fallback."
     }
 
     Sync-EncoderModeState
@@ -2181,11 +2221,13 @@ function Get-MediaInfoIntroText {
     return @"
 Selected file / Properties
 
-Izaberi fajl u tabeli da ovde vidis format, kontejner, rezoluciju, odnos stranica, FPS, broj frejmova, protok, audio i trajanje.
+Izaberi fajl u tabeli da ovde vidis ulazni format, kontejner, rezoluciju, odnos stranica, FPS, broj frejmova, protok, audio i trajanje.
+Desni gornji panel sada pokazuje planirani izlaz: codec, resolution, bitrate, split, crop, trim i procenu velicine pre konverzije.
 Open Player ili dupli klik otvaraju poseban floating Player / Trim prozor. Tamo radis preview, timeline, trim, segmente, crop i aspect.
 Glavni ekran je sada batch radna povrsina: folderi, preset-i, queue, Start/Pause/Resume i status ostaju ovde.
 Player / Trim koristi Save to Queue da vrati izmene nazad u glavni batch bez zatrpavanja ovog ekrana.
 Video filters dodaje Deinterlace, Denoise, Rotate/flip, Scale i Audio normalize za ceo batch.
+Video bitrate u Advanced Settings je opcion override; ostavi prazno za CRF/Quality mode.
 
 Quality mode:
 
@@ -3123,6 +3165,186 @@ function Get-PlanItemAspectStatusText {
     return "Manual " + (Get-AspectModeShortLabel -AspectMode $aspectMode)
 }
 
+function Get-CurrentVideoBitrateText {
+    if (-not (Get-Variable -Name "videoBitrateTextBox" -ErrorAction SilentlyContinue)) {
+        return ""
+    }
+
+    return [string]$videoBitrateTextBox.Text.Trim()
+}
+
+function Get-VhsMp4VideoCodecDisplayName {
+    param(
+        [string]$Codec
+    )
+
+    switch -Regex ([string]$Codec) {
+        '(^|_)h264|libx264' { return "H.264" }
+        '(^|_)hevc|libx265' { return "H.265 / HEVC" }
+        default { return [string]$Codec }
+    }
+}
+
+function Get-PlanItemPlannedDurationText {
+    param(
+        [AllowNull()]
+        $Item,
+        $MediaInfo
+    )
+
+    $trimDurationProperty = if ($null -ne $Item) { $Item.PSObject.Properties["TrimDurationSeconds"] } else { $null }
+    if ($trimDurationProperty -and $null -ne $trimDurationProperty.Value -and [double]$trimDurationProperty.Value -gt 0) {
+        return (Format-VhsMp4Duration -Seconds ([double]$trimDurationProperty.Value))
+    }
+
+    if ($null -ne $MediaInfo -and -not [string]::IsNullOrWhiteSpace([string]$MediaInfo.DurationText)) {
+        return [string]$MediaInfo.DurationText
+    }
+
+    return "--"
+}
+
+function Get-PlanItemOutputPlanState {
+    param(
+        [AllowNull()]
+        $Item
+    )
+
+    if ($null -eq $Item) {
+        return [pscustomobject]@{
+            Container = "MP4"
+            Resolution = "--"
+            DurationText = "--"
+            VideoSummary = "--"
+            AudioSummary = "--"
+            BitrateText = "--"
+            Details = "Planirani izlaz nije dostupan."
+        }
+    }
+
+    $mediaInfoProperty = $Item.PSObject.Properties["MediaInfo"]
+    $mediaInfo = if ($mediaInfoProperty) { $mediaInfoProperty.Value } else { $null }
+    $qualityMode = [string]$qualityModeComboBox.SelectedItem
+    if ([string]::IsNullOrWhiteSpace($qualityMode)) {
+        $qualityMode = "Universal MP4 H.264"
+    }
+    $crfValue = 22
+    [void][int]::TryParse([string]$crfTextBox.Text, [ref]$crfValue)
+    $presetName = [string]$presetComboBox.SelectedItem
+    if ([string]::IsNullOrWhiteSpace($presetName)) {
+        $presetName = "slow"
+    }
+    $audioBitrate = [string]$audioTextBox.Text
+    if ([string]::IsNullOrWhiteSpace($audioBitrate) -or $audioBitrate -notmatch '^\d+k$') {
+        $audioBitrate = "160k"
+    }
+    $videoBitrate = Get-CurrentVideoBitrateText
+    if (-not [string]::IsNullOrWhiteSpace($videoBitrate) -and $videoBitrate -notmatch '^\d+k$') {
+        $videoBitrate = ""
+    }
+    $encoderMode = if (Get-Variable -Name encoderModeComboBox -ErrorAction SilentlyContinue) { [string]$encoderModeComboBox.SelectedItem } else { $script:EncoderModeDefaultName }
+    $profile = Get-VhsMp4QualityProfile -QualityMode $qualityMode -Crf $crfValue -Preset $presetName -AudioBitrate $audioBitrate
+    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $encoderMode -EncoderInventory $script:EncoderInventory -VideoBitrate $videoBitrate
+    $durationSeconds = 0.0
+    if ($null -ne $mediaInfo -and $null -ne $mediaInfo.DurationSeconds) {
+        $durationSeconds = [double]$mediaInfo.DurationSeconds
+    }
+    $trimDurationProperty = $Item.PSObject.Properties["TrimDurationSeconds"]
+    if ($trimDurationProperty -and $null -ne $trimDurationProperty.Value -and [double]$trimDurationProperty.Value -gt 0) {
+        $durationSeconds = [double]$trimDurationProperty.Value
+    }
+
+    $maxPartGbForEstimate = 3.8
+    if (Get-Variable -Name maxPartGbTextBox -ErrorAction SilentlyContinue) {
+        $rawMaxPartText = [string]$maxPartGbTextBox.Text
+        if (-not [string]::IsNullOrWhiteSpace($rawMaxPartText)) {
+            [void][double]::TryParse($rawMaxPartText.Trim().Replace(",", "."), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$maxPartGbForEstimate)
+        }
+    }
+
+    $estimate = if ($durationSeconds -gt 0) {
+        Get-VhsMp4EstimatedOutputInfo `
+            -DurationSeconds $durationSeconds `
+            -QualityMode $qualityMode `
+            -Crf $crfValue `
+            -AudioBitrate $audioBitrate `
+            -VideoBitrate $videoBitrate `
+            -SplitOutput:$splitOutputCheckBox.Checked `
+            -MaxPartGb $maxPartGbForEstimate
+    }
+    else {
+        $null
+    }
+
+    $snapshot = Get-PlanItemCurrentAspectSnapshot -Item $Item
+    $plannedResolution = if ($null -ne $snapshot -and $null -ne $snapshot.OutputAspectWidth -and $null -ne $snapshot.OutputAspectHeight) {
+        "$([string]$snapshot.OutputAspectWidth)x$([string]$snapshot.OutputAspectHeight)"
+    }
+    elseif ($null -ne $mediaInfo -and -not [string]::IsNullOrWhiteSpace([string]$mediaInfo.Resolution)) {
+        [string]$mediaInfo.Resolution
+    }
+    else {
+        "--"
+    }
+
+    $videoCodecLabel = Get-VhsMp4VideoCodecDisplayName -Codec ([string]$encoderPlan.VideoCodec)
+    $rateControlText = if (-not [string]::IsNullOrWhiteSpace([string]$videoBitrate)) {
+        "Target $videoBitrate"
+    }
+    else {
+        "CRF $crfValue | preset $presetName"
+    }
+    $videoSummary = "$videoCodecLabel | $rateControlText | $([string]$encoderPlan.ResolvedMode)"
+    $audioSummary = "AAC | $([string]$profile.AudioBitrate)"
+    $videoKbpsText = if ($null -ne $estimate) { Format-VhsMp4KbpsText -Kbps ([int]$estimate.VideoKbps) } else { "--" }
+    $audioKbpsText = if ($null -ne $estimate) { Format-VhsMp4KbpsText -Kbps ([int]$estimate.AudioKbps) } else { "--" }
+    $totalKbpsText = if ($null -ne $estimate) { Format-VhsMp4KbpsText -Kbps ([int]$estimate.TotalKbps) + " est." } else { "--" }
+    $estimatedSize = Get-PlanItemPropertyText -Item $Item -Name "EstimatedSize" -Default "Estimate: --"
+    $usbNote = Get-PlanItemPropertyText -Item $Item -Name "UsbNote" -Default "USB note: --"
+    $trimSummary = Get-PlanItemPropertyText -Item $Item -Name "TrimSummary" -Default "--"
+    $cropSummary = Get-PlanItemPropertyText -Item $Item -Name "CropSummary" -Default "--"
+    $aspectStatus = Get-PlanItemAspectStatusText -Item $Item
+    $displayOutputName = if ($Item.PSObject.Properties["DisplayOutputName"] -and -not [string]::IsNullOrWhiteSpace([string]$Item.DisplayOutputName)) { [string]$Item.DisplayOutputName } else { [System.IO.Path]::GetFileName([string]$Item.OutputPath) }
+    $splitSummary = if ($splitOutputCheckBox.Checked -and $null -ne $estimate) {
+        "On | oko $maxPartGbForEstimate GB | $([string]$estimate.PartCount) delova"
+    }
+    else {
+        "Off"
+    }
+
+    $details = @"
+Planned output
+
+File: $displayOutputName
+Container: MP4
+Resolution: $plannedResolution
+Duration: $(Get-PlanItemPlannedDurationText -Item $Item -MediaInfo $mediaInfo)
+Video codec: $videoCodecLabel
+Rate control: $rateControlText
+Video bitrate: $videoKbpsText
+Audio codec: AAC
+Audio bitrate: $audioKbpsText
+Total bitrate: $totalKbpsText
+Encode engine: $([string]$encoderPlan.Summary)
+Aspect: $aspectStatus
+Trim: $trimSummary
+Crop: $cropSummary
+Split output: $splitSummary
+$estimatedSize
+$usbNote
+"@
+
+    return [pscustomobject]@{
+        Container = "MP4"
+        Resolution = $plannedResolution
+        DurationText = (Get-PlanItemPlannedDurationText -Item $Item -MediaInfo $mediaInfo)
+        VideoSummary = $videoSummary
+        AudioSummary = $audioSummary
+        BitrateText = $totalKbpsText
+        Details = $details
+    }
+}
+
 function Format-VhsMp4MediaDetails {
     param(
         [AllowNull()]
@@ -3149,10 +3371,10 @@ function Format-VhsMp4MediaDetails {
     $outputAspectHeight = if ($null -ne $snapshot -and $null -ne $snapshot.OutputAspectHeight) { [string]$snapshot.OutputAspectHeight } else { "--" }
 
     if ($null -eq $mediaInfo) {
-        return @"
+    return @"
 Selected file / Properties
 
-Properties / Media info
+Input / source properties
 
 File: $($Item.SourceName)
 Path: $($Item.SourcePath)
@@ -3172,7 +3394,7 @@ $usbNote
     return @"
 Selected file / Properties
 
-Properties / Media info
+Input / source properties
 
 File: $($Item.SourceName)
 Path: $($Item.SourcePath)
@@ -3222,16 +3444,47 @@ function Update-MediaInfoPanel {
                 $details = Get-PlanItemPropertyText -Item $item -Name "MediaDetails" -Default ""
                 if (-not [string]::IsNullOrWhiteSpace($details)) {
                     $infoBox.Text = $details
+                    Update-OutputPlanPanel
                     return
                 }
 
                 $infoBox.Text = Format-VhsMp4MediaDetails -Item $item
+                Update-OutputPlanPanel
                 return
             }
         }
     }
 
     $infoBox.Text = Get-MediaInfoIntroText
+    Update-OutputPlanPanel
+}
+
+function Update-OutputPlanPanel {
+    if (-not (Get-Variable -Name "outputPlanInfoBox" -ErrorAction SilentlyContinue)) {
+        return
+    }
+
+    $item = Get-SelectedPlanItem
+    if ($null -eq $item) {
+        $outputPlanInfoBox.Text = @"
+Planned output
+
+Izaberi fajl u queue listi da ovde odmah vidis planirani izlaz:
+- codec i encode engine
+- resolution i aspect
+- video/audio bitrate
+- trim/crop/split i procenu velicine
+"@
+        return
+    }
+
+    $details = Get-PlanItemPropertyText -Item $item -Name "PlannedOutputDetails" -Default ""
+    if (-not [string]::IsNullOrWhiteSpace($details)) {
+        $outputPlanInfoBox.Text = $details
+        return
+    }
+
+    $outputPlanInfoBox.Text = (Get-PlanItemOutputPlanState -Item $item).Details
 }
 
 function Get-SelectedPlanItem {
@@ -4680,10 +4933,48 @@ function Open-PlayerTrimWindow {
             $stopPlaybackButton.Enabled = $false
             $playerPreviewFrameButton.Enabled = -not [string]::IsNullOrWhiteSpace($resolvedFfmpegPath)
             try {
+                $playbackTimer.Stop()
+            }
+            catch {
+            }
+            try {
                 $mediaElement.Stop()
             }
             catch {
             }
+        }
+    }
+
+    function Start-PlayerPlayback {
+        if ($localState.Mode -ne "Playback mode") {
+            return
+        }
+
+        try {
+            $mediaElement.Play()
+            $playbackTimer.Start()
+        }
+        catch {
+            try {
+                $playbackTimer.Stop()
+            }
+            catch {
+            }
+            Set-PlayerTrimDialogMode "Preview mode" "fallback"
+        }
+    }
+
+    function Stop-PlayerPlayback {
+        try {
+            $playbackTimer.Stop()
+        }
+        catch {
+        }
+
+        try {
+            $mediaElement.Stop()
+        }
+        catch {
         }
     }
 
@@ -5575,27 +5866,12 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $playPauseButton.Add_Click(({
-        if ($localState.Mode -ne "Playback mode") {
-            return
-        }
-
-        try {
-            $mediaElement.Play()
-            $playbackTimer.Start()
-        }
-        catch {
-            $playerRuntime.'Set-PlayerTrimDialogMode'("Preview mode", "fallback")
-        }
+        $playerRuntime.'Start-PlayerPlayback'()
     }).GetNewClosure())
 
     $stopPlaybackButton.Add_Click(({
         if ($localState.Mode -eq "Playback mode") {
-            try {
-                $mediaElement.Stop()
-            }
-            catch {
-            }
-            $playbackTimer.Stop()
+            $playerRuntime.'Stop-PlayerPlayback'()
         }
         $playerRuntime.'Set-PlayerPositionSeconds'(0, $false, ($localState.Mode -eq "Preview mode"))
     }).GetNewClosure())
@@ -5669,12 +5945,7 @@ function Open-PlayerTrimWindow {
     $dialog.Add_FormClosing(({
         param($sender, $eventArgs)
 
-        $playbackTimer.Stop()
-        try {
-            $mediaElement.Stop()
-        }
-        catch {
-        }
+        $playerRuntime.'Stop-PlayerPlayback'()
 
         if ($runtimeState.ClosingAfterSave -or -not $localState.Dirty) {
             return
@@ -5869,9 +6140,37 @@ function Update-SelectedTrimGridRow {
             $row.Cells["Range"].Value = $rangeText
             $row.Cells["Aspect"].Value = $aspectText
             $row.Cells["Crop"].Value = $cropText
+            $plannedContainer = Get-PlanItemPropertyText -Item $Item -Name "PlannedContainer" -Default ""
+            $plannedResolution = Get-PlanItemPropertyText -Item $Item -Name "PlannedResolution" -Default ""
+            $plannedDuration = Get-PlanItemPropertyText -Item $Item -Name "PlannedDurationText" -Default ""
+            $plannedVideo = Get-PlanItemPropertyText -Item $Item -Name "PlannedVideoSummary" -Default ""
+            $plannedAudio = Get-PlanItemPropertyText -Item $Item -Name "PlannedAudioSummary" -Default ""
+            $plannedBitrate = Get-PlanItemPropertyText -Item $Item -Name "PlannedBitrateText" -Default ""
+            if (-not [string]::IsNullOrWhiteSpace($plannedContainer)) { $row.Cells["Container"].Value = $plannedContainer }
+            if (-not [string]::IsNullOrWhiteSpace($plannedResolution)) { $row.Cells["Resolution"].Value = $plannedResolution }
+            if (-not [string]::IsNullOrWhiteSpace($plannedDuration)) { $row.Cells["Duration"].Value = $plannedDuration }
+            if (-not [string]::IsNullOrWhiteSpace($plannedVideo)) { $row.Cells["Video"].Value = $plannedVideo }
+            if (-not [string]::IsNullOrWhiteSpace($plannedAudio)) { $row.Cells["Audio"].Value = $plannedAudio }
+            if (-not [string]::IsNullOrWhiteSpace($plannedBitrate)) { $row.Cells["Bitrate"].Value = $plannedBitrate }
             break
         }
     }
+}
+
+function Update-PlanItemOutputPresentation {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Item
+    )
+
+    $outputPlan = Get-PlanItemOutputPlanState -Item $Item
+    $Item | Add-Member -NotePropertyName "PlannedContainer" -NotePropertyValue ([string]$outputPlan.Container) -Force
+    $Item | Add-Member -NotePropertyName "PlannedResolution" -NotePropertyValue ([string]$outputPlan.Resolution) -Force
+    $Item | Add-Member -NotePropertyName "PlannedDurationText" -NotePropertyValue ([string]$outputPlan.DurationText) -Force
+    $Item | Add-Member -NotePropertyName "PlannedVideoSummary" -NotePropertyValue ([string]$outputPlan.VideoSummary) -Force
+    $Item | Add-Member -NotePropertyName "PlannedAudioSummary" -NotePropertyValue ([string]$outputPlan.AudioSummary) -Force
+    $Item | Add-Member -NotePropertyName "PlannedBitrateText" -NotePropertyValue ([string]$outputPlan.BitrateText) -Force
+    $Item | Add-Member -NotePropertyName "PlannedOutputDetails" -NotePropertyValue ([string]$outputPlan.Details) -Force
 }
 
 function Update-PlanItemTrimEstimate {
@@ -5908,6 +6207,7 @@ function Update-PlanItemTrimEstimate {
             -QualityMode ([string]$qualityModeComboBox.SelectedItem) `
             -Crf ([int]$crfTextBox.Text) `
             -AudioBitrate $audioTextBox.Text `
+            -VideoBitrate (Get-CurrentVideoBitrateText) `
             -SplitOutput:$splitOutputCheckBox.Checked `
             -MaxPartGb $maxPartGbForEstimate
 
@@ -5918,18 +6218,27 @@ function Update-PlanItemTrimEstimate {
 
         $Item | Add-Member -NotePropertyName "EstimatedSize" -NotePropertyValue $estimatedSize -Force
         $Item | Add-Member -NotePropertyName "UsbNote" -NotePropertyValue $estimate.UsbNote -Force
+        Update-PlanItemOutputPresentation -Item $Item
         $Item | Add-Member -NotePropertyName "MediaDetails" -NotePropertyValue (Format-VhsMp4MediaDetails -Item $Item) -Force
 
         foreach ($row in $grid.Rows) {
             if ([string]$row.Cells["SourceName"].Value -eq [string]$Item.SourceName) {
                 $row.Cells["EstimatedSize"].Value = $estimatedSize
                 $row.Cells["UsbNote"].Value = $estimate.UsbNote
+                $row.Cells["Container"].Value = Get-PlanItemPropertyText -Item $Item -Name "PlannedContainer" -Default $row.Cells["Container"].Value
+                $row.Cells["Resolution"].Value = Get-PlanItemPropertyText -Item $Item -Name "PlannedResolution" -Default $row.Cells["Resolution"].Value
+                $row.Cells["Duration"].Value = Get-PlanItemPropertyText -Item $Item -Name "PlannedDurationText" -Default $row.Cells["Duration"].Value
+                $row.Cells["Video"].Value = Get-PlanItemPropertyText -Item $Item -Name "PlannedVideoSummary" -Default $row.Cells["Video"].Value
+                $row.Cells["Audio"].Value = Get-PlanItemPropertyText -Item $Item -Name "PlannedAudioSummary" -Default $row.Cells["Audio"].Value
+                $row.Cells["Bitrate"].Value = Get-PlanItemPropertyText -Item $Item -Name "PlannedBitrateText" -Default $row.Cells["Bitrate"].Value
                 break
             }
         }
+        Update-OutputPlanPanel
     }
     catch {
         Add-LogLine ("Estimate warning: " + (Get-VhsMp4ErrorMessage -ErrorObject $_))
+        Update-PlanItemOutputPresentation -Item $Item
         $Item | Add-Member -NotePropertyName "MediaDetails" -NotePropertyValue (Format-VhsMp4MediaDetails -Item $Item) -Force
     }
 }
@@ -6042,12 +6351,17 @@ function Set-GridRows {
 
         $mediaInfoProperty = $item.PSObject.Properties["MediaInfo"]
         $mediaInfo = if ($mediaInfoProperty) { $mediaInfoProperty.Value } else { $null }
-        $container = if ($mediaInfo) { [string]$mediaInfo.Container } else { "" }
-        $resolution = if ($mediaInfo) { [string]$mediaInfo.Resolution } else { "" }
-        $duration = if ($mediaInfo) { [string]$mediaInfo.DurationText } else { "" }
-        $video = if ($mediaInfo) { [string]$mediaInfo.VideoSummary } else { "" }
-        $audio = if ($mediaInfo) { [string]$mediaInfo.AudioSummary } else { "" }
-        $bitrate = if ($mediaInfo) { [string]$mediaInfo.OverallBitrateText } else { "" }
+        $sourceResolution = if ($mediaInfo) { [string]$mediaInfo.Resolution } else { "" }
+        $sourceDuration = if ($mediaInfo) { [string]$mediaInfo.DurationText } else { "" }
+        $sourceVideoSummary = if ($mediaInfo) { [string]$mediaInfo.VideoSummary } else { "" }
+        $sourceAudioSummary = if ($mediaInfo) { [string]$mediaInfo.AudioSummary } else { "" }
+        $sourceBitrate = if ($mediaInfo) { [string]$mediaInfo.OverallBitrateText } else { "" }
+        $container = Get-PlanItemPropertyText -Item $item -Name "PlannedContainer" -Default "MP4"
+        $resolution = Get-PlanItemPropertyText -Item $item -Name "PlannedResolution" -Default $sourceResolution
+        $duration = Get-PlanItemPropertyText -Item $item -Name "PlannedDurationText" -Default $sourceDuration
+        $video = Get-PlanItemPropertyText -Item $item -Name "PlannedVideoSummary" -Default $sourceVideoSummary
+        $audio = Get-PlanItemPropertyText -Item $item -Name "PlannedAudioSummary" -Default $sourceAudioSummary
+        $bitrate = Get-PlanItemPropertyText -Item $item -Name "PlannedBitrateText" -Default $sourceBitrate
         $frames = if ($mediaInfo -and $mediaInfo.FrameCount) { [string]$mediaInfo.FrameCount } else { "" }
         $range = Get-PlanItemPropertyText -Item $item -Name "TrimSummary" -Default "--"
         $aspect = Get-PlanItemAspectStatusText -Item $item
@@ -6060,6 +6374,7 @@ function Set-GridRows {
 
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
+    Update-OutputPlanPanel
     Update-ProgressBar
     Update-ActionButtons
 }
@@ -6117,6 +6432,7 @@ function Add-PlanEstimates {
                         -QualityMode ([string]$qualityModeComboBox.SelectedItem) `
                         -Crf ([int]$crfTextBox.Text) `
                         -AudioBitrate $audioTextBox.Text `
+                        -VideoBitrate (Get-CurrentVideoBitrateText) `
                         -SplitOutput:$splitOutputCheckBox.Checked `
                         -MaxPartGb $maxPartGbForEstimate
 
@@ -6138,6 +6454,7 @@ function Add-PlanEstimates {
         $item | Add-Member -NotePropertyName "MediaSummary" -NotePropertyValue $mediaSummary -Force
         $item | Add-Member -NotePropertyName "EstimatedSize" -NotePropertyValue $estimatedSize -Force
         $item | Add-Member -NotePropertyName "UsbNote" -NotePropertyValue $usbNote -Force
+        Update-PlanItemOutputPresentation -Item $item
         $item | Add-Member -NotePropertyName "MediaDetails" -NotePropertyValue (Format-VhsMp4MediaDetails -Item $item) -Force
     }
 
@@ -6193,6 +6510,7 @@ function Update-BatchContextSettingsFromSettings {
     $context.Crf = $Settings.Crf
     $context.Preset = $Settings.Preset
     $context.AudioBitrate = $Settings.AudioBitrate
+    $context.VideoBitrate = $Settings.VideoBitrate
     $context.FfmpegPath = $Settings.FfmpegPath
     $context.WorkflowPresetName = $Settings.WorkflowPresetName
     $context.SplitOutput = [bool]$Settings.SplitOutput
@@ -6486,6 +6804,7 @@ function Export-QueuePlanToFile {
             Crf = $crfValue
             Preset = [string]$presetComboBox.SelectedItem
             AudioBitrate = [string]$audioTextBox.Text
+            VideoBitrate = Get-CurrentVideoBitrateText
             Deinterlace = [string]$deinterlaceComboBox.SelectedItem
             Denoise = [string]$denoiseComboBox.SelectedItem
             RotateFlip = [string]$rotateFlipComboBox.SelectedItem
@@ -6652,6 +6971,11 @@ function Get-Settings {
         throw "Audio bitrate mora biti oblika 160k."
     }
 
+    $videoBitrateText = Get-CurrentVideoBitrateText
+    if (-not [string]::IsNullOrWhiteSpace($videoBitrateText) -and $videoBitrateText -notmatch "^\d+k$") {
+        throw "Video bitrate mora biti oblika 4500k ili prazno za CRF/Quality mode."
+    }
+
     $maxPartGb = 3.8
     if ($splitOutputCheckBox.Checked) {
         $maxPartText = $maxPartGbTextBox.Text.Trim().Replace(",", ".")
@@ -6671,7 +6995,7 @@ function Get-Settings {
     }
 
     if ([string]::IsNullOrWhiteSpace($script:ResolvedFfmpegPath)) {
-        throw "FFmpeg nije spreman. Koristi Install FFmpeg ili Browse FFmpeg."
+        throw "FFmpeg nije spreman. Program ga pokusava automatski instalirati; rucni fallback je u Help > Install FFmpeg / Browse FFmpeg."
     }
 
     return [pscustomobject]@{
@@ -6681,6 +7005,7 @@ function Get-Settings {
         Crf = $crfValue
         Preset = [string]$presetComboBox.SelectedItem
         AudioBitrate = $audioTextBox.Text
+        VideoBitrate = $videoBitrateText
         FfmpegPath = $script:ResolvedFfmpegPath
         WorkflowPresetName = if ([string]::IsNullOrWhiteSpace([string]$workflowPresetComboBox.SelectedItem)) { $script:WorkflowPresetCustomName } else { [string]$workflowPresetComboBox.SelectedItem }
         SplitOutput = [bool]$splitOutputCheckBox.Checked
@@ -6708,12 +7033,15 @@ function Invoke-WorkflowPresetFieldChanged {
     }
 
     Update-WorkflowPresetDirtyState
-    if (Test-BatchPaused) {
-        try {
-            [void](Sync-PausedBatchPlanFromCurrentSettings -StatusPrefix "Paused")
-        }
-        catch {
+    try {
+        Refresh-PlanEstimatesForCurrentSettings -StatusPrefix "Podesavanja"
+    }
+    catch {
+        if (Test-BatchPaused) {
             Set-StatusText ("Paused | " + (Get-VhsMp4ErrorMessage -ErrorObject $_))
+        }
+        else {
+            Set-StatusText ("Podesavanja | " + (Get-VhsMp4ErrorMessage -ErrorObject $_))
         }
     }
     Update-ActionButtons
@@ -6952,6 +7280,7 @@ function Invoke-TestSample {
             -Crf $settings.Crf `
             -Preset $settings.Preset `
             -AudioBitrate $settings.AudioBitrate `
+            -VideoBitrate $settings.VideoBitrate `
             -FfmpegPath $settings.FfmpegPath `
             -SplitOutput:$false `
             -MaxPartGb $settings.MaxPartGb `
@@ -6974,6 +7303,7 @@ function Invoke-TestSample {
             -Crf $context.Crf `
             -Preset $context.Preset `
             -AudioBitrate $context.AudioBitrate `
+            -VideoBitrate $context.VideoBitrate `
             -SampleSeconds 120 `
             -Deinterlace $context.Deinterlace `
             -Denoise $context.Denoise `
@@ -7060,20 +7390,27 @@ function Prompt-BrowseFfmpeg {
     return $false
 }
 
-function Install-FFmpegInteractive {
-    $message = "GUI moze da instalira FFmpeg preko winget i da ga automatski doda u user PATH.`r`n`r`nNastavi?"
-    $choice = [System.Windows.Forms.MessageBox]::Show($message, "Install FFmpeg", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
-    if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
-        return
-    }
+function Install-FFmpegAutomatic {
+    param(
+        [switch]$AllowBrowseFallback,
+        [switch]$ShowFailureDialog,
+        [switch]$StartupBootstrap
+    )
 
     try {
         $wingetPath = Resolve-VhsMp4CommandPath -CommandPath "winget"
     }
     catch {
-        Add-LogLine "winget nije pronadjen. Prelazim na rucni izbor ffmpeg.exe."
-        [void](Prompt-BrowseFfmpeg)
-        return
+        $message = "winget nije pronadjen. FFmpeg auto-install nije moguc bez winget-a."
+        Add-LogLine $message
+        Set-StatusText $message
+        if ($AllowBrowseFallback) {
+            [void](Prompt-BrowseFfmpeg)
+        }
+        elseif ($ShowFailureDialog) {
+            [System.Windows.Forms.MessageBox]::Show($message, "Install FFmpeg", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        }
+        return $false
     }
 
     $installArgs = @(
@@ -7086,7 +7423,12 @@ function Install-FFmpegInteractive {
     )
 
     $form.UseWaitCursor = $true
-    Set-StatusText "Instaliram FFmpeg..."
+    if ($StartupBootstrap) {
+        Set-StatusText "FFmpeg nije pronadjen. Pokusavam automatsku instalaciju..."
+    }
+    else {
+        Set-StatusText "Instaliram FFmpeg..."
+    }
     Add-LogLine "winget install --id Gyan.FFmpeg.Essentials -e --accept-package-agreements --accept-source-agreements --disable-interactivity"
 
     try {
@@ -7109,6 +7451,7 @@ function Install-FFmpegInteractive {
             $ffmpegPathTextBox.Text = $installedFfmpeg
             Sync-FfmpegState
             Set-StatusText "FFmpeg je instaliran i spreman."
+            return $true
         }
         else {
             Sync-FfmpegState
@@ -7119,14 +7462,54 @@ function Install-FFmpegInteractive {
         $message = Get-VhsMp4ErrorMessage -ErrorObject $_
         Add-LogLine ("Install FFmpeg error: " + $message)
         Set-StatusText $message
-        $fallback = [System.Windows.Forms.MessageBox]::Show("Automatska instalacija nije uspela ili FFmpeg nije pronadjen posle instalacije.`r`n`r`nDa otvorim rucni izbor ffmpeg.exe?", "Install FFmpeg", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
-        if ($fallback -eq [System.Windows.Forms.DialogResult]::Yes) {
-            [void](Prompt-BrowseFfmpeg)
+        if ($AllowBrowseFallback) {
+            $fallback = [System.Windows.Forms.MessageBox]::Show("Automatska instalacija nije uspela ili FFmpeg nije pronadjen posle instalacije.`r`n`r`nDa otvorim rucni izbor ffmpeg.exe?", "Install FFmpeg", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            if ($fallback -eq [System.Windows.Forms.DialogResult]::Yes) {
+                [void](Prompt-BrowseFfmpeg)
+            }
         }
+        elseif ($ShowFailureDialog) {
+            [System.Windows.Forms.MessageBox]::Show($message, "Install FFmpeg", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        }
+        return $false
     }
     finally {
         $form.UseWaitCursor = $false
         Update-ActionButtons
+    }
+}
+
+function Install-FFmpegInteractive {
+    $message = "GUI moze da instalira FFmpeg preko winget i da ga automatski doda u user PATH.`r`n`r`nNastavi?"
+    $choice = [System.Windows.Forms.MessageBox]::Show($message, "Install FFmpeg", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+    if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
+        return
+    }
+
+    [void](Install-FFmpegAutomatic -AllowBrowseFallback -ShowFailureDialog)
+}
+
+function Ensure-FfmpegReadyOnStartup {
+    if ($script:AutoFfmpegBootstrapAttempted -or $script:AutoFfmpegBootstrapInProgress) {
+        return
+    }
+
+    if ((Get-VhsMp4InstallType) -eq "Repo/dev") {
+        return
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace([string]$script:ResolvedFfmpegPath)) {
+        return
+    }
+
+    $script:AutoFfmpegBootstrapAttempted = $true
+    $script:AutoFfmpegBootstrapInProgress = $true
+    try {
+        [void](Install-FFmpegAutomatic -StartupBootstrap)
+    }
+    finally {
+        $script:AutoFfmpegBootstrapInProgress = $false
+        Sync-FfmpegState
     }
 }
 
@@ -7167,6 +7550,7 @@ function Finish-BatchSession {
                 -Crf $script:BatchContext.Context.Crf `
                 -Preset $script:BatchContext.Context.Preset `
                 -AudioBitrate $script:BatchContext.Context.AudioBitrate `
+                -VideoBitrate $script:BatchContext.Context.VideoBitrate `
                 -SplitOutput ([bool]$script:BatchContext.Context.SplitOutput) `
                 -MaxPartGb $script:BatchContext.Context.MaxPartGb `
                 -FilterSummary $script:BatchContext.Context.FilterSummary `
@@ -7267,6 +7651,7 @@ function Start-NextQueuedItem {
                 -Crf $script:BatchContext.Context.Crf `
                 -Preset $script:BatchContext.Context.Preset `
                 -AudioBitrate $script:BatchContext.Context.AudioBitrate `
+                -VideoBitrate $script:BatchContext.Context.VideoBitrate `
                 -ProgressPath $script:CurrentProgressPath `
                 -SplitOutput:([bool]$script:BatchContext.Context.SplitOutput) `
                 -MaxPartGb $script:BatchContext.Context.MaxPartGb `
@@ -7383,6 +7768,7 @@ function Start-BatchSession {
         -Crf $Settings.Crf `
         -Preset $Settings.Preset `
         -AudioBitrate $Settings.AudioBitrate `
+        -VideoBitrate $Settings.VideoBitrate `
         -FfmpegPath $Settings.FfmpegPath `
         -SplitOutput:([bool]$Settings.SplitOutput) `
         -MaxPartGb $Settings.MaxPartGb `
@@ -7414,6 +7800,7 @@ function Start-BatchSession {
             -Crf $context.Crf `
             -Preset $context.Preset `
             -AudioBitrate $context.AudioBitrate `
+            -VideoBitrate $context.VideoBitrate `
             -SplitOutput ([bool]$context.SplitOutput) `
             -MaxPartGb $context.MaxPartGb `
             -FilterSummary $context.FilterSummary `
@@ -7442,7 +7829,8 @@ function Start-BatchSession {
     if (-not [string]::IsNullOrWhiteSpace([string]$context.WorkflowPresetName)) {
         Write-SessionLog -Message ("WorkflowPreset: " + [string]$context.WorkflowPresetName)
     }
-    Write-SessionLog -Message ("QualityMode: " + $context.QualityMode + " | CRF: " + $context.Crf + " | Preset: " + $context.Preset + " | AudioBitrate: " + $context.AudioBitrate)
+    $videoBitrateLogText = if (-not [string]::IsNullOrWhiteSpace([string]$context.VideoBitrate)) { [string]$context.VideoBitrate } else { "auto/CRF" }
+    Write-SessionLog -Message ("QualityMode: " + $context.QualityMode + " | CRF: " + $context.Crf + " | Preset: " + $context.Preset + " | VideoBitrate: " + $videoBitrateLogText + " | AudioBitrate: " + $context.AudioBitrate)
     Write-SessionLog -Message ("SplitOutput: " + $context.SplitOutput + " | MaxPartGb: " + $context.MaxPartGb)
     Write-SessionLog -Message ("Encode engine: requested " + [string]$context.EncoderMode + " | using " + [string]$context.ResolvedEncoderMode)
     if (-not [string]::IsNullOrWhiteSpace([string]$context.FilterSummary)) {
@@ -7561,6 +7949,16 @@ $helpMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $helpMenuItem.Text = "Help"
 $menuStrip.Items.Add($helpMenuItem) | Out-Null
 
+$installFfmpegMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$installFfmpegMenuItem.Text = "Install FFmpeg"
+$helpMenuItem.DropDownItems.Add($installFfmpegMenuItem) | Out-Null
+
+$browseFfmpegMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$browseFfmpegMenuItem.Text = "Browse FFmpeg"
+$helpMenuItem.DropDownItems.Add($browseFfmpegMenuItem) | Out-Null
+
+$helpMenuItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
 $aboutMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $aboutMenuItem.Text = "About VHS MP4 Optimizer"
 $helpMenuItem.DropDownItems.Add($aboutMenuItem) | Out-Null
@@ -7663,13 +8061,17 @@ $sourceLayout.Controls.Add($ffmpegPathTextBox, 1, 2)
 
 $browseFfmpegButton = New-Object System.Windows.Forms.Button
 $browseFfmpegButton.Text = "Browse FFmpeg"
-$browseFfmpegButton.Dock = "Fill"
-$sourceLayout.Controls.Add($browseFfmpegButton, 2, 2)
 
 $installFfmpegButton = New-Object System.Windows.Forms.Button
 $installFfmpegButton.Text = "Install FFmpeg"
-$installFfmpegButton.Dock = "Fill"
-$sourceLayout.Controls.Add($installFfmpegButton, 3, 2)
+
+$ffmpegHelpNoteLabel = New-Object System.Windows.Forms.Label
+$ffmpegHelpNoteLabel.Text = "Auto-install pri startu | Help > Install FFmpeg / Browse FFmpeg za rucni fallback"
+$ffmpegHelpNoteLabel.Dock = "Fill"
+$ffmpegHelpNoteLabel.TextAlign = "MiddleLeft"
+$ffmpegHelpNoteLabel.AutoEllipsis = $true
+$sourceLayout.Controls.Add($ffmpegHelpNoteLabel, 2, 2)
+$sourceLayout.SetColumnSpan($ffmpegHelpNoteLabel, 2)
 
 $controlsStackLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $controlsStackLayout.Dock = "Fill"
@@ -7889,6 +8291,22 @@ $audioTextBox = New-Object System.Windows.Forms.TextBox
 $audioTextBox.Width = 70
 $audioTextBox.Text = "160k"
 $settingsFlow.Controls.Add($audioTextBox)
+
+$videoBitrateLabel = New-Object System.Windows.Forms.Label
+$videoBitrateLabel.Text = "Video bitrate"
+$videoBitrateLabel.Width = 82
+$videoBitrateLabel.Margin = New-Object System.Windows.Forms.Padding(16, 6, 3, 3)
+$settingsFlow.Controls.Add($videoBitrateLabel)
+
+$videoBitrateTextBox = New-Object System.Windows.Forms.TextBox
+$videoBitrateTextBox.Name = "videoBitrateTextBox"
+$videoBitrateTextBox.Width = 74
+$videoBitrateTextBox.Text = ""
+$settingsFlow.Controls.Add($videoBitrateTextBox)
+
+$videoBitrateHelpText = "Video bitrate je opcion override. Ostavi prazno za CRF/Quality mode. Primer: 4500k."
+$toolTip.SetToolTip($videoBitrateLabel, $videoBitrateHelpText)
+$toolTip.SetToolTip($videoBitrateTextBox, $videoBitrateHelpText)
 
 $splitOutputCheckBox = New-Object System.Windows.Forms.CheckBox
 $splitOutputCheckBox.Text = "Split output"
@@ -8127,9 +8545,10 @@ $statusPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $statusPanel.Dock = "Fill"
 $statusPanel.ColumnCount = 1
 $statusPanel.RowCount = 3
+$statusPanel.Padding = New-Object System.Windows.Forms.Padding(8, 6, 8, 8)
 $statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
+$statusPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
 
 $statusTitleLabel = New-Object System.Windows.Forms.Label
 $statusTitleLabel.Text = "Batch status"
@@ -8142,6 +8561,7 @@ $statusValueLabel.Text = "Scan Files pregleda video fajlove u folderu i podfolde
 $statusValueLabel.AutoSize = $false
 $statusValueLabel.Dock = "Fill"
 $statusValueLabel.TextAlign = "TopLeft"
+$statusValueLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $statusValueLabel.MaximumSize = New-Object System.Drawing.Size(0, 0)
 $statusPanel.Controls.Add($statusValueLabel, 0, 1)
 $script:LastNormalStatusText = $statusValueLabel.Text
@@ -8172,11 +8592,13 @@ $ffmpegStatusPanel.Controls.Add($ffmpegHintLabel)
 $mainSplit = New-Object System.Windows.Forms.SplitContainer
 $mainSplit.Dock = "Fill"
 $mainSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel2
+$mainSplit.IsSplitterFixed = $false
 $mainSplit.SplitterDistance = 880
 
 $workspaceSplit = New-Object System.Windows.Forms.SplitContainer
 $workspaceSplit.Dock = "Fill"
 $workspaceSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
+$workspaceSplit.IsSplitterFixed = $false
 $workspaceSplit.SplitterDistance = 520
 $rootLayout.Controls.Add($workspaceSplit, 0, 1)
 $workspaceSplit.Panel1.Controls.Add($mainSplit)
@@ -8240,10 +8662,30 @@ $selectedFileSummaryLabel.AutoEllipsis = $true
 $selectedFileSummaryLabel.Text = "Izaberi fajl u queue listi pa koristi Open Player za preview, trim, crop i aspect korekciju."
 $rightPanel.Controls.Add($selectedFileSummaryLabel, 0, 1)
 
+$detailsSplit = New-Object System.Windows.Forms.SplitContainer
+$detailsSplit.Dock = "Fill"
+$detailsSplit.Orientation = [System.Windows.Forms.Orientation]::Horizontal
+$detailsSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::None
+$rightPanel.Controls.Add($detailsSplit, 0, 2)
+
+$outputPlanGroupBox = New-Object System.Windows.Forms.GroupBox
+$outputPlanGroupBox.Text = "Planned output"
+$outputPlanGroupBox.Dock = "Fill"
+$detailsSplit.Panel1.Controls.Add($outputPlanGroupBox)
+
+$outputPlanInfoBox = New-Object System.Windows.Forms.RichTextBox
+$outputPlanInfoBox.Dock = "Fill"
+$outputPlanInfoBox.ReadOnly = $true
+$outputPlanInfoBox.BorderStyle = "None"
+$outputPlanInfoBox.BackColor = [System.Drawing.SystemColors]::Window
+$outputPlanInfoBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$outputPlanInfoBox.Text = "Planned output`r`n`r`nIzaberi fajl u queue listi da vidis planirani izlaz."
+$outputPlanGroupBox.Controls.Add($outputPlanInfoBox)
+
 $propertiesGroupBox = New-Object System.Windows.Forms.GroupBox
-$propertiesGroupBox.Text = "Properties / Media info"
+$propertiesGroupBox.Text = "Input / source properties"
 $propertiesGroupBox.Dock = "Fill"
-$rightPanel.Controls.Add($propertiesGroupBox, 0, 2)
+$detailsSplit.Panel2.Controls.Add($propertiesGroupBox)
 
 $infoBox = New-Object System.Windows.Forms.RichTextBox
 $infoBox.Dock = "Fill"
@@ -8671,6 +9113,14 @@ $aboutMenuItem.Add_Click({
     Show-AboutDialog
 })
 
+$installFfmpegMenuItem.Add_Click({
+    Install-FFmpegInteractive
+})
+
+$browseFfmpegMenuItem.Add_Click({
+    [void](Prompt-BrowseFfmpeg)
+})
+
 $checkForUpdatesMenuItem.Add_Click({
     [void](Invoke-UpdateCheck)
 })
@@ -9051,6 +9501,10 @@ $audioTextBox.Add_TextChanged({
     Invoke-WorkflowPresetFieldChanged
 })
 
+$videoBitrateTextBox.Add_TextChanged({
+    Invoke-WorkflowPresetFieldChanged
+})
+
 $encoderModeComboBox.Add_SelectedIndexChanged({
     Invoke-WorkflowPresetFieldChanged
 })
@@ -9163,6 +9617,7 @@ $form.Add_Shown({
     $mainSplit.Panel2MinSize = $script:RightPanelTargetWidth
     Set-MainSplitLayout
     Set-WorkspaceSplitLayout
+    Set-DetailsSplitLayout
     Set-AdvancedSettingsVisibility -Visible:$false
     Update-VhsMp4ProcessPathFromEnvironment | Out-Null
     Sync-FfmpegState
@@ -9172,12 +9627,28 @@ $form.Add_Shown({
         Set-StatusText $script:WorkflowPresetStorageWarning
     }
     Update-ActionButtons
+    Ensure-FfmpegReadyOnStartup
     $startupUpdateTimer.Start()
 })
 
 $form.Add_Resize({
     Set-MainSplitLayout
     Set-WorkspaceSplitLayout
+    Set-DetailsSplitLayout
+})
+
+$mainSplit.Add_SplitterMoved({
+    $panel2Width = $mainSplit.Width - $mainSplit.SplitterDistance - $mainSplit.SplitterWidth
+    if ($panel2Width -ge 360) {
+        $script:RightPanelTargetWidth = $panel2Width
+    }
+})
+
+$workspaceSplit.Add_SplitterMoved({
+    $bottomPanelHeight = $workspaceSplit.Height - $workspaceSplit.SplitterDistance - $workspaceSplit.SplitterWidth
+    if ($bottomPanelHeight -ge 220) {
+        $script:WorkspaceBottomTargetHeight = $bottomPanelHeight
+    }
 })
 
 $dragEnterHandler = {

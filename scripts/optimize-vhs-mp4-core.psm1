@@ -2231,7 +2231,9 @@ function Resolve-VhsMp4VideoEncoderPlan {
         [Parameter(Mandatory = $true)]
         [object]$QualityProfile,
         [string]$EncoderMode = "Auto",
-        [object]$EncoderInventory
+        [object]$EncoderInventory,
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = ""
     )
 
     $normalizedMode = Get-VhsMp4NormalizedEncoderMode -EncoderMode $EncoderMode
@@ -2239,14 +2241,29 @@ function Resolve-VhsMp4VideoEncoderPlan {
     if ([string]::IsNullOrWhiteSpace($codecFamily)) {
         $codecFamily = if ([string]$QualityProfile.VideoCodec -like "libx265") { "hevc" } else { "h264" }
     }
+    $videoBitrateProvided = -not [string]::IsNullOrWhiteSpace([string]$VideoBitrate)
+    $videoBitrateKbps = if ($videoBitrateProvided) { Convert-VhsMp4BitrateToKbps -Bitrate $VideoBitrate } else { 0 }
+    $videoBufferSize = if ($videoBitrateProvided) { "$($videoBitrateKbps * 2)k" } else { "" }
+    $cpuVideoArguments = if ($videoBitrateProvided) {
+        @(
+            "-preset", [string]$QualityProfile.Preset,
+            "-b:v", [string]$VideoBitrate,
+            "-maxrate", [string]$VideoBitrate,
+            "-bufsize", $videoBufferSize,
+            "-pix_fmt", "yuv420p"
+        )
+    }
+    else {
+        @("-preset", [string]$QualityProfile.Preset, "-crf", "$([int]$QualityProfile.Crf)", "-pix_fmt", "yuv420p")
+    }
 
     $cpuPlan = [pscustomobject]@{
         RequestedMode = $normalizedMode
         ResolvedMode = "CPU"
         VideoCodec = [string]$QualityProfile.VideoCodec
         VideoTag = [string]$QualityProfile.VideoTag
-        VideoArguments = @("-preset", [string]$QualityProfile.Preset, "-crf", "$([int]$QualityProfile.Crf)", "-pix_fmt", "yuv420p")
-        Summary = "Encode engine: CPU"
+        VideoArguments = $cpuVideoArguments
+        Summary = if ($videoBitrateProvided) { "Encode engine: CPU | target bitrate $VideoBitrate" } else { "Encode engine: CPU" }
         FallbackUsed = ($normalizedMode -notin @("Auto", "CPU"))
     }
 
@@ -2282,12 +2299,20 @@ function Resolve-VhsMp4VideoEncoderPlan {
 
     switch ($normalizedMode) {
         "NVIDIA NVENC" {
-            return [pscustomobject]@{
-                RequestedMode = $normalizedMode
-                ResolvedMode = $normalizedMode
-                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_nvenc" } else { "h264_nvenc" }
-                VideoTag = [string]$QualityProfile.VideoTag
-                VideoArguments = @(
+            $videoArguments = if ($videoBitrateProvided) {
+                @(
+                    "-preset", (Get-VhsMp4NvencPreset -Preset ([string]$QualityProfile.Preset)),
+                    "-tune", "hq",
+                    "-rc", "vbr",
+                    "-b:v", [string]$VideoBitrate,
+                    "-maxrate", [string]$VideoBitrate,
+                    "-bufsize", $videoBufferSize,
+                    "-multipass", "fullres",
+                    "-pix_fmt", "yuv420p"
+                )
+            }
+            else {
+                @(
                     "-preset", (Get-VhsMp4NvencPreset -Preset ([string]$QualityProfile.Preset)),
                     "-tune", "hq",
                     "-rc", "vbr",
@@ -2296,39 +2321,72 @@ function Resolve-VhsMp4VideoEncoderPlan {
                     "-multipass", "fullres",
                     "-pix_fmt", "yuv420p"
                 )
-                Summary = "Encode engine: NVIDIA NVENC"
+            }
+            return [pscustomobject]@{
+                RequestedMode = $normalizedMode
+                ResolvedMode = $normalizedMode
+                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_nvenc" } else { "h264_nvenc" }
+                VideoTag = [string]$QualityProfile.VideoTag
+                VideoArguments = $videoArguments
+                Summary = if ($videoBitrateProvided) { "Encode engine: NVIDIA NVENC | target bitrate $VideoBitrate" } else { "Encode engine: NVIDIA NVENC" }
                 FallbackUsed = $false
             }
         }
         "Intel QSV" {
-            return [pscustomobject]@{
-                RequestedMode = $normalizedMode
-                ResolvedMode = $normalizedMode
-                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_qsv" } else { "h264_qsv" }
-                VideoTag = [string]$QualityProfile.VideoTag
-                VideoArguments = @(
+            $videoArguments = if ($videoBitrateProvided) {
+                @(
+                    "-preset", (Get-VhsMp4QsvPreset -Preset ([string]$QualityProfile.Preset)),
+                    "-b:v", [string]$VideoBitrate,
+                    "-maxrate", [string]$VideoBitrate,
+                    "-bufsize", $videoBufferSize,
+                    "-look_ahead", "0",
+                    "-pix_fmt", "nv12"
+                )
+            }
+            else {
+                @(
                     "-preset", (Get-VhsMp4QsvPreset -Preset ([string]$QualityProfile.Preset)),
                     "-global_quality", "$([int]$QualityProfile.Crf)",
                     "-look_ahead", "0",
                     "-pix_fmt", "nv12"
                 )
-                Summary = "Encode engine: Intel QSV"
+            }
+            return [pscustomobject]@{
+                RequestedMode = $normalizedMode
+                ResolvedMode = $normalizedMode
+                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_qsv" } else { "h264_qsv" }
+                VideoTag = [string]$QualityProfile.VideoTag
+                VideoArguments = $videoArguments
+                Summary = if ($videoBitrateProvided) { "Encode engine: Intel QSV | target bitrate $VideoBitrate" } else { "Encode engine: Intel QSV" }
                 FallbackUsed = $false
             }
         }
         "AMD AMF" {
-            return [pscustomobject]@{
-                RequestedMode = $normalizedMode
-                ResolvedMode = $normalizedMode
-                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_amf" } else { "h264_amf" }
-                VideoTag = [string]$QualityProfile.VideoTag
-                VideoArguments = @(
+            $videoArguments = if ($videoBitrateProvided) {
+                @(
+                    "-quality", (Get-VhsMp4AmfPreset -Preset ([string]$QualityProfile.Preset)),
+                    "-rc", "vbr_peak",
+                    "-b:v", [string]$VideoBitrate,
+                    "-maxrate", [string]$VideoBitrate,
+                    "-bufsize", $videoBufferSize,
+                    "-pix_fmt", "yuv420p"
+                )
+            }
+            else {
+                @(
                     "-quality", (Get-VhsMp4AmfPreset -Preset ([string]$QualityProfile.Preset)),
                     "-rc", "qvbr",
                     "-qvbr_quality_level", "$([int]$QualityProfile.Crf)",
                     "-pix_fmt", "yuv420p"
                 )
-                Summary = "Encode engine: AMD AMF"
+            }
+            return [pscustomobject]@{
+                RequestedMode = $normalizedMode
+                ResolvedMode = $normalizedMode
+                VideoCodec = if ($codecFamily -eq "hevc") { "hevc_amf" } else { "h264_amf" }
+                VideoTag = [string]$QualityProfile.VideoTag
+                VideoArguments = $videoArguments
+                Summary = if ($videoBitrateProvided) { "Encode engine: AMD AMF | target bitrate $VideoBitrate" } else { "Encode engine: AMD AMF" }
                 FallbackUsed = $false
             }
         }
@@ -2552,6 +2610,8 @@ function New-VhsMp4RunContext {
         [string]$Preset = "slow",
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [string]$FfmpegPath = "ffmpeg",
         [switch]$SplitOutput,
         [ValidateRange(0.001, 1024)]
@@ -2592,7 +2652,7 @@ function New-VhsMp4RunContext {
             $resolvedEncoderInventory = Get-VhsMp4EncoderInventory -FfmpegPath $resolvedFfmpegPath
         }
     }
-    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $normalizedEncoderMode -EncoderInventory $resolvedEncoderInventory
+    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $normalizedEncoderMode -EncoderInventory $resolvedEncoderInventory -VideoBitrate $VideoBitrate
     $trimWindow = Get-VhsMp4TrimWindow -TrimStart $TrimStart -TrimEnd $TrimEnd
     $filterSummary = Get-VhsMp4FilterSummary -Deinterlace $Deinterlace -Denoise $Denoise -RotateFlip $RotateFlip -ScaleMode $ScaleMode -AudioNormalize:$AudioNormalize
 
@@ -2610,6 +2670,7 @@ function New-VhsMp4RunContext {
         Crf = $profile.Crf
         Preset = $profile.Preset
         AudioBitrate = $profile.AudioBitrate
+        VideoBitrate = [string]$VideoBitrate
         FfmpegPath = $resolvedFfmpegPath
         SplitOutput = [bool]$SplitOutput
         MaxPartGb = $MaxPartGb
@@ -2668,8 +2729,14 @@ function Get-VhsMp4SplitVideoMaxKbps {
         [ValidateSet("Universal MP4 H.264", "Small MP4 H.264", "High Quality MP4 H.264", "HEVC H.265 Smaller", "Standard VHS", "Smaller File", "Better Quality", "Custom")]
         [string]$QualityMode = "Standard VHS",
         [ValidateRange(0, 51)]
-        [int]$Crf = 22
+        [int]$Crf = 22,
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = ""
     )
+
+    if (-not [string]::IsNullOrWhiteSpace([string]$VideoBitrate)) {
+        return (Convert-VhsMp4BitrateToKbps -Bitrate $VideoBitrate)
+    }
 
     switch ($QualityMode) {
         { $_ -in @("Small MP4 H.264", "Smaller File", "HEVC H.265 Smaller") } { return 3000 }
@@ -2715,13 +2782,15 @@ function Get-VhsMp4EstimatedOutputInfo {
         [int]$Crf = 22,
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [switch]$SplitOutput,
         [ValidateRange(0.001, 1024)]
         [double]$MaxPartGb = 3.8
     )
 
     $profile = Get-VhsMp4QualityProfile -QualityMode $QualityMode -Crf $Crf -AudioBitrate $AudioBitrate
-    $videoKbps = Get-VhsMp4SplitVideoMaxKbps -QualityMode $profile.QualityMode -Crf $profile.Crf
+    $videoKbps = Get-VhsMp4SplitVideoMaxKbps -QualityMode $profile.QualityMode -Crf $profile.Crf -VideoBitrate $VideoBitrate
     $audioKbps = Convert-VhsMp4BitrateToKbps -Bitrate $profile.AudioBitrate
     $totalKbps = [Math]::Max(1, $videoKbps + $audioKbps)
     $estimatedBytes = [Math]::Ceiling(($DurationSeconds * $totalKbps * 1000.0) / 8.0)
@@ -2749,6 +2818,7 @@ function Get-VhsMp4EstimatedOutputInfo {
         DurationSeconds = $DurationSeconds
         VideoKbps = $videoKbps
         AudioKbps = $audioKbps
+        TotalKbps = $totalKbps
         EstimatedBytes = [int64]$estimatedBytes
         EstimatedGb = [Math]::Round($estimatedGb, 2)
         PartCount = $partCount
@@ -2845,6 +2915,8 @@ function Write-VhsMp4CustomerReport {
         [string]$Preset = "slow",
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [bool]$SplitOutput = $false,
         [ValidateRange(0.001, 1024)]
         [double]$MaxPartGb = 3.8,
@@ -2869,6 +2941,9 @@ function Write-VhsMp4CustomerReport {
     $lines.Add("Quality mode: $QualityMode")
     $lines.Add("CRF: $Crf")
     $lines.Add("Preset: $Preset")
+    if (-not [string]::IsNullOrWhiteSpace([string]$VideoBitrate)) {
+        $lines.Add("Video bitrate: $VideoBitrate")
+    }
     $lines.Add("Audio bitrate: $AudioBitrate")
     $lines.Add("Split output: $splitText")
     if (-not [string]::IsNullOrWhiteSpace($FilterSummary)) {
@@ -3252,6 +3327,8 @@ function Get-VhsMp4FfmpegArguments {
         [string]$Preset = "slow",
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [string]$ProgressPath,
         [ValidateRange(0, 86400)]
         [int]$SampleSeconds = 0,
@@ -3279,8 +3356,9 @@ function Get-VhsMp4FfmpegArguments {
     )
 
     $profile = Get-VhsMp4QualityProfile -QualityMode $QualityMode -Crf $Crf -Preset $Preset -AudioBitrate $AudioBitrate
-    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $EncoderMode -EncoderInventory $EncoderInventory
-    $videoMaxKbps = Get-VhsMp4SplitVideoMaxKbps -QualityMode $profile.QualityMode -Crf $profile.Crf
+    $encoderPlan = Resolve-VhsMp4VideoEncoderPlan -QualityProfile $profile -EncoderMode $EncoderMode -EncoderInventory $EncoderInventory -VideoBitrate $VideoBitrate
+    $videoMaxKbps = Get-VhsMp4SplitVideoMaxKbps -QualityMode $profile.QualityMode -Crf $profile.Crf -VideoBitrate $VideoBitrate
+    $hasVideoBitrateOverride = -not [string]::IsNullOrWhiteSpace([string]$VideoBitrate)
     $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments
     $videoFilterChain = Get-VhsMp4VideoFilterChain -InputObject $VideoInfo -CropState $CropState -AspectMode $AspectMode -Deinterlace $Deinterlace -Denoise $Denoise -RotateFlip $RotateFlip -ScaleMode $ScaleMode
     $audioFilterChain = Get-VhsMp4AudioFilterChain -AudioNormalize:$AudioNormalize
@@ -3345,7 +3423,7 @@ function Get-VhsMp4FfmpegArguments {
         "-b:a", $profile.AudioBitrate
     )
 
-    if ($SplitOutput) {
+    if ($SplitOutput -and -not $hasVideoBitrateOverride) {
         $ffmpegArgs += @("-maxrate", "$($videoMaxKbps)k", "-bufsize", "$($videoMaxKbps * 2)k")
     }
 
@@ -3488,6 +3566,8 @@ function Start-VhsMp4FileProcess {
         [string]$Preset = "slow",
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [string]$ProgressPath,
         [ValidateRange(0, 86400)]
         [int]$SampleSeconds = 0,
@@ -3521,6 +3601,7 @@ function Start-VhsMp4FileProcess {
         -Crf $Crf `
         -Preset $Preset `
         -AudioBitrate $AudioBitrate `
+        -VideoBitrate $VideoBitrate `
         -ProgressPath $ProgressPath `
         -SampleSeconds $SampleSeconds `
         -SplitOutput:$SplitOutput `
@@ -3626,6 +3707,8 @@ function Invoke-VhsMp4File {
         [string]$Preset = "slow",
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [ValidateRange(0, 86400)]
         [int]$SampleSeconds = 0,
         [switch]$SplitOutput,
@@ -3657,6 +3740,7 @@ function Invoke-VhsMp4File {
         -Crf $Crf `
         -Preset $Preset `
         -AudioBitrate $AudioBitrate `
+        -VideoBitrate $VideoBitrate `
         -SampleSeconds $SampleSeconds `
         -SplitOutput:$SplitOutput `
         -MaxPartGb $MaxPartGb `
@@ -3689,6 +3773,8 @@ function Invoke-VhsMp4Batch {
         [string]$Preset = "slow",
         [ValidatePattern("^\d+k$")]
         [string]$AudioBitrate = "160k",
+        [ValidatePattern('^$|^\d+k$')]
+        [string]$VideoBitrate = "",
         [string]$FfmpegPath = "ffmpeg",
         [switch]$SplitOutput,
         [ValidateRange(0.001, 1024)]
@@ -3720,6 +3806,7 @@ function Invoke-VhsMp4Batch {
         -Crf $Crf `
         -Preset $Preset `
         -AudioBitrate $AudioBitrate `
+        -VideoBitrate $VideoBitrate `
         -FfmpegPath $FfmpegPath `
         -SplitOutput:$SplitOutput `
         -MaxPartGb $MaxPartGb `
@@ -3747,7 +3834,8 @@ function Invoke-VhsMp4Batch {
 
     Write-VhsMp4Log -LogPath $context.LogPath -Message "InputDir: $($context.InputDir)" -OnLog $OnLog
     Write-VhsMp4Log -LogPath $context.LogPath -Message "OutputDir: $($context.OutputDir)" -OnLog $OnLog
-    Write-VhsMp4Log -LogPath $context.LogPath -Message "QualityMode: $($context.QualityMode) | CRF: $($context.Crf) | Preset: $($context.Preset) | AudioBitrate: $($context.AudioBitrate)" -OnLog $OnLog
+    $videoBitrateLogText = if (-not [string]::IsNullOrWhiteSpace([string]$context.VideoBitrate)) { [string]$context.VideoBitrate } else { "auto/CRF" }
+    Write-VhsMp4Log -LogPath $context.LogPath -Message "QualityMode: $($context.QualityMode) | CRF: $($context.Crf) | Preset: $($context.Preset) | VideoBitrate: $videoBitrateLogText | AudioBitrate: $($context.AudioBitrate)" -OnLog $OnLog
     Write-VhsMp4Log -LogPath $context.LogPath -Message "SplitOutput: $($context.SplitOutput) | MaxPartGb: $($context.MaxPartGb)" -OnLog $OnLog
     if (-not [string]::IsNullOrWhiteSpace([string]$context.FilterSummary)) {
         Write-VhsMp4Log -LogPath $context.LogPath -Message "Filters: $($context.FilterSummary)" -OnLog $OnLog
@@ -3816,6 +3904,7 @@ function Invoke-VhsMp4Batch {
                 -Crf $context.Crf `
                 -Preset $context.Preset `
                 -AudioBitrate $context.AudioBitrate `
+                -VideoBitrate $context.VideoBitrate `
                 -SplitOutput:([bool]$context.SplitOutput) `
                 -MaxPartGb $context.MaxPartGb `
                 -TrimStart $itemTrimPlan.StartText `
@@ -3881,6 +3970,7 @@ function Invoke-VhsMp4Batch {
         -Crf $context.Crf `
         -Preset $context.Preset `
         -AudioBitrate $context.AudioBitrate `
+        -VideoBitrate $context.VideoBitrate `
         -SplitOutput ([bool]$context.SplitOutput) `
         -MaxPartGb $context.MaxPartGb `
         -FilterSummary $context.FilterSummary
