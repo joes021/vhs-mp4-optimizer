@@ -272,6 +272,7 @@ Napomene:
 - Help -> About pokazuje Current version, Release tag, Install type, Install path i GitHub repo.
 - Help -> Check for Updates proverava poslednji GitHub release i pita pre download/install toka.
 "@
+$null = New-Item -ItemType Directory -Path $releaseRootFull -Force
 Set-Content -LiteralPath (Join-Path $releaseRootFull "README - kako se koristi.txt") -Value $readme -Encoding UTF8
 
 $checklist = @"
