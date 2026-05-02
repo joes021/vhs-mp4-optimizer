@@ -35,6 +35,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         Item = item;
         Timeline = item.TimelineProject ?? TimelineEditorService.CreateInitial(item.MediaInfo);
         Segments = new ObservableCollection<TimelineSegment>(Timeline.Segments);
+        TimelineBlocks = new ObservableCollection<TimelineBlockItemViewModel>();
         AspectModes = new ObservableCollection<string>(AspectModesService());
 
         var transformSettings = item.TransformSettings ?? new ItemTransformSettings();
@@ -55,6 +56,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
         MoveRightCommand = new AsyncRelayCommand(MoveRightAsync, CanModifySelectedSegment);
         SaveToQueueCommand = new RelayCommand(SaveToQueue);
+        SelectTimelineBlockCommand = new RelayCommand<TimelineBlockItemViewModel?>(SelectTimelineBlock);
 
         GoToStartCommand = new AsyncRelayCommand(GoToStartAsync);
         GoToEndCommand = new AsyncRelayCommand(GoToEndAsync);
@@ -87,6 +89,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
     public ObservableCollection<TimelineSegment> Segments { get; }
 
+    public ObservableCollection<TimelineBlockItemViewModel> TimelineBlocks { get; }
+
     public ObservableCollection<string> AspectModes { get; }
 
     public IAsyncRelayCommand CutSegmentCommand { get; }
@@ -100,6 +104,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     public IAsyncRelayCommand MoveRightCommand { get; }
 
     public IRelayCommand SaveToQueueCommand { get; }
+
+    public IRelayCommand<TimelineBlockItemViewModel?> SelectTimelineBlockCommand { get; }
 
     public IAsyncRelayCommand GoToStartCommand { get; }
 
@@ -196,6 +202,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         RippleDeleteCommand.NotifyCanExecuteChanged();
         MoveLeftCommand.NotifyCanExecuteChanged();
         MoveRightCommand.NotifyCanExecuteChanged();
+        SyncSelectedTimelineBlock();
     }
 
     partial void OnPreviewVirtualSecondsChanged(double value) => UpdatePreviewTimeTexts();
@@ -336,11 +343,46 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
             Segments.Add(segment);
         }
 
+        var selectedBlockId = TimelineBlocks.FirstOrDefault(block => block.IsSelected)?.SegmentId ?? selectedId;
+        TimelineBlocks.Clear();
+        foreach (var block in TimelineStripService.BuildBlocks(Timeline))
+        {
+            TimelineBlocks.Add(new TimelineBlockItemViewModel
+            {
+                SegmentId = block.SegmentId,
+                Kind = block.Kind,
+                TimelineStartSeconds = block.TimelineStartSeconds,
+                WidthPixels = block.WidthPixels,
+                Label = block.Label,
+                Summary = block.Summary,
+                IsSelected = block.SegmentId == selectedBlockId
+            });
+        }
+
         SelectedSegment = Segments.FirstOrDefault(segment => segment.Id == selectedId) ?? Segments.FirstOrDefault();
         var keepDuration = TimelineEditorService.GetKeptDurationSeconds(Timeline);
         PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
         UpdatePreviewTimeTexts();
+    }
+
+    private void SelectTimelineBlock(TimelineBlockItemViewModel? block)
+    {
+        if (block is null)
+        {
+            return;
+        }
+
+        var segment = Segments.FirstOrDefault(candidate => candidate.Id == block.SegmentId);
+        if (segment is null)
+        {
+            return;
+        }
+
+        SelectedSegment = segment;
+        PreviewVirtualSeconds = Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum);
+        EditorHint = $"{block.Label} segment selektovan | {block.Summary}";
+        _ = LoadPreviewAsync();
     }
 
     private async Task LoadPreviewAsync()
@@ -480,6 +522,15 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     }
 
     private static IReadOnlyList<string> AspectModesService() => CoreServices.AspectModes.All;
+
+    private void SyncSelectedTimelineBlock()
+    {
+        var selectedId = SelectedSegment?.Id;
+        foreach (var block in TimelineBlocks)
+        {
+            block.IsSelected = block.SegmentId == selectedId;
+        }
+    }
 
     private async void PlaybackTimerOnTick(object? sender, EventArgs e)
     {
