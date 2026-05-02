@@ -84,12 +84,12 @@
 
                 <StackPanel Grid.Column="7" Spacing="8" VerticalAlignment="Bottom">
                     <Button Content="Open Output" />
-                    <Button Content="Test Sample" />
+                    <Button Content="Test Sample" Command="{Binding TestSampleCommand}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="8" Spacing="8" VerticalAlignment="Bottom">
-                    <Button Content="Open Log" />
-                    <Button Content="Start Conversion" Classes="accent" />
+                    <Button Content="Open Sample" Command="{Binding OpenSampleCommand}" />
+                    <Button Content="Start Conversion" Classes="accent" Command="{Binding StartConversionCommand}" />
                     <Button Content="Pause / Resume" />
                 </StackPanel>
             </Grid>

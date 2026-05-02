@@ -1,5 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -13,6 +15,7 @@ namespace VhsMp4Optimizer.App.ViewModels;
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly SourceScanService _sourceScanService = new();
+    private readonly FfmpegConversionService _conversionService = new();
     private readonly string? _ffmpegPath;
 
     public MainWindowViewModel()
@@ -24,6 +27,9 @@ public partial class MainWindowViewModel : ViewModelBase
         ScaleModes = new ObservableCollection<string>(CoreServices.ScaleModes.All);
         AspectModes = new ObservableCollection<string>(CoreServices.AspectModes.All);
         ScanFilesCommand = new AsyncRelayCommand(ScanFilesAsync);
+        StartConversionCommand = new AsyncRelayCommand(StartConversionAsync);
+        TestSampleCommand = new AsyncRelayCommand(TestSampleAsync);
+        OpenSampleCommand = new RelayCommand(OpenSample, CanOpenSample);
 
         if (!string.IsNullOrWhiteSpace(_ffmpegPath))
         {
@@ -74,6 +80,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private QueueItemSummary? _selectedQueueItem;
 
+    [ObservableProperty]
+    private string? _lastSamplePath;
+
     public ObservableCollection<QueueItemSummary> QueueItems { get; }
 
     public ObservableCollection<PropertyComparisonRow> ComparisonRows { get; }
@@ -86,7 +95,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public IAsyncRelayCommand ScanFilesCommand { get; }
 
-    partial void OnSelectedQueueItemChanged(QueueItemSummary? value) => RefreshComparisonRows(value);
+    public IAsyncRelayCommand StartConversionCommand { get; }
+
+    public IAsyncRelayCommand TestSampleCommand { get; }
+
+    public IRelayCommand OpenSampleCommand { get; }
+
+    partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
+    {
+        RefreshComparisonRows(value);
+        OpenSampleCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnQualityModeChanged(string value) => RefreshPlannedOutput();
 
@@ -97,6 +116,8 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnVideoBitrateChanged(string value) => RefreshPlannedOutput();
 
     partial void OnAudioBitrateChanged(string value) => RefreshPlannedOutput();
+
+    partial void OnLastSamplePathChanged(string? value) => OpenSampleCommand.NotifyCanExecuteChanged();
 
     private Task ScanFilesAsync()
     {
@@ -134,6 +155,108 @@ public partial class MainWindowViewModel : ViewModelBase
         return Task.CompletedTask;
     }
 
+    private async Task StartConversionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        {
+            StatusMessage = "ffmpeg nije dostupan za Start Conversion.";
+            return;
+        }
+
+        if (QueueItems.Count == 0)
+        {
+            StatusMessage = "Nema queue stavki za obradu.";
+            return;
+        }
+
+        var settings = BuildSettings();
+        var items = QueueItems.ToList();
+        var converted = 0;
+
+        foreach (var item in items)
+        {
+            if (item.MediaInfo is null)
+            {
+                continue;
+            }
+
+            ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "processing"));
+            ProgressMessage = $"Obrada: {currentDisplayName(item)}";
+
+            try
+            {
+                var request = new ConversionRequest
+                {
+                    MediaInfo = item.MediaInfo,
+                    Settings = settings,
+                    OutputPath = item.OutputPath,
+                    TimelineProject = item.TimelineProject
+                };
+
+                await _conversionService.ConvertAsync(_ffmpegPath, request);
+                converted++;
+                ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done"));
+            }
+            catch (Exception ex)
+            {
+                ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "failed"));
+                StatusMessage = $"Greska pri obradi {item.SourceFile}: {ex.Message}";
+                LogMessage = ex.ToString();
+                return;
+            }
+        }
+
+        ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted}";
+        StatusMessage = $"Start Conversion zavrsen. Done: {converted}";
+        LogMessage = $"Output folder: {OutputFolder}";
+    }
+
+    private async Task TestSampleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        {
+            StatusMessage = "ffmpeg nije dostupan za Test Sample.";
+            return;
+        }
+
+        if (SelectedQueueItem?.MediaInfo is null)
+        {
+            StatusMessage = "Izaberi fajl iz queue liste za Test Sample.";
+            return;
+        }
+
+        var sampleDirectory = Path.Combine(OutputFolder, "samples");
+        Directory.CreateDirectory(sampleDirectory);
+        var samplePath = Path.Combine(sampleDirectory, $"{Path.GetFileNameWithoutExtension(SelectedQueueItem.SourceFile)}-sample.mp4");
+        var start = SelectedQueueItem.MediaInfo.DurationSeconds > 150 ? 30 : 0;
+        var duration = Math.Min(120, Math.Max(10, SelectedQueueItem.MediaInfo.DurationSeconds - start));
+        var settings = BuildSettings();
+
+        try
+        {
+            await _conversionService.ConvertAsync(_ffmpegPath, new ConversionRequest
+            {
+                MediaInfo = SelectedQueueItem.MediaInfo,
+                Settings = settings,
+                OutputPath = samplePath,
+                TimelineProject = SelectedQueueItem.TimelineProject,
+                IsSample = true,
+                SampleStartSeconds = start,
+                SampleDurationSeconds = duration
+            });
+
+            LastSamplePath = samplePath;
+            StatusMessage = $"Test Sample napravljen: {Path.GetFileName(samplePath)}";
+            ProgressMessage = $"Sample start: {start:0}s | duration: {duration:0}s";
+            LogMessage = samplePath;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Test Sample nije uspeo: {ex.Message}";
+            LogMessage = ex.ToString();
+        }
+    }
+
     private void RefreshPlannedOutput()
     {
         if (QueueItems.Count == 0)
@@ -162,7 +285,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 Audio = item.Audio,
                 Status = item.Status,
                 MediaInfo = item.MediaInfo,
-                PlannedOutput = planned
+                PlannedOutput = planned,
+                TimelineProject = item.TimelineProject
             });
         }
 
@@ -249,4 +373,65 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedQueueItem = QueueItems.FirstOrDefault(item => string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase));
         StatusMessage = "Timeline izmene su vracene u batch queue.";
     }
+
+    private void ReplaceItem(string sourcePath, Func<QueueItemSummary, QueueItemSummary> updater)
+    {
+        for (var index = 0; index < QueueItems.Count; index++)
+        {
+            var item = QueueItems[index];
+            if (!string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var updated = updater(item);
+            QueueItems[index] = updated;
+            if (SelectedQueueItem?.SourcePath == sourcePath)
+            {
+                SelectedQueueItem = updated;
+            }
+
+            return;
+        }
+    }
+
+    private static QueueItemSummary CloneItem(QueueItemSummary source, MediaInfo? mediaInfo, OutputPlanSummary? plannedOutput, string status)
+    {
+        return new QueueItemSummary
+        {
+            SourceFile = source.SourceFile,
+            SourcePath = source.SourcePath,
+            OutputFile = source.OutputFile,
+            OutputPath = source.OutputPath,
+            OutputPattern = source.OutputPattern,
+            Container = source.Container,
+            Resolution = source.Resolution,
+            Duration = source.Duration,
+            Video = source.Video,
+            Audio = source.Audio,
+            Status = status,
+            MediaInfo = mediaInfo,
+            PlannedOutput = plannedOutput,
+            TimelineProject = source.TimelineProject
+        };
+    }
+
+    private bool CanOpenSample()
+        => !string.IsNullOrWhiteSpace(LastSamplePath) && File.Exists(LastSamplePath);
+
+    private void OpenSample()
+    {
+        if (!CanOpenSample())
+        {
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = LastSamplePath!,
+            UseShellExecute = true
+        });
+    }
+
+    private static string currentDisplayName(QueueItemSummary item) => item.SourceFile;
 }
