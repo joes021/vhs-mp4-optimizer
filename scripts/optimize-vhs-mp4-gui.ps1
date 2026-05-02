@@ -2791,8 +2791,14 @@ function Update-ActionButtons {
         $trimEndTextBox.Enabled = $canEditSelectedItem
         $previewTimeTextBox.Enabled = $canEditSelectedItem
         $previewTimelineTrackBar.Enabled = $canEditSelectedItem -and $hasTimelineDuration
+        $jumpToPreviewStartButton.Enabled = $canEditSelectedItem -and $hasTimelineDuration
+        $jumpToPreviewEndButton.Enabled = $canEditSelectedItem -and $hasTimelineDuration
         $previousFrameButton.Enabled = $canEditSelectedItem
         $nextFrameButton.Enabled = $canEditSelectedItem
+        $previous25FramesButton.Enabled = $canEditSelectedItem
+        $next25FramesButton.Enabled = $canEditSelectedItem
+        $previous250FramesButton.Enabled = $canEditSelectedItem
+        $next250FramesButton.Enabled = $canEditSelectedItem
         $setTrimStartButton.Enabled = $canEditSelectedItem
         $setTrimEndButton.Enabled = $canEditSelectedItem
         if (Get-Variable -Name "autoPreviewCheckBox" -ErrorAction SilentlyContinue) {
@@ -4504,13 +4510,15 @@ function Update-PreviewTimeline {
 function Move-PreviewFrame {
     param(
         [int]$Direction,
+        [int]$FrameCount = 1,
         [bool]$RefreshImage = $true
     )
 
     $frameRate = Get-SelectedPreviewFrameRate
     $frameStep = if ($frameRate -gt 0) { 1.0 / $frameRate } else { 1.0 / 25.0 }
     $currentSeconds = Get-PreviewPositionSeconds
-    Set-PreviewPositionSeconds -Seconds ($currentSeconds + ($Direction * $frameStep)) -RefreshImage:$RefreshImage
+    $effectiveFrameCount = [Math]::Max(1, [int]$FrameCount)
+    Set-PreviewPositionSeconds -Seconds ($currentSeconds + ($Direction * $frameStep * $effectiveFrameCount)) -RefreshImage:$RefreshImage
 }
 
 function Move-PreviewSeconds {
@@ -4705,6 +4713,7 @@ function Save-SelectedTrimSegments {
     Update-SelectedTrimGridRow -Item $item
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
+    Update-ActionButtons
     Add-LogLine ($LogAction + ": " + $item.SourceName + " | " + $trimPlan.Summary)
 }
 
@@ -4817,7 +4826,7 @@ function Set-TrimPointFromPreview {
     }
 
     Update-CutRangeDisplay
-    $previewStatusLabel.Text = "Cut point: " + $Point + " = " + $previewTime + " | Apply Trim za potvrdu."
+    $previewStatusLabel.Text = "Cut point: " + $Point + " = " + $previewTime + " | Cut Segment za potvrdu."
 }
 
 function Invoke-PreviewKeyboardShortcut {
@@ -5165,7 +5174,7 @@ function Open-PlayerTrimWindow {
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
-    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 36)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 72)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
     $playerRootLayout.Controls.Add($playerWorkspaceLayout, 0, 1)
 
@@ -5271,13 +5280,43 @@ function Open-PlayerTrimWindow {
     $nextPlayerFrameButton.AutoSize = $true
     $transportFlow.Controls.Add($nextPlayerFrameButton)
 
+    $previous25PlayerFramesButton = New-Object System.Windows.Forms.Button
+    $previous25PlayerFramesButton.Text = "< 25 Frames"
+    $previous25PlayerFramesButton.AutoSize = $true
+    $transportFlow.Controls.Add($previous25PlayerFramesButton)
+
+    $next25PlayerFramesButton = New-Object System.Windows.Forms.Button
+    $next25PlayerFramesButton.Text = "25 Frames >"
+    $next25PlayerFramesButton.AutoSize = $true
+    $transportFlow.Controls.Add($next25PlayerFramesButton)
+
+    $previous250PlayerFramesButton = New-Object System.Windows.Forms.Button
+    $previous250PlayerFramesButton.Text = "< 250 Frames"
+    $previous250PlayerFramesButton.AutoSize = $true
+    $transportFlow.Controls.Add($previous250PlayerFramesButton)
+
+    $next250PlayerFramesButton = New-Object System.Windows.Forms.Button
+    $next250PlayerFramesButton.Text = "250 Frames >"
+    $next250PlayerFramesButton.AutoSize = $true
+    $transportFlow.Controls.Add($next250PlayerFramesButton)
+
+    $jumpToPlayerStartButton = New-Object System.Windows.Forms.Button
+    $jumpToPlayerStartButton.Text = "Start"
+    $jumpToPlayerStartButton.AutoSize = $true
+    $transportFlow.Controls.Add($jumpToPlayerStartButton)
+
+    $jumpToPlayerEndButton = New-Object System.Windows.Forms.Button
+    $jumpToPlayerEndButton.Text = "End"
+    $jumpToPlayerEndButton.AutoSize = $true
+    $transportFlow.Controls.Add($jumpToPlayerEndButton)
+
     $setPlayerTrimStartButton = New-Object System.Windows.Forms.Button
-    $setPlayerTrimStartButton.Text = "Set Start"
+    $setPlayerTrimStartButton.Text = "IN Point"
     $setPlayerTrimStartButton.AutoSize = $true
     $transportFlow.Controls.Add($setPlayerTrimStartButton)
 
     $setPlayerTrimEndButton = New-Object System.Windows.Forms.Button
-    $setPlayerTrimEndButton.Text = "Set End"
+    $setPlayerTrimEndButton.Text = "END Point"
     $setPlayerTrimEndButton.AutoSize = $true
     $transportFlow.Controls.Add($setPlayerTrimEndButton)
 
@@ -5341,7 +5380,7 @@ function Open-PlayerTrimWindow {
     $playerTrimGroupBox.Controls.Add($trimLayout)
 
     $playerTrimStartLabel = New-Object System.Windows.Forms.Label
-    $playerTrimStartLabel.Text = "Start (HH:MM:SS)"
+    $playerTrimStartLabel.Text = "IN Point (HH:MM:SS)"
     $playerTrimStartLabel.Dock = "Fill"
     $playerTrimStartLabel.TextAlign = "MiddleLeft"
     $trimLayout.Controls.Add($playerTrimStartLabel, 0, 0)
@@ -5351,7 +5390,7 @@ function Open-PlayerTrimWindow {
     $trimLayout.Controls.Add($playerTrimStartTextBox, 1, 0)
 
     $playerTrimEndLabel = New-Object System.Windows.Forms.Label
-    $playerTrimEndLabel.Text = "End (HH:MM:SS)"
+    $playerTrimEndLabel.Text = "END Point (HH:MM:SS)"
     $playerTrimEndLabel.Dock = "Fill"
     $playerTrimEndLabel.TextAlign = "MiddleLeft"
     $trimLayout.Controls.Add($playerTrimEndLabel, 0, 1)
@@ -5367,12 +5406,12 @@ function Open-PlayerTrimWindow {
     $trimLayout.SetColumnSpan($trimActionsFlow, 2)
 
     $applyPlayerTrimButton = New-Object System.Windows.Forms.Button
-    $applyPlayerTrimButton.Text = "Apply Trim"
+    $applyPlayerTrimButton.Text = "Cut Segment"
     $applyPlayerTrimButton.AutoSize = $true
     $trimActionsFlow.Controls.Add($applyPlayerTrimButton)
 
     $addPlayerSegmentButton = New-Object System.Windows.Forms.Button
-    $addPlayerSegmentButton.Text = "Cut Segment"
+    $addPlayerSegmentButton.Text = "Add Cut"
     $addPlayerSegmentButton.AutoSize = $true
     $trimActionsFlow.Controls.Add($addPlayerSegmentButton)
 
@@ -6323,7 +6362,10 @@ function Open-PlayerTrimWindow {
     }
 
     function Move-PlayerFrame {
-        param([int]$Direction)
+        param(
+            [int]$Direction,
+            [int]$FrameCount = 1
+        )
         Commit-PlayerPreviewTimeText -RequestPreview $false
         $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $localState.PreviewPositionSeconds -Default 0.0
         $frameRate = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.FrameRate -Default 25.0
@@ -6331,7 +6373,8 @@ function Open-PlayerTrimWindow {
             $frameRate = 25.0
         }
         $runtimeState.FrameRate = $frameRate
-        Navigate-PlayerPositionSeconds -Seconds ($currentSeconds + ($Direction * (1.0 / $frameRate)))
+        $effectiveFrameCount = [Math]::Max(1, [int]$FrameCount)
+        Navigate-PlayerPositionSeconds -Seconds ($currentSeconds + ($Direction * (1.0 / $frameRate) * $effectiveFrameCount))
     }
 
     function Set-PlayerTrimPoint {
@@ -6401,7 +6444,7 @@ function Open-PlayerTrimWindow {
             Set-PlayerTrimDialogDirty
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Apply Trim", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Cut Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
         }
     }
 
@@ -6652,8 +6695,11 @@ function Open-PlayerTrimWindow {
     }
 
     function Move-PlayerFrame {
-        param([int]$Direction)
-        $playerRuntime.'Move-PlayerFrame'($Direction)
+        param(
+            [int]$Direction,
+            [int]$FrameCount = 1
+        )
+        $playerRuntime.'Move-PlayerFrame'($Direction, $FrameCount)
     }
 
     function Set-PlayerTrimPoint {
@@ -6862,6 +6908,30 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Move-PlayerFrame'(1)
     }).GetNewClosure())
 
+    $previous25PlayerFramesButton.Add_Click(({
+        $playerRuntime.'Move-PlayerFrame'(-1, 25)
+    }).GetNewClosure())
+
+    $next25PlayerFramesButton.Add_Click(({
+        $playerRuntime.'Move-PlayerFrame'(1, 25)
+    }).GetNewClosure())
+
+    $previous250PlayerFramesButton.Add_Click(({
+        $playerRuntime.'Move-PlayerFrame'(-1, 250)
+    }).GetNewClosure())
+
+    $next250PlayerFramesButton.Add_Click(({
+        $playerRuntime.'Move-PlayerFrame'(1, 250)
+    }).GetNewClosure())
+
+    $jumpToPlayerStartButton.Add_Click(({
+        $playerRuntime.'Navigate-PlayerPositionSeconds'(0)
+    }).GetNewClosure())
+
+    $jumpToPlayerEndButton.Add_Click(({
+        $playerRuntime.'Navigate-PlayerPositionSeconds'([double]$runtimeState.DurationSeconds)
+    }).GetNewClosure())
+
     $playerPreviewFrameButton.Add_Click(({
         $playerRuntime.'Commit-PlayerPreviewTimeText'($true)
     }).GetNewClosure())
@@ -7045,6 +7115,7 @@ function Apply-PlayerTrimWindowResult {
     }
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
+    Update-ActionButtons
     $trimSummary = Get-PlanItemPropertyText -Item $Item -Name "TrimSummary" -Default "--"
     $cropSummary = Get-PlanItemPropertyText -Item $Item -Name "CropSummary" -Default "--"
     Add-LogLine ("Player / Trim saved: " + $Item.SourceName + " | Trim " + $trimSummary + " | Crop " + $cropSummary)
@@ -7342,10 +7413,11 @@ function Apply-SelectedTrim {
         Update-SelectedTrimGridRow -Item $item
         Update-MediaInfoPanel
         Update-PreviewTrimPanel
-        Add-LogLine ("Apply Trim: " + $item.SourceName + " | " + $trimPlan.Summary)
+        Update-ActionButtons
+        Add-LogLine ("Cut Segment: " + $item.SourceName + " | " + $trimPlan.Summary)
     }
     catch {
-        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Apply Trim", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Cut Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
     }
 }
 
@@ -7369,6 +7441,7 @@ function Clear-SelectedTrim {
     Update-PlanItemTrimEstimate -Item $item
     Update-SelectedTrimGridRow -Item $item
     Update-MediaInfoPanel
+    Update-ActionButtons
     $previewStatusLabel.Text = "Selected file: " + $item.SourceName
     if (Get-Variable -Name "selectedFileSummaryLabel" -ErrorAction SilentlyContinue) {
         $selectedFileSummaryLabel.Text = "Range: -- | Crop: " + (Get-PlanItemCropStatusText -Item $item) + " | Aspect: " + (Get-PlanItemAspectStatusText -Item $item) + " | Open Player za detaljnu obradu."
@@ -10215,7 +10288,7 @@ $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Wind
 $trimGroupBox.Controls.Add($trimLayout)
 
 $trimStartLabel = New-Object System.Windows.Forms.Label
-$trimStartLabel.Text = "Start (HH:MM:SS)"
+$trimStartLabel.Text = "IN Point (HH:MM:SS)"
 $trimStartLabel.Dock = "Fill"
 $trimStartLabel.TextAlign = "MiddleLeft"
 $trimStartLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
@@ -10227,7 +10300,7 @@ $trimStartTextBox.Margin = New-Object System.Windows.Forms.Padding(0, 4, 8, 0)
 $trimLayout.Controls.Add($trimStartTextBox, 1, 0)
 
 $trimEndLabel = New-Object System.Windows.Forms.Label
-$trimEndLabel.Text = "End (HH:MM:SS)"
+$trimEndLabel.Text = "END Point (HH:MM:SS)"
 $trimEndLabel.Dock = "Fill"
 $trimEndLabel.TextAlign = "MiddleLeft"
 $trimEndLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
@@ -10247,12 +10320,12 @@ $trimLayout.Controls.Add($trimButtonsFlow, 0, 1)
 $trimLayout.SetColumnSpan($trimButtonsFlow, 4)
 
 $applyTrimButton = New-Object System.Windows.Forms.Button
-$applyTrimButton.Text = "Apply Trim"
+$applyTrimButton.Text = "Cut Segment"
 $applyTrimButton.AutoSize = $true
 $trimButtonsFlow.Controls.Add($applyTrimButton)
 
 $addSegmentButton = New-Object System.Windows.Forms.Button
-$addSegmentButton.Text = "Cut Segment"
+$addSegmentButton.Text = "Add Cut"
 $addSegmentButton.AutoSize = $true
 $trimButtonsFlow.Controls.Add($addSegmentButton)
 
@@ -10289,16 +10362,18 @@ $trimLayout.SetColumnSpan($cutRangeLabel, 4)
 
 $previewControlsPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $previewControlsPanel.Dock = "Fill"
-$previewControlsPanel.ColumnCount = 5
-$previewControlsPanel.RowCount = 4
+$previewControlsPanel.ColumnCount = 6
+$previewControlsPanel.RowCount = 5
 $previewControlsPanel.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 96)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
+$previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 104)))
 $previewControlsPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 92)))
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
+$previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 $previewControlsPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 
@@ -10307,7 +10382,7 @@ $previewWorkspaceLayout.Dock = "Fill"
 $previewWorkspaceLayout.ColumnCount = 1
 $previewWorkspaceLayout.RowCount = 3
 $previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 124)))
+$previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 152)))
 $previewWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
 
 $previewTimeLabel = New-Object System.Windows.Forms.Label
@@ -10329,18 +10404,19 @@ $previewPositionLabel.Dock = "Fill"
 $previewPositionLabel.TextAlign = "MiddleLeft"
 $previewPositionLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 6, 0)
 $previewControlsPanel.Controls.Add($previewPositionLabel, 2, 0)
+$previewControlsPanel.SetColumnSpan($previewPositionLabel, 2)
 
 $previewFrameButton = New-Object System.Windows.Forms.Button
 $previewFrameButton.Text = "Preview Frame"
 $previewFrameButton.Dock = "Fill"
 $previewFrameButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
-$previewControlsPanel.Controls.Add($previewFrameButton, 3, 0)
+$previewControlsPanel.Controls.Add($previewFrameButton, 4, 0)
 
 $openVideoButton = New-Object System.Windows.Forms.Button
 $openVideoButton.Text = "Open Video"
 $openVideoButton.Dock = "Fill"
 $openVideoButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
-$previewControlsPanel.Controls.Add($openVideoButton, 4, 0)
+$previewControlsPanel.Controls.Add($openVideoButton, 5, 0)
 
 $previewTimelineTrackBar = New-Object System.Windows.Forms.TrackBar
 $previewTimelineTrackBar.Dock = "Fill"
@@ -10352,38 +10428,74 @@ $previewTimelineTrackBar.SmallChange = 1
 $previewTimelineTrackBar.LargeChange = $script:PreviewTimelineScale
 $previewTimelineTrackBar.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 0)
 $previewControlsPanel.Controls.Add($previewTimelineTrackBar, 0, 1)
-$previewControlsPanel.SetColumnSpan($previewTimelineTrackBar, 5)
+$previewControlsPanel.SetColumnSpan($previewTimelineTrackBar, 6)
+
+$jumpToPreviewStartButton = New-Object System.Windows.Forms.Button
+$jumpToPreviewStartButton.Text = "Start"
+$jumpToPreviewStartButton.Dock = "Fill"
+$jumpToPreviewStartButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
+$previewControlsPanel.Controls.Add($jumpToPreviewStartButton, 0, 2)
+
+$previous250FramesButton = New-Object System.Windows.Forms.Button
+$previous250FramesButton.Text = "< 250 Frames"
+$previous250FramesButton.Dock = "Fill"
+$previous250FramesButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
+$previewControlsPanel.Controls.Add($previous250FramesButton, 1, 2)
+
+$previous25FramesButton = New-Object System.Windows.Forms.Button
+$previous25FramesButton.Text = "< 25 Frames"
+$previous25FramesButton.Dock = "Fill"
+$previous25FramesButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
+$previewControlsPanel.Controls.Add($previous25FramesButton, 2, 2)
+
+$next25FramesButton = New-Object System.Windows.Forms.Button
+$next25FramesButton.Text = "25 Frames >"
+$next25FramesButton.Dock = "Fill"
+$next25FramesButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
+$previewControlsPanel.Controls.Add($next25FramesButton, 3, 2)
+
+$next250FramesButton = New-Object System.Windows.Forms.Button
+$next250FramesButton.Text = "250 Frames >"
+$next250FramesButton.Dock = "Fill"
+$next250FramesButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
+$previewControlsPanel.Controls.Add($next250FramesButton, 4, 2)
+
+$jumpToPreviewEndButton = New-Object System.Windows.Forms.Button
+$jumpToPreviewEndButton.Text = "End"
+$jumpToPreviewEndButton.Dock = "Fill"
+$jumpToPreviewEndButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
+$previewControlsPanel.Controls.Add($jumpToPreviewEndButton, 5, 2)
 
 $previousFrameButton = New-Object System.Windows.Forms.Button
 $previousFrameButton.Text = "< Frame"
 $previousFrameButton.Dock = "Fill"
 $previousFrameButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
-$previewControlsPanel.Controls.Add($previousFrameButton, 0, 2)
+$previewControlsPanel.Controls.Add($previousFrameButton, 0, 3)
 
 $nextFrameButton = New-Object System.Windows.Forms.Button
 $nextFrameButton.Text = "Frame >"
 $nextFrameButton.Dock = "Fill"
 $nextFrameButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
-$previewControlsPanel.Controls.Add($nextFrameButton, 1, 2)
+$previewControlsPanel.Controls.Add($nextFrameButton, 1, 3)
 
 $autoPreviewCheckBox = New-Object System.Windows.Forms.CheckBox
 $autoPreviewCheckBox.Text = "Auto preview"
 $autoPreviewCheckBox.Checked = $true
 $autoPreviewCheckBox.Dock = "Fill"
 $autoPreviewCheckBox.Margin = New-Object System.Windows.Forms.Padding(0, 3, 6, 0)
-$previewControlsPanel.Controls.Add($autoPreviewCheckBox, 2, 2)
+$previewControlsPanel.Controls.Add($autoPreviewCheckBox, 2, 3)
 
 $setTrimStartButton = New-Object System.Windows.Forms.Button
-$setTrimStartButton.Text = "Set Start"
+$setTrimStartButton.Text = "IN Point"
 $setTrimStartButton.Dock = "Fill"
 $setTrimStartButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
-$previewControlsPanel.Controls.Add($setTrimStartButton, 3, 2)
+$previewControlsPanel.Controls.Add($setTrimStartButton, 4, 3)
 
 $setTrimEndButton = New-Object System.Windows.Forms.Button
-$setTrimEndButton.Text = "Set End"
+$setTrimEndButton.Text = "END Point"
 $setTrimEndButton.Dock = "Fill"
 $setTrimEndButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
-$previewControlsPanel.Controls.Add($setTrimEndButton, 4, 2)
+$previewControlsPanel.Controls.Add($setTrimEndButton, 5, 3)
 
 $previewCropOverlayLabel = New-Object System.Windows.Forms.Label
 $previewCropOverlayLabel.Text = "Crop overlay: --"
@@ -10391,8 +10503,8 @@ $previewCropOverlayLabel.Dock = "Fill"
 $previewCropOverlayLabel.TextAlign = "MiddleLeft"
 $previewCropOverlayLabel.Font = New-Object System.Drawing.Font("Consolas", 8)
 $previewCropOverlayLabel.ForeColor = [System.Drawing.SystemColors]::GrayText
-$previewControlsPanel.Controls.Add($previewCropOverlayLabel, 0, 3)
-$previewControlsPanel.SetColumnSpan($previewCropOverlayLabel, 5)
+$previewControlsPanel.Controls.Add($previewCropOverlayLabel, 0, 4)
+$previewControlsPanel.SetColumnSpan($previewCropOverlayLabel, 6)
 
 $previewMarkersPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $previewMarkersPanel.Dock = "Fill"
@@ -10728,6 +10840,30 @@ $previousFrameButton.Add_Click({
 
 $nextFrameButton.Add_Click({
     Move-PreviewFrame -Direction 1
+})
+
+$previous25FramesButton.Add_Click({
+    Move-PreviewFrame -Direction -1 -FrameCount 25
+})
+
+$next25FramesButton.Add_Click({
+    Move-PreviewFrame -Direction 1 -FrameCount 25
+})
+
+$previous250FramesButton.Add_Click({
+    Move-PreviewFrame -Direction -1 -FrameCount 250
+})
+
+$next250FramesButton.Add_Click({
+    Move-PreviewFrame -Direction 1 -FrameCount 250
+})
+
+$jumpToPreviewStartButton.Add_Click({
+    Set-PreviewPositionSeconds -Seconds 0 -RefreshImage:$true
+})
+
+$jumpToPreviewEndButton.Add_Click({
+    Set-PreviewPositionSeconds -Seconds (Get-SelectedPreviewDurationSeconds) -RefreshImage:$true
 })
 
 $setTrimStartButton.Add_Click({
