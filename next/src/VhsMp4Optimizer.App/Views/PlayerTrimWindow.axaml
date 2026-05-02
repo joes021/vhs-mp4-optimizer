@@ -62,7 +62,7 @@
         </Border>
 
         <Border Grid.Row="1" Grid.Column="1" Background="#141A24" BorderBrush="#2A3346" BorderThickness="1" CornerRadius="8" Padding="12">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="Timeline segments" />
                 <TextBlock Grid.Row="1" Margin="0,6,0,12" Opacity="0.8" Text="{Binding TimelineSummary}" />
 
@@ -86,18 +86,24 @@
                 </Grid>
 
                 <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+                    <Button Content="Detect Crop" Command="{Binding DetectCropCommand}" />
+                    <Button Content="Auto Crop" Command="{Binding AutoCropCommand}" />
+                    <Button Content="Clear Crop" Command="{Binding ClearCropCommand}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="6" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
                     <Button Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
                     <Button Content="Delete" Command="{Binding DeleteSegmentCommand}" />
                     <Button Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
                 </StackPanel>
 
-                <StackPanel Grid.Row="6" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+                <StackPanel Grid.Row="7" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
                     <Button Content="Move Left" Command="{Binding MoveLeftCommand}" />
                     <Button Content="Move Right" Command="{Binding MoveRightCommand}" />
                     <Button Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
                 </StackPanel>
 
-                <ListBox Grid.Row="7" ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}">
+                <ListBox Grid.Row="8" ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="core:TimelineSegment">
                             <Border Margin="0,0,0,8" Padding="10" CornerRadius="6" Background="#1A2231">

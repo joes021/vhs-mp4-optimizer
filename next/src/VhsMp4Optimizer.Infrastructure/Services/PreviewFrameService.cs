@@ -6,7 +6,7 @@ namespace VhsMp4Optimizer.Infrastructure.Services;
 
 public sealed class PreviewFrameService
 {
-    public async Task<string?> RenderPreviewAsync(string ffmpegPath, MediaInfo mediaInfo, double sourceSeconds, CancellationToken cancellationToken = default)
+    public async Task<string?> RenderPreviewAsync(string ffmpegPath, MediaInfo mediaInfo, double sourceSeconds, ItemTransformSettings? transformSettings = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
         {
@@ -27,13 +27,20 @@ public sealed class PreviewFrameService
             return previewPath;
         }
 
-        var args = new[]
+        var filters = new List<string>();
+        if (transformSettings?.Crop is { HasCrop: true } crop)
+        {
+            filters.Add($"crop=in_w-{crop.Left + crop.Right}:in_h-{crop.Top + crop.Bottom}:{crop.Left}:{crop.Top}");
+        }
+
+        filters.Add("scale=960:-2");
+        var args = new List<string>
         {
             "-y",
             "-ss", safeSeconds.ToString("0.###", CultureInfo.InvariantCulture),
             "-i", mediaInfo.SourcePath,
             "-frames:v", "1",
-            "-vf", "scale=960:-2",
+            "-vf", string.Join(",", filters),
             previewPath
         };
 

@@ -19,6 +19,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 {
     private readonly Action<TimelineProject, ItemTransformSettings?> _saveAction;
     private readonly PreviewFrameService _previewFrameService = new();
+    private readonly CropDetectService _cropDetectService = new();
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
 
@@ -61,6 +62,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         Back250FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(-250));
         Forward250FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(250));
         RefreshPreviewCommand = new AsyncRelayCommand(LoadPreviewAsync);
+        DetectCropCommand = new AsyncRelayCommand(DetectCropAsync);
+        AutoCropCommand = new AsyncRelayCommand(DetectCropAsync);
+        ClearCropCommand = new AsyncRelayCommand(ClearCropAsync);
         SetInPointCommand = new RelayCommand(SetInPointFromCurrent);
         SetOutPointCommand = new RelayCommand(SetOutPointFromCurrent);
 
@@ -103,6 +107,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     public IAsyncRelayCommand Forward250FramesCommand { get; }
 
     public IAsyncRelayCommand RefreshPreviewCommand { get; }
+
+    public IAsyncRelayCommand DetectCropCommand { get; }
+
+    public IAsyncRelayCommand AutoCropCommand { get; }
+
+    public IAsyncRelayCommand ClearCropCommand { get; }
 
     public IRelayCommand SetInPointCommand { get; }
 
@@ -303,7 +313,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         try
         {
             EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
-            var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, token).ConfigureAwait(false);
+            var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token).ConfigureAwait(false);
             if (token.IsCancellationRequested || string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
             {
                 return;
@@ -323,6 +333,47 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         {
             EditorHint = $"Preview nije uspeo: {ex.Message}";
         }
+    }
+
+    private async Task DetectCropAsync()
+    {
+        if (Item.MediaInfo is null || string.IsNullOrWhiteSpace(_ffmpegPath))
+        {
+            EditorHint = "Crop detect trazi media info i ffmpeg.";
+            return;
+        }
+
+        try
+        {
+            EditorHint = "Crop detect radi...";
+            var detected = await _cropDetectService.DetectAsync(_ffmpegPath, Item.MediaInfo).ConfigureAwait(false);
+            if (detected is null)
+            {
+                EditorHint = "Crop detect nije nasao pouzdan crop za ovaj fajl.";
+                return;
+            }
+
+            CropLeft = detected.Left;
+            CropTop = detected.Top;
+            CropRight = detected.Right;
+            CropBottom = detected.Bottom;
+            EditorHint = $"Crop detect: L{CropLeft} T{CropTop} R{CropRight} B{CropBottom}";
+            await LoadPreviewAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            EditorHint = $"Crop detect nije uspeo: {ex.Message}";
+        }
+    }
+
+    private async Task ClearCropAsync()
+    {
+        CropLeft = 0;
+        CropTop = 0;
+        CropRight = 0;
+        CropBottom = 0;
+        EditorHint = "Crop je ociscen.";
+        await LoadPreviewAsync().ConfigureAwait(false);
     }
 
     private void UpdatePreviewTimeTexts()
