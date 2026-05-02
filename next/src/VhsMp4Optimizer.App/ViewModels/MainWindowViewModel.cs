@@ -17,6 +17,7 @@ public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly SourceScanService _sourceScanService = new();
     private readonly FfmpegConversionService _conversionService = new();
+    private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly string? _ffmpegPath;
     private IReadOnlyList<string>? _explicitSourcePaths;
     private bool _suppressSelectionReset;
@@ -37,6 +38,7 @@ public partial class MainWindowViewModel : ViewModelBase
         SkipSelectedCommand = new RelayCommand(SkipSelected);
         RetryFailedCommand = new RelayCommand(RetryFailedItems);
         ClearCompletedCommand = new RelayCommand(ClearCompletedItems);
+        SplitSelectedCopyCommand = new AsyncRelayCommand(SplitSelectedCopyAsync, CanSplitSelectedCopy);
 
         if (!string.IsNullOrWhiteSpace(_ffmpegPath))
         {
@@ -133,10 +135,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public IRelayCommand ClearCompletedCommand { get; }
 
+    public IAsyncRelayCommand SplitSelectedCopyCommand { get; }
+
     partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
     {
         RefreshComparisonRows(value);
         OpenSampleCommand.NotifyCanExecuteChanged();
+        SplitSelectedCopyCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnInputFolderChanged(string value)
@@ -508,6 +513,28 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = "Timeline izmene su vracene u batch queue.";
     }
 
+    public async Task JoinFilesCopyAsync(IReadOnlyList<string> inputPaths, string outputPath)
+    {
+        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        {
+            StatusMessage = "ffmpeg nije dostupan za copy join.";
+            return;
+        }
+
+        try
+        {
+            await _copyOnlyMediaToolsService.JoinAsync(_ffmpegPath, inputPaths, outputPath);
+            StatusMessage = $"Copy join zavrsen: {Path.GetFileName(outputPath)}";
+            ProgressMessage = $"Join fajlova: {inputPaths.Count} -> {outputPath}";
+            LogMessage = outputPath;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Copy join nije uspeo: {ex.Message}";
+            LogMessage = ex.ToString();
+        }
+    }
+
     private void SkipSelected()
     {
         if (SelectedQueueItem is null)
@@ -540,6 +567,35 @@ public partial class MainWindowViewModel : ViewModelBase
 
         SelectedQueueItem = QueueItems.FirstOrDefault();
         StatusMessage = $"Done stavke su uklonjene iz queue liste | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+    }
+
+    private bool CanSplitSelectedCopy()
+        => !string.IsNullOrWhiteSpace(_ffmpegPath) && SelectedQueueItem?.MediaInfo is not null;
+
+    private async Task SplitSelectedCopyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ffmpegPath) || SelectedQueueItem?.MediaInfo is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var createdFiles = await _copyOnlyMediaToolsService.SplitAsync(
+                _ffmpegPath,
+                SelectedQueueItem.MediaInfo,
+                OutputFolder,
+                MaxPartGb);
+
+            StatusMessage = $"Copy split zavrsen: {createdFiles.Count} delova za {SelectedQueueItem.SourceFile}";
+            ProgressMessage = string.Join(Environment.NewLine, createdFiles.Select(Path.GetFileName));
+            LogMessage = string.Join(Environment.NewLine, createdFiles);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Copy split nije uspeo: {ex.Message}";
+            LogMessage = ex.ToString();
+        }
     }
 
     private void ReplaceItem(string sourcePath, Func<QueueItemSummary, QueueItemSummary> updater)
