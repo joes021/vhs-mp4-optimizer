@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VhsMp4Optimizer.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="VhsMp4Optimizer.App.Views.AboutWindow"
+        x:DataType="vm:AboutWindowViewModel"
+        Width="640"
+        Height="340"
+        CanResize="False"
+        Title="About VHS MP4 Optimizer Next">
+
+    <Border Background="#141A24" Padding="18">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnDefinitions="150,*" RowSpacing="10" ColumnSpacing="12">
+            <TextBlock Grid.ColumnSpan="2" FontSize="24" FontWeight="SemiBold" Text="{Binding AppName}" />
+
+            <TextBlock Grid.Row="1" FontWeight="SemiBold" Text="Version" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Version}" TextWrapping="Wrap" />
+
+            <TextBlock Grid.Row="2" FontWeight="SemiBold" Text="Install path" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding InstallPath}" TextWrapping="Wrap" />
+
+            <TextBlock Grid.Row="3" FontWeight="SemiBold" Text="User guide" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding GuidePath}" TextWrapping="Wrap" />
+
+            <TextBlock Grid.Row="4" FontWeight="SemiBold" Text="Migration branch" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding BranchHint}" TextWrapping="Wrap" />
+
+            <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Opacity="0.8" TextWrapping="Wrap"
+                       Text="Nova Avalonia baza postepeno preuzima batch, trim, crop i timeline logiku iz starog sistema. Ovaj About prozor i User Guide sada vec zive i u novoj aplikaciji." />
+        </Grid>
+    </Border>
+</Window>

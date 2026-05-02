@@ -1,8 +1,12 @@
+using System;
 using System.Linq;
 using System.IO;
+using System.Reflection;
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using VhsMp4Optimizer.App.ViewModels;
+using VhsMp4Optimizer.Infrastructure.Services;
 
 namespace VhsMp4Optimizer.App.Views;
 
@@ -160,5 +164,49 @@ public partial class MainWindow : Window
         {
             await viewModel.JoinFilesCopyAsync(localPaths, outputPath);
         }
+    }
+
+    private void OpenUserGuideClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var guidePath = DesktopGuideLocator.FindGuidePath(AppContext.BaseDirectory);
+        if (string.IsNullOrWhiteSpace(guidePath) || !File.Exists(guidePath))
+        {
+            viewModel.StatusMessage = "User guide nije pronadjen uz novu Avalonia aplikaciju.";
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = guidePath,
+            UseShellExecute = true
+        });
+    }
+
+    private void OpenAboutClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var assembly = typeof(MainWindow).Assembly;
+        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
+            ?? "dev";
+        var guidePath = DesktopGuideLocator.FindGuidePath(AppContext.BaseDirectory) ?? "Guide nije pronadjen";
+
+        var window = new AboutWindow
+        {
+            DataContext = new AboutWindowViewModel
+            {
+                AppName = "VHS MP4 Optimizer Next",
+                Version = version,
+                InstallPath = AppContext.BaseDirectory,
+                GuidePath = guidePath,
+                BranchHint = "codex/avalonia-migration"
+            }
+        };
+
+        window.ShowDialog(this);
     }
 }
