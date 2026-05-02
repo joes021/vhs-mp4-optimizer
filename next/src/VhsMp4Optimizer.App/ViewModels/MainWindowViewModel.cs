@@ -70,10 +70,22 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _aspectMode = CoreServices.AspectModes.Auto;
 
     [ObservableProperty]
+    private bool _splitOutput;
+
+    [ObservableProperty]
+    private double _maxPartGb = 3.8;
+
+    [ObservableProperty]
     private string _videoBitrate = "5000k";
 
     [ObservableProperty]
     private string _audioBitrate = "160k";
+
+    [ObservableProperty]
+    private string _sampleStartText = string.Empty;
+
+    [ObservableProperty]
+    private string _sampleDurationText = string.Empty;
 
     [ObservableProperty]
     private string _statusMessage;
@@ -138,6 +150,10 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnVideoBitrateChanged(string value) => RefreshPlannedOutput();
 
     partial void OnAudioBitrateChanged(string value) => RefreshPlannedOutput();
+
+    partial void OnSplitOutputChanged(bool value) => RefreshPlannedOutput();
+
+    partial void OnMaxPartGbChanged(double value) => RefreshPlannedOutput();
 
     partial void OnLastSamplePathChanged(string? value) => OpenSampleCommand.NotifyCanExecuteChanged();
 
@@ -253,8 +269,8 @@ public partial class MainWindowViewModel : ViewModelBase
         var sampleDirectory = Path.Combine(OutputFolder, "samples");
         Directory.CreateDirectory(sampleDirectory);
         var samplePath = Path.Combine(sampleDirectory, $"{Path.GetFileNameWithoutExtension(SelectedQueueItem.SourceFile)}-sample.mp4");
-        var start = SelectedQueueItem.MediaInfo.DurationSeconds > 150 ? 30 : 0;
-        var duration = Math.Min(120, Math.Max(10, SelectedQueueItem.MediaInfo.DurationSeconds - start));
+        var start = ResolveSampleStartSeconds(SelectedQueueItem.MediaInfo.DurationSeconds);
+        var duration = ResolveSampleDurationSeconds(SelectedQueueItem.MediaInfo.DurationSeconds, start);
         var settings = BuildSettings();
 
         try
@@ -272,8 +288,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             LastSamplePath = samplePath;
             StatusMessage = $"Test Sample napravljen: {Path.GetFileName(samplePath)}";
-            ProgressMessage = $"Sample start: {start:0}s | duration: {duration:0}s";
-            LogMessage = samplePath;
+        ProgressMessage = $"Sample start: {start:0}s | duration: {duration:0}s";
+        LogMessage = samplePath;
         }
         catch (Exception ex)
         {
@@ -338,6 +354,9 @@ public partial class MainWindowViewModel : ViewModelBase
         AspectMode = AspectMode,
         VideoBitrate = VideoBitrate,
         AudioBitrate = AudioBitrate
+        ,
+        SplitOutput = SplitOutput,
+        MaxPartGb = MaxPartGb
     };
 
     public void UseSelectedFiles(IReadOnlyList<string> filePaths)
@@ -439,6 +458,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     EncodeEngineText = planned.EncodeEngineText,
                     EstimatedSizeText = planned.EstimatedSizeText,
                     UsbNoteText = planned.UsbNoteText,
+                    SplitModeText = planned.SplitModeText,
                     AspectText = planned.AspectText,
                     OutputWidth = planned.OutputWidth,
                     OutputHeight = planned.OutputHeight
@@ -545,4 +565,49 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static string currentDisplayName(QueueItemSummary item) => item.SourceFile;
+
+    private double ResolveSampleStartSeconds(double sourceDurationSeconds)
+    {
+        if (TryParseTimeText(SampleStartText, out var explicitStart))
+        {
+            return Math.Max(0, Math.Min(sourceDurationSeconds, explicitStart));
+        }
+
+        return sourceDurationSeconds > 150 ? 30 : 0;
+    }
+
+    private double ResolveSampleDurationSeconds(double sourceDurationSeconds, double startSeconds)
+    {
+        if (TryParseTimeText(SampleDurationText, out var explicitDuration))
+        {
+            var clamped = Math.Max(1, explicitDuration);
+            return Math.Min(clamped, Math.Max(1, sourceDurationSeconds - startSeconds));
+        }
+
+        return Math.Min(120, Math.Max(10, sourceDurationSeconds - startSeconds));
+    }
+
+    private static bool TryParseTimeText(string value, out double seconds)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            seconds = 0;
+            return false;
+        }
+
+        if (TimeSpan.TryParse(value, out var parsedTime))
+        {
+            seconds = parsedTime.TotalSeconds;
+            return true;
+        }
+
+        if (double.TryParse(value, out var parsedSeconds))
+        {
+            seconds = parsedSeconds;
+            return true;
+        }
+
+        seconds = 0;
+        return false;
+    }
 }

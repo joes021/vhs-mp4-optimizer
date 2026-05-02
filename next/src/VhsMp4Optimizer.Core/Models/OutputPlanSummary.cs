@@ -14,6 +14,7 @@ public sealed class OutputPlanSummary
     public required string EncodeEngineText { get; init; }
     public required string EstimatedSizeText { get; init; }
     public required string UsbNoteText { get; init; }
+    public required string SplitModeText { get; init; }
     public required string AspectText { get; init; }
     public required int OutputWidth { get; init; }
     public required int OutputHeight { get; init; }

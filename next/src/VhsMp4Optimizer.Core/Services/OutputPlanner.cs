@@ -24,6 +24,9 @@ public static class OutputPlanner
             : estimatedGb >= 3.95
                 ? "FAT32 rizik: ukljuci Split output ili koristi exFAT"
                 : "FAT32 OK; exFAT OK";
+        var splitMode = settings.SplitOutput
+            ? $"Split ON | max {settings.MaxPartGb:0.0} GB | delova: {partCount}"
+            : "Split OFF";
 
         var rateControlText = string.IsNullOrWhiteSpace(settings.VideoBitrate)
             ? $"CRF {profile.Crf} | preset {profile.Preset}"
@@ -43,6 +46,7 @@ public static class OutputPlanner
             EncodeEngineText = "CPU / libx264",
             EstimatedSizeText = $"Estimate: {estimatedGb:F2} GB",
             UsbNoteText = $"USB note: {usbNote}",
+            SplitModeText = splitMode,
             AspectText = aspectLabel,
             OutputWidth = outputWidth,
             OutputHeight = outputHeight

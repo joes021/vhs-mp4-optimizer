@@ -98,7 +98,7 @@
         </Border>
 
         <Border Grid.Row="2" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="12">
-            <Grid ColumnDefinitions="180,180,160,160,160,*" ColumnSpacing="10">
+            <Grid ColumnDefinitions="150,150,150,150,130,130,140,*" ColumnSpacing="10">
                 <StackPanel Spacing="4">
                     <TextBlock Classes="section-title" Text="Advanced Settings" Margin="0,0,0,4" />
                     <TextBlock Text="Deinterlace" Opacity="0.75" />
@@ -128,12 +128,24 @@
                 <StackPanel Grid.Column="4" Spacing="4">
                     <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
                     <TextBlock Text="Split output" Opacity="0.75" />
-                    <CheckBox Content="Enable split" />
+                    <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
                 </StackPanel>
-                <StackPanel Grid.Column="5" Spacing="6">
+                <StackPanel Grid.Column="5" Spacing="4">
+                    <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
+                    <TextBlock Text="Max part GB" Opacity="0.75" />
+                    <NumericUpDown Value="{Binding MaxPartGb}" Minimum="0.5" Maximum="25" Increment="0.1" FormatString="0.0" />
+                </StackPanel>
+                <StackPanel Grid.Column="6" Spacing="4">
+                    <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
+                    <TextBlock Text="Sample start" Opacity="0.75" />
+                    <TextBox Text="{Binding SampleStartText}" PlaceholderText="00:00:30" />
+                    <TextBlock Text="Sample duration" Opacity="0.75" />
+                    <TextBox Text="{Binding SampleDurationText}" PlaceholderText="00:02:00" />
+                </StackPanel>
+                <StackPanel Grid.Column="7" Spacing="6">
                     <TextBlock Classes="section-title" Text="Migration note" Margin="0,0,0,4" />
                     <TextBlock TextWrapping="Wrap" Opacity="0.8"
-                               Text="Ovo je nova Avalonia osnova. Sledece faze prenose scan, queue planiranje, player/trim i timeline editor iz stare verzije u novi cross-platform sistem." />
+                               Text="Nova Avalonia baza sada vec radi scan, planned output, konverziju, test sample i timeline export za jedan fajl. Sledece faze dodaju crop/aspect parity i pravi preview engine." />
                 </StackPanel>
             </Grid>
         </Border>
@@ -181,8 +193,14 @@
             <Border Grid.Column="2" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="10">
                 <Grid RowDefinitions="Auto,*">
                     <TextBlock Classes="section-title" Text="Input / Planned output" />
-                    <ScrollViewer Grid.Row="1">
-                        <ItemsControl ItemsSource="{Binding ComparisonRows}">
+                    <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="8">
+                        <Grid ColumnDefinitions="1.1*,1.7*,1.7*" ColumnSpacing="10">
+                            <TextBlock Text="Parametar" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="Input" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="2" Text="Planned output" FontWeight="SemiBold" />
+                        </Grid>
+                        <ScrollViewer Grid.Row="1">
+                            <ItemsControl ItemsSource="{Binding ComparisonRows}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="core:PropertyComparisonRow">
                                     <Grid ColumnDefinitions="1.1*,1.7*,1.7*" ColumnSpacing="10" Margin="0,0,0,8">
@@ -192,8 +210,9 @@
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>

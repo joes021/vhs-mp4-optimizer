@@ -52,4 +52,54 @@ public sealed class OutputPlanningTests
         Assert.Equal("H.264", plan.VideoCodecLabel);
         Assert.Contains("FAT32", plan.UsbNoteText);
     }
+
+    [Fact]
+    public void Should_include_split_summary_when_split_output_is_enabled()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            Container = "avi",
+            DurationSeconds = 7200,
+            DurationText = "02:00:00",
+            SizeBytes = 5_900_000_000,
+            SizeText = "5.49 GB",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 180000,
+            VideoBitrateKbps = 8864,
+            VideoBitrateText = "8864 kbps",
+            AudioCodec = "pcm_s16le",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo | 720x576 | 4:3 | 25 fps",
+            AudioSummary = "pcm_s16le | 2 ch | 48000 Hz | 1536 kbps"
+        };
+
+        var settings = new BatchSettings
+        {
+            QualityMode = QualityModes.StandardVhs,
+            ScaleMode = ScaleModes.Pal576p,
+            AudioBitrate = "160k",
+            SplitOutput = true,
+            MaxPartGb = 3.8
+        };
+
+        var plan = OutputPlanner.Build(mediaInfo, settings);
+
+        Assert.Contains("Split ON", plan.SplitModeText);
+        Assert.Contains("delova", plan.SplitModeText);
+        Assert.Contains("USB note", plan.UsbNoteText);
+    }
 }

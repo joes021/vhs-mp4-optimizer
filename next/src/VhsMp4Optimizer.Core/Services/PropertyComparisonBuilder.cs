@@ -29,7 +29,9 @@ public static class PropertyComparisonBuilder
             new PropertyComparisonRow { Label = "Resolution", InputValue = input.Resolution, OutputValue = output.Resolution },
             new PropertyComparisonRow { Label = "Duration", InputValue = input.DurationText, OutputValue = output.DurationText },
             new PropertyComparisonRow { Label = "FPS", InputValue = input.FrameRateText, OutputValue = input.FrameRateText },
+            new PropertyComparisonRow { Label = "Frames", InputValue = input.FrameCount.ToString(), OutputValue = "--" },
             new PropertyComparisonRow { Label = "Aspect", InputValue = input.DisplayAspectRatio, OutputValue = output.AspectText },
+            new PropertyComparisonRow { Label = "SAR", InputValue = input.SampleAspectRatio, OutputValue = "--" },
             new PropertyComparisonRow { Label = "Video codec", InputValue = input.VideoCodec, OutputValue = output.VideoCodecLabel },
             new PropertyComparisonRow { Label = "Video bitrate", InputValue = input.VideoBitrateText, OutputValue = output.VideoBitrateComparisonText },
             new PropertyComparisonRow { Label = "Audio codec", InputValue = input.AudioCodec, OutputValue = output.AudioCodecText },
@@ -37,6 +39,7 @@ public static class PropertyComparisonBuilder
             new PropertyComparisonRow { Label = "Total bitrate", InputValue = input.OverallBitrateText, OutputValue = output.BitrateText },
             new PropertyComparisonRow { Label = "Encode engine", InputValue = "--", OutputValue = output.EncodeEngineText },
             new PropertyComparisonRow { Label = "Input size / estimate", InputValue = input.SizeText, OutputValue = output.EstimatedSizeText },
+            new PropertyComparisonRow { Label = "Split output", InputValue = "--", OutputValue = output.SplitModeText },
             new PropertyComparisonRow { Label = "USB note", InputValue = "--", OutputValue = output.UsbNoteText }
         };
     }
