@@ -1332,6 +1332,111 @@ exit 0
     assert abs(payload["AfterPosition"] - 22.54) < 0.001
 
 
+def test_vhs_gui_modeless_player_save_to_queue_can_compute_trim_plan(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    modeless_return_pattern = re.compile(r"(?ms)^\s*if \(\$Modeless\) \{\s*return \$dialog\s*\}\s*")
+    modeless_return_replacement = """
+    if ($Modeless) {
+        $script:TestPlayerRuntime = $playerRuntime
+        $script:TestPlayerTrimStartTextBox = $playerTrimStartTextBox
+        $script:TestPlayerTrimEndTextBox = $playerTrimEndTextBox
+        return $dialog
+    }
+"""
+    gui_script, modeless_replacements = modeless_return_pattern.subn(modeless_return_replacement, gui_script, count=1)
+    assert modeless_replacements == 1
+
+    probe = f"""
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mov,mp4,m4a,3gp,3g2,mj2'
+    ContainerLongName = 'QuickTime / MOV'
+    DurationSeconds = 2602.2
+    DurationText = '00:43:22.2'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '720x576'
+    DisplayAspectRatio = '4:3'
+    SampleAspectRatio = '16:15'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 65055
+    VideoBitrateText = '8864 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+}}
+$script:ResolvedFfmpegPath = ''
+$script:SavedTrimResult = $null
+$dialog = @(Open-PlayerTrimWindow -Item $item -Modeless -OnSave {{
+    param($savedItem, $saveResult)
+    $script:SavedTrimResult = $saveResult
+}}) | Where-Object {{ $null -ne $_ -and $_ -is [System.Windows.Forms.Form] }} | Select-Object -Last 1
+$dialog.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$script:TestPlayerTrimStartTextBox.Text = '00:00:46'
+$script:TestPlayerTrimEndTextBox.Text = '00:43:15.8'
+$script:TestPlayerRuntime.'Save-PlayerTrimChanges'($false)
+[System.Windows.Forms.Application]::DoEvents()
+$summary = [string]$script:SavedTrimResult.TrimState.TrimSummary
+$duration = [double]$script:SavedTrimResult.TrimState.TrimDurationSeconds
+$dialog.Close()
+[System.Windows.Forms.Application]::DoEvents()
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    Summary = $summary
+    Duration = $duration
+}} | ConvertTo-Json -Depth 4
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+exit 0
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-player-modeless-save-trim-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["Summary"] == "00:00:46 - 00:43:15.8"
+    assert abs(payload["Duration"] - 52.4) < 0.1
+
+
 def test_vhs_gui_player_trim_timeline_uses_value_changed_navigation_handler() -> None:
     script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
 
@@ -1684,8 +1789,8 @@ def test_vhs_gui_has_manual_timeline_frame_and_cut_controls() -> None:
         "Set-TrimPointFromPreview -Point Start",
         "Set-TrimPointFromPreview -Point End",
         '$applyTrimButton.Text = "Cut Segment"',
-        '$setTrimStartButton.Text = "IN Point"',
-        '$setTrimEndButton.Text = "END Point"',
+        '$setTrimStartButton.Text = "In Point"',
+        '$setTrimEndButton.Text = "Out Point"',
         '$previous25FramesButton.Text = "< 25 Frames"',
         '$next25FramesButton.Text = "25 Frames >"',
         '$previous250FramesButton.Text = "< 250 Frames"',
@@ -1747,21 +1852,23 @@ def test_vhs_gui_contains_player_trim_window_tokens() -> None:
         "Preview mode",
         "ElementHost",
         "MediaElement",
-        "Play / Pause",
         "Save-PlayerTrimChanges",
         '$applyPlayerTrimButton.Text = "Cut Segment"',
-        '$setPlayerTrimStartButton.Text = "IN Point"',
-        '$setPlayerTrimEndButton.Text = "END Point"',
+        '$playPlayerButton.Text = "Play"',
+        '$pausePlayerButton.Text = "Pause"',
+        '$setPlayerTrimStartButton.Text = "In Point"',
+        '$setPlayerTrimEndButton.Text = "Out Point"',
         '$previous25PlayerFramesButton.Text = "< 25 Frames"',
         '$next25PlayerFramesButton.Text = "25 Frames >"',
         '$previous250PlayerFramesButton.Text = "< 250 Frames"',
         '$next250PlayerFramesButton.Text = "250 Frames >"',
         '$jumpToPlayerStartButton.Text = "Start"',
-        '$jumpToPlayerEndButton.Text = "End"',
         "Move-PlayerFrame'(-1, 25)",
         "Move-PlayerFrame'(1, 25)",
         "Move-PlayerFrame'(-1, 250)",
         "Move-PlayerFrame'(1, 250)",
+        "GetEffectiveTrimPlan = ${function:Get-VhsMp4EffectiveTrimPlan}",
+        "& $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds",
     ]:
         assert token in script, f"missing player/trim token: {token}"
 

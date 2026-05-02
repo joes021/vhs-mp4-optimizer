@@ -5260,63 +5260,58 @@ function Open-PlayerTrimWindow {
     $transportFlow.WrapContents = $true
     $playerWorkspaceLayout.Controls.Add($transportFlow, 0, 3)
 
-    $playPauseButton = New-Object System.Windows.Forms.Button
-    $playPauseButton.Text = "Play / Pause"
-    $playPauseButton.AutoSize = $true
-    $transportFlow.Controls.Add($playPauseButton)
-
-    $stopPlaybackButton = New-Object System.Windows.Forms.Button
-    $stopPlaybackButton.Text = "Stop"
-    $stopPlaybackButton.AutoSize = $true
-    $transportFlow.Controls.Add($stopPlaybackButton)
-
-    $previousPlayerFrameButton = New-Object System.Windows.Forms.Button
-    $previousPlayerFrameButton.Text = "< Frame"
-    $previousPlayerFrameButton.AutoSize = $true
-    $transportFlow.Controls.Add($previousPlayerFrameButton)
-
-    $nextPlayerFrameButton = New-Object System.Windows.Forms.Button
-    $nextPlayerFrameButton.Text = "Frame >"
-    $nextPlayerFrameButton.AutoSize = $true
-    $transportFlow.Controls.Add($nextPlayerFrameButton)
-
-    $previous25PlayerFramesButton = New-Object System.Windows.Forms.Button
-    $previous25PlayerFramesButton.Text = "< 25 Frames"
-    $previous25PlayerFramesButton.AutoSize = $true
-    $transportFlow.Controls.Add($previous25PlayerFramesButton)
-
-    $next25PlayerFramesButton = New-Object System.Windows.Forms.Button
-    $next25PlayerFramesButton.Text = "25 Frames >"
-    $next25PlayerFramesButton.AutoSize = $true
-    $transportFlow.Controls.Add($next25PlayerFramesButton)
+    $jumpToPlayerStartButton = New-Object System.Windows.Forms.Button
+    $jumpToPlayerStartButton.Text = "Start"
+    $jumpToPlayerStartButton.AutoSize = $true
+    $transportFlow.Controls.Add($jumpToPlayerStartButton)
 
     $previous250PlayerFramesButton = New-Object System.Windows.Forms.Button
     $previous250PlayerFramesButton.Text = "< 250 Frames"
     $previous250PlayerFramesButton.AutoSize = $true
     $transportFlow.Controls.Add($previous250PlayerFramesButton)
 
+    $previous25PlayerFramesButton = New-Object System.Windows.Forms.Button
+    $previous25PlayerFramesButton.Text = "< 25 Frames"
+    $previous25PlayerFramesButton.AutoSize = $true
+    $transportFlow.Controls.Add($previous25PlayerFramesButton)
+
+    $previousPlayerFrameButton = New-Object System.Windows.Forms.Button
+    $previousPlayerFrameButton.Text = "< Frame"
+    $previousPlayerFrameButton.AutoSize = $true
+    $transportFlow.Controls.Add($previousPlayerFrameButton)
+
+    $playPlayerButton = New-Object System.Windows.Forms.Button
+    $playPlayerButton.Text = "Play"
+    $playPlayerButton.AutoSize = $true
+    $transportFlow.Controls.Add($playPlayerButton)
+
+    $pausePlayerButton = New-Object System.Windows.Forms.Button
+    $pausePlayerButton.Text = "Pause"
+    $pausePlayerButton.AutoSize = $true
+    $transportFlow.Controls.Add($pausePlayerButton)
+
+    $nextPlayerFrameButton = New-Object System.Windows.Forms.Button
+    $nextPlayerFrameButton.Text = "Frame >"
+    $nextPlayerFrameButton.AutoSize = $true
+    $transportFlow.Controls.Add($nextPlayerFrameButton)
+
+    $next25PlayerFramesButton = New-Object System.Windows.Forms.Button
+    $next25PlayerFramesButton.Text = "25 Frames >"
+    $next25PlayerFramesButton.AutoSize = $true
+    $transportFlow.Controls.Add($next25PlayerFramesButton)
+
     $next250PlayerFramesButton = New-Object System.Windows.Forms.Button
     $next250PlayerFramesButton.Text = "250 Frames >"
     $next250PlayerFramesButton.AutoSize = $true
     $transportFlow.Controls.Add($next250PlayerFramesButton)
 
-    $jumpToPlayerStartButton = New-Object System.Windows.Forms.Button
-    $jumpToPlayerStartButton.Text = "Start"
-    $jumpToPlayerStartButton.AutoSize = $true
-    $transportFlow.Controls.Add($jumpToPlayerStartButton)
-
-    $jumpToPlayerEndButton = New-Object System.Windows.Forms.Button
-    $jumpToPlayerEndButton.Text = "End"
-    $jumpToPlayerEndButton.AutoSize = $true
-    $transportFlow.Controls.Add($jumpToPlayerEndButton)
-
     $setPlayerTrimStartButton = New-Object System.Windows.Forms.Button
-    $setPlayerTrimStartButton.Text = "IN Point"
+    $setPlayerTrimStartButton.Text = "In Point"
     $setPlayerTrimStartButton.AutoSize = $true
     $transportFlow.Controls.Add($setPlayerTrimStartButton)
 
     $setPlayerTrimEndButton = New-Object System.Windows.Forms.Button
-    $setPlayerTrimEndButton.Text = "END Point"
+    $setPlayerTrimEndButton.Text = "Out Point"
     $setPlayerTrimEndButton.AutoSize = $true
     $transportFlow.Controls.Add($setPlayerTrimEndButton)
 
@@ -5380,7 +5375,7 @@ function Open-PlayerTrimWindow {
     $playerTrimGroupBox.Controls.Add($trimLayout)
 
     $playerTrimStartLabel = New-Object System.Windows.Forms.Label
-    $playerTrimStartLabel.Text = "IN Point (HH:MM:SS)"
+    $playerTrimStartLabel.Text = "In Point (HH:MM:SS)"
     $playerTrimStartLabel.Dock = "Fill"
     $playerTrimStartLabel.TextAlign = "MiddleLeft"
     $trimLayout.Controls.Add($playerTrimStartLabel, 0, 0)
@@ -5390,7 +5385,7 @@ function Open-PlayerTrimWindow {
     $trimLayout.Controls.Add($playerTrimStartTextBox, 1, 0)
 
     $playerTrimEndLabel = New-Object System.Windows.Forms.Label
-    $playerTrimEndLabel.Text = "END Point (HH:MM:SS)"
+    $playerTrimEndLabel.Text = "Out Point (HH:MM:SS)"
     $playerTrimEndLabel.Dock = "Fill"
     $playerTrimEndLabel.TextAlign = "MiddleLeft"
     $trimLayout.Controls.Add($playerTrimEndLabel, 0, 1)
@@ -5631,6 +5626,7 @@ function Open-PlayerTrimWindow {
         Dialog = $dialog
         Item = $Item
         MediaInfo = $mediaInfo
+        GetEffectiveTrimPlan = ${function:Get-VhsMp4EffectiveTrimPlan}
         LocalState = $localState
         RuntimeState = $runtimeState
         Modeless = [bool]$Modeless
@@ -5639,8 +5635,8 @@ function Open-PlayerTrimWindow {
         PlaybackHost = $playbackHost
         PlayerModeLabel = $playerModeLabel
         PlayerPreviewPictureBox = $playerPreviewPictureBox
-        PlayPauseButton = $playPauseButton
-        StopPlaybackButton = $stopPlaybackButton
+        PlayButton = $playPlayerButton
+        PauseButton = $pausePlayerButton
         PlayerPreviewFrameButton = $playerPreviewFrameButton
         PlayerSegmentsListBox = $playerSegmentsListBox
         RemovePlayerSegmentButton = $removePlayerSegmentButton
@@ -5673,6 +5669,7 @@ function Open-PlayerTrimWindow {
         $dialog = $ctx.Dialog
         $Item = $ctx.Item
         $mediaInfo = $ctx.MediaInfo
+        $getEffectiveTrimPlan = $ctx.GetEffectiveTrimPlan
         $localState = $ctx.LocalState
         $runtimeState = $ctx.RuntimeState
         $Modeless = [bool]$ctx.Modeless
@@ -5681,8 +5678,8 @@ function Open-PlayerTrimWindow {
         $playbackHost = $ctx.PlaybackHost
         $playerModeLabel = $ctx.PlayerModeLabel
         $playerPreviewPictureBox = $ctx.PlayerPreviewPictureBox
-        $playPauseButton = $ctx.PlayPauseButton
-        $stopPlaybackButton = $ctx.StopPlaybackButton
+        $playButton = $ctx.PlayButton
+        $pauseButton = $ctx.PauseButton
         $playerPreviewFrameButton = $ctx.PlayerPreviewFrameButton
         $playerSegmentsListBox = $ctx.PlayerSegmentsListBox
         $removePlayerSegmentButton = $ctx.RemovePlayerSegmentButton
@@ -5732,8 +5729,8 @@ function Open-PlayerTrimWindow {
             $playerModeLabel.ForeColor = [System.Drawing.Color]::FromArgb(22, 78, 99)
             $playbackHost.Visible = $true
             $playerPreviewPictureBox.Visible = $false
-            $playPauseButton.Enabled = $true
-            $stopPlaybackButton.Enabled = $true
+            $playButton.Enabled = $true
+            $pauseButton.Enabled = $true
             $playerPreviewFrameButton.Enabled = $false
         }
         else {
@@ -5745,8 +5742,8 @@ function Open-PlayerTrimWindow {
             $playerModeLabel.ForeColor = [System.Drawing.Color]::FromArgb(146, 64, 14)
             $playbackHost.Visible = $false
             $playerPreviewPictureBox.Visible = $true
-            $playPauseButton.Enabled = $false
-            $stopPlaybackButton.Enabled = $false
+            $playButton.Enabled = $false
+            $pauseButton.Enabled = $false
             $playerPreviewFrameButton.Enabled = -not [string]::IsNullOrWhiteSpace($resolvedFfmpegPath)
             try {
                 $playbackTimer.Stop()
@@ -6412,7 +6409,7 @@ function Open-PlayerTrimWindow {
                     EndText = [string]$segmentWindow.EndText
                 }
                 $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
-                $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
+                $trimPlan = & $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
                 $localState.TrimSegments = @($normalized.Segments)
                 $localState.TrimStartText = ""
                 $localState.TrimEndText = ""
@@ -6424,7 +6421,7 @@ function Open-PlayerTrimWindow {
                 return
             }
 
-            $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
+            $trimPlan = & $getEffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
             if ([string]::IsNullOrWhiteSpace([string]$trimPlan.Summary)) {
                 $localState.TrimStartText = ""
                 $localState.TrimEndText = ""
@@ -6468,7 +6465,7 @@ function Open-PlayerTrimWindow {
             })
 
             $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
-            $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
+            $trimPlan = & $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
             $localState.TrimSegments = @($normalized.Segments)
             $localState.TrimStartText = ""
             $localState.TrimEndText = ""
@@ -6500,7 +6497,7 @@ function Open-PlayerTrimWindow {
 
         if ($remaining.Count -gt 0) {
             $normalized = Get-VhsMp4TrimSegments -TrimSegments $remaining
-            $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
+            $trimPlan = & $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
             $localState.TrimSegments = @($normalized.Segments)
             $localState.TrimSummary = [string]$trimPlan.Summary
             $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
@@ -6545,7 +6542,7 @@ function Open-PlayerTrimWindow {
 
         try {
             if (@($localState.TrimSegments).Count -eq 0) {
-                $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
+                $trimPlan = & $getEffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
                 if ($trimPlan.Count -gt 0) {
                     $cutSegment = @($trimPlan.Segments)[0]
                     $localState.TrimStartText = [string]$cutSegment.StartText
@@ -6889,15 +6886,14 @@ function Open-PlayerTrimWindow {
         }
     }).GetNewClosure())
 
-    $playPauseButton.Add_Click(({
+    $playPlayerButton.Add_Click(({
         $playerRuntime.'Start-PlayerPlayback'()
     }).GetNewClosure())
 
-    $stopPlaybackButton.Add_Click(({
+    $pausePlayerButton.Add_Click(({
         if ($localState.Mode -eq "Playback mode") {
             $playerRuntime.'Stop-PlayerPlayback'()
         }
-        $playerRuntime.'Set-PlayerPositionSeconds'(0, $false, ($localState.Mode -eq "Preview mode"))
     }).GetNewClosure())
 
     $previousPlayerFrameButton.Add_Click(({
@@ -6926,10 +6922,6 @@ function Open-PlayerTrimWindow {
 
     $jumpToPlayerStartButton.Add_Click(({
         $playerRuntime.'Navigate-PlayerPositionSeconds'(0)
-    }).GetNewClosure())
-
-    $jumpToPlayerEndButton.Add_Click(({
-        $playerRuntime.'Navigate-PlayerPositionSeconds'([double]$runtimeState.DurationSeconds)
     }).GetNewClosure())
 
     $playerPreviewFrameButton.Add_Click(({
@@ -10288,7 +10280,7 @@ $trimLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Wind
 $trimGroupBox.Controls.Add($trimLayout)
 
 $trimStartLabel = New-Object System.Windows.Forms.Label
-$trimStartLabel.Text = "IN Point (HH:MM:SS)"
+    $trimStartLabel.Text = "In Point (HH:MM:SS)"
 $trimStartLabel.Dock = "Fill"
 $trimStartLabel.TextAlign = "MiddleLeft"
 $trimStartLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
@@ -10300,7 +10292,7 @@ $trimStartTextBox.Margin = New-Object System.Windows.Forms.Padding(0, 4, 8, 0)
 $trimLayout.Controls.Add($trimStartTextBox, 1, 0)
 
 $trimEndLabel = New-Object System.Windows.Forms.Label
-$trimEndLabel.Text = "END Point (HH:MM:SS)"
+    $trimEndLabel.Text = "Out Point (HH:MM:SS)"
 $trimEndLabel.Dock = "Fill"
 $trimEndLabel.TextAlign = "MiddleLeft"
 $trimEndLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
@@ -10486,13 +10478,13 @@ $autoPreviewCheckBox.Margin = New-Object System.Windows.Forms.Padding(0, 3, 6, 0
 $previewControlsPanel.Controls.Add($autoPreviewCheckBox, 2, 3)
 
 $setTrimStartButton = New-Object System.Windows.Forms.Button
-$setTrimStartButton.Text = "IN Point"
+    $setTrimStartButton.Text = "In Point"
 $setTrimStartButton.Dock = "Fill"
 $setTrimStartButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 6, 2)
 $previewControlsPanel.Controls.Add($setTrimStartButton, 4, 3)
 
 $setTrimEndButton = New-Object System.Windows.Forms.Button
-$setTrimEndButton.Text = "END Point"
+    $setTrimEndButton.Text = "Out Point"
 $setTrimEndButton.Dock = "Fill"
 $setTrimEndButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
 $previewControlsPanel.Controls.Add($setTrimEndButton, 5, 3)
