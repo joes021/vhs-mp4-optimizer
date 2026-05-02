@@ -5678,6 +5678,7 @@ function Open-PlayerTrimWindow {
     $playbackTimer.Interval = 200
     $runtimeState = [pscustomobject]@{
         DurationSeconds = $durationSeconds
+        VirtualDurationSeconds = $durationSeconds
         FrameRate = $frameRate
         DialogResult = $dialogResult
         ClosingAfterSave = $closingAfterSave
@@ -5895,6 +5896,216 @@ function Open-PlayerTrimWindow {
         }
 
         Update-PlayerCutDisplay
+    }
+
+    function Get-PlayerCurrentTrimProjection {
+        $sourceDuration = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.DurationSeconds -Default 0.0
+        if ($sourceDuration -le 0) {
+            return [pscustomobject]@{
+                Mode = "none"
+                Segments = @()
+                EffectiveSegments = @()
+                Count = 0
+                StartSeconds = $null
+                EndSeconds = $null
+                DurationSeconds = 0.0
+                StartText = ""
+                EndText = ""
+                DurationText = ""
+                Summary = ""
+            }
+        }
+
+        try {
+            $segments = @($localState.TrimSegments)
+            if ($segments.Count -gt 0) {
+                return (& $getEffectiveTrimPlan -TrimSegments $segments -SourceDurationSeconds $sourceDuration)
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace([string]$localState.TrimStartText) -or -not [string]::IsNullOrWhiteSpace([string]$localState.TrimEndText)) {
+                return (& $getEffectiveTrimPlan -TrimStart $localState.TrimStartText -TrimEnd $localState.TrimEndText -SourceDurationSeconds $sourceDuration)
+            }
+        }
+        catch {
+        }
+
+        $fullWindow = Get-VhsMp4TrimWindow -TrimStart "00:00:00" -TrimEnd (Format-VhsMp4FfmpegTime -Seconds $sourceDuration)
+        $fullSegment = [pscustomobject]@{
+            StartSeconds = $fullWindow.StartSeconds
+            EndSeconds = $fullWindow.EndSeconds
+            DurationSeconds = $fullWindow.DurationSeconds
+            StartText = $fullWindow.StartText
+            EndText = $fullWindow.EndText
+            DurationText = $fullWindow.DurationText
+            Summary = $fullWindow.Summary
+        }
+
+        return [pscustomobject]@{
+            Mode = "none"
+            Segments = @()
+            EffectiveSegments = @($fullSegment)
+            Count = 0
+            StartSeconds = $fullSegment.StartSeconds
+            EndSeconds = $fullSegment.EndSeconds
+            DurationSeconds = [double]$fullSegment.DurationSeconds
+            StartText = $fullSegment.StartText
+            EndText = $fullSegment.EndText
+            DurationText = $fullSegment.DurationText
+            Summary = ""
+        }
+    }
+
+    function Convert-PlayerSourcePositionToVirtualInfo {
+        param(
+            [double]$SourceSeconds,
+            [bool]$SnapToVisible = $true
+        )
+
+        $projection = Get-PlayerCurrentTrimProjection
+        $sourceDuration = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.DurationSeconds -Default 0.0
+        $source = Convert-ToVhsMp4FiniteDouble -Value $SourceSeconds -Default 0.0
+        $source = [Math]::Max(0.0, $source)
+        if ($sourceDuration -gt 0) {
+            $source = [Math]::Min($sourceDuration, $source)
+        }
+
+        $segments = @($projection.EffectiveSegments)
+        if ($segments.Count -eq 0) {
+            return [pscustomobject]@{
+                SourceSeconds = $source
+                VirtualSeconds = $source
+                VirtualDurationSeconds = $sourceDuration
+            }
+        }
+
+        $bestSource = Convert-ToVhsMp4FiniteDouble -Value $segments[0].StartSeconds -Default 0.0
+        $bestVirtual = 0.0
+        $bestDistance = [double]::PositiveInfinity
+        $accumulated = 0.0
+        foreach ($segment in $segments) {
+            $segmentStart = Convert-ToVhsMp4FiniteDouble -Value $segment.StartSeconds -Default 0.0
+            $segmentEnd = Convert-ToVhsMp4FiniteDouble -Value $segment.EndSeconds -Default $segmentStart
+            $segmentDuration = Convert-ToVhsMp4FiniteDouble -Value $segment.DurationSeconds -Default ($segmentEnd - $segmentStart)
+            if ($segmentDuration -lt 0) {
+                $segmentDuration = [Math]::Max(0.0, $segmentEnd - $segmentStart)
+            }
+
+            if ($source -ge ($segmentStart - 0.0001) -and $source -le ($segmentEnd + 0.0001)) {
+                $visibleSource = [Math]::Min($segmentEnd, [Math]::Max($segmentStart, $source))
+                return [pscustomobject]@{
+                    SourceSeconds = $visibleSource
+                    VirtualSeconds = $accumulated + ($visibleSource - $segmentStart)
+                    VirtualDurationSeconds = [double]$projection.DurationSeconds
+                }
+            }
+
+            foreach ($candidate in @(
+                [pscustomobject]@{ SourceSeconds = $segmentStart; VirtualSeconds = $accumulated },
+                [pscustomobject]@{ SourceSeconds = $segmentEnd; VirtualSeconds = $accumulated + $segmentDuration }
+            )) {
+                $distance = [Math]::Abs($source - [double]$candidate.SourceSeconds)
+                if (($distance + 0.0001) -lt $bestDistance) {
+                    $bestDistance = $distance
+                    $bestSource = [double]$candidate.SourceSeconds
+                    $bestVirtual = [double]$candidate.VirtualSeconds
+                }
+            }
+
+            $accumulated += $segmentDuration
+        }
+
+        if (-not $SnapToVisible) {
+            return [pscustomobject]@{
+                SourceSeconds = $source
+                VirtualSeconds = [Math]::Min([double]$projection.DurationSeconds, [Math]::Max(0.0, $bestVirtual))
+                VirtualDurationSeconds = [double]$projection.DurationSeconds
+            }
+        }
+
+        return [pscustomobject]@{
+            SourceSeconds = $bestSource
+            VirtualSeconds = [Math]::Min([double]$projection.DurationSeconds, [Math]::Max(0.0, $bestVirtual))
+            VirtualDurationSeconds = [double]$projection.DurationSeconds
+        }
+    }
+
+    function Convert-PlayerVirtualSecondsToSourceSeconds {
+        param([double]$VirtualSeconds)
+
+        $projection = Get-PlayerCurrentTrimProjection
+        $segments = @($projection.EffectiveSegments)
+        $virtualDuration = Convert-ToVhsMp4FiniteDouble -Value $projection.DurationSeconds -Default $runtimeState.DurationSeconds
+        if ($virtualDuration -lt 0) {
+            $virtualDuration = 0.0
+        }
+
+        $virtual = Convert-ToVhsMp4FiniteDouble -Value $VirtualSeconds -Default 0.0
+        $virtual = [Math]::Max(0.0, $virtual)
+        if ($virtualDuration -gt 0) {
+            $virtual = [Math]::Min($virtualDuration, $virtual)
+        }
+
+        if ($segments.Count -eq 0) {
+            return $virtual
+        }
+
+        $remaining = $virtual
+        foreach ($segment in $segments) {
+            $segmentStart = Convert-ToVhsMp4FiniteDouble -Value $segment.StartSeconds -Default 0.0
+            $segmentEnd = Convert-ToVhsMp4FiniteDouble -Value $segment.EndSeconds -Default $segmentStart
+            $segmentDuration = Convert-ToVhsMp4FiniteDouble -Value $segment.DurationSeconds -Default ($segmentEnd - $segmentStart)
+            if ($segmentDuration -lt 0) {
+                $segmentDuration = [Math]::Max(0.0, $segmentEnd - $segmentStart)
+            }
+
+            if ($remaining -le ($segmentDuration + 0.0001)) {
+                return [Math]::Min($segmentEnd, ($segmentStart + [Math]::Max(0.0, $remaining)))
+            }
+
+            $remaining -= $segmentDuration
+        }
+
+        $lastSegment = $segments[-1]
+        return (Convert-ToVhsMp4FiniteDouble -Value $lastSegment.EndSeconds -Default 0.0)
+    }
+
+    function Sync-PlayerVirtualTimelineRange {
+        $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
+        $projection = Get-PlayerCurrentTrimProjection
+        $virtualDuration = Convert-ToVhsMp4FiniteDouble -Value $projection.DurationSeconds -Default $runtimeState.DurationSeconds
+        if ($virtualDuration -lt 0) {
+            $virtualDuration = 0.0
+        }
+        $runtimeState.VirtualDurationSeconds = $virtualDuration
+
+        $timelineMaximum = [Math]::Max(1, [int][Math]::Round($virtualDuration * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero))
+        $localState.TimelineSyncActive = $true
+        try {
+            if ($playerTimelineTrackBar.Maximum -ne $timelineMaximum) {
+                $playerTimelineTrackBar.Maximum = $timelineMaximum
+            }
+            $largeChange = [Math]::Max(1, [Math]::Min($timelineMaximum, $timelineScale))
+            if ($playerTimelineTrackBar.LargeChange -ne $largeChange) {
+                $playerTimelineTrackBar.LargeChange = $largeChange
+            }
+            if ($playerTimelineTrackBar.Value -gt $playerTimelineTrackBar.Maximum) {
+                $playerTimelineTrackBar.Value = $playerTimelineTrackBar.Maximum
+            }
+        }
+        finally {
+            $localState.TimelineSyncActive = $false
+        }
+    }
+
+    function Refresh-PlayerTrimProjection {
+        param([bool]$RequestPreview = $true)
+
+        if ($localState.Mode -eq "Playback mode") {
+            Set-PlayerTrimDialogMode "Preview mode" "cut preview"
+        }
+
+        Sync-PlayerVirtualTimelineRange
+        Set-PlayerPositionSeconds -Seconds $localState.PreviewPositionSeconds -SyncPlayer $false -RequestPreview $RequestPreview
     }
 
     function Convert-PlayerCropFieldValue {
@@ -6249,14 +6460,29 @@ function Open-PlayerTrimWindow {
             $position = [Math]::Min($durationSeconds, $position)
         }
 
+        Sync-PlayerVirtualTimelineRange
+        $virtualPositionInfo = Convert-PlayerSourcePositionToVirtualInfo -SourceSeconds $position -SnapToVisible $true
+        $position = Convert-ToVhsMp4FiniteDouble -Value $virtualPositionInfo.SourceSeconds -Default $position
+        $virtualDurationSeconds = Convert-ToVhsMp4FiniteDouble -Value $virtualPositionInfo.VirtualDurationSeconds -Default $durationSeconds
+        if ($virtualDurationSeconds -lt 0) {
+            $virtualDurationSeconds = 0.0
+        }
+        $runtimeState.VirtualDurationSeconds = $virtualDurationSeconds
+        $virtualPosition = Convert-ToVhsMp4FiniteDouble -Value $virtualPositionInfo.VirtualSeconds -Default 0.0
+        $virtualPosition = [Math]::Max(0.0, [Math]::Min($virtualDurationSeconds, $virtualPosition))
+
         $localState.PreviewPositionSeconds = $position
         $positionText = Format-VhsMp4FfmpegTime -Seconds $position
         if ([string]::IsNullOrWhiteSpace($positionText)) {
             $positionText = "00:00:00"
         }
 
-        $totalText = if ($durationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $durationSeconds } else { "--:--:--" }
-        $playerPositionLabel.Text = $positionText + " / " + $totalText
+        $virtualText = if ($virtualDurationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $virtualPosition } else { "00:00:00" }
+        if ([string]::IsNullOrWhiteSpace($virtualText)) {
+            $virtualText = "00:00:00"
+        }
+        $totalText = if ($virtualDurationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $virtualDurationSeconds } else { "--:--:--" }
+        $playerPositionLabel.Text = $virtualText + " / " + $totalText
         $localState.PreviewTimeTextSync = $true
         try {
             $playerPreviewTimeTextBox.Text = $positionText
@@ -6266,7 +6492,7 @@ function Open-PlayerTrimWindow {
         }
 
         $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
-        $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
+        $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($virtualPosition * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
         if ($playerTimelineTrackBar.Value -ne $timelineValue) {
             $localState.TimelineSyncActive = $true
             try {
@@ -6340,7 +6566,8 @@ function Open-PlayerTrimWindow {
         }
 
         $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
-        Navigate-PlayerPositionSeconds -Seconds ([double]$TimelineValue / [double]$timelineScale)
+        $virtualSeconds = [double]$TimelineValue / [double]$timelineScale
+        Navigate-PlayerPositionSeconds -Seconds (Convert-PlayerVirtualSecondsToSourceSeconds -VirtualSeconds $virtualSeconds)
     }
 
     function Try-Sync-PlayerPreviewTimeText {
@@ -6427,14 +6654,16 @@ function Open-PlayerTrimWindow {
             [int]$FrameCount = 1
         )
         Commit-PlayerPreviewTimeText -RequestPreview $false
-        $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $localState.PreviewPositionSeconds -Default 0.0
+        $currentPositionInfo = Convert-PlayerSourcePositionToVirtualInfo -SourceSeconds $localState.PreviewPositionSeconds -SnapToVisible $true
+        $currentSeconds = Convert-ToVhsMp4FiniteDouble -Value $currentPositionInfo.VirtualSeconds -Default 0.0
         $frameRate = Convert-ToVhsMp4FiniteDouble -Value $runtimeState.FrameRate -Default 25.0
         if ($frameRate -le 0) {
             $frameRate = 25.0
         }
         $runtimeState.FrameRate = $frameRate
         $effectiveFrameCount = [Math]::Max(1, [int]$FrameCount)
-        Navigate-PlayerPositionSeconds -Seconds ($currentSeconds + ($Direction * (1.0 / $frameRate) * $effectiveFrameCount))
+        $targetVirtualSeconds = $currentSeconds + ($Direction * (1.0 / $frameRate) * $effectiveFrameCount)
+        Navigate-PlayerPositionSeconds -Seconds (Convert-PlayerVirtualSecondsToSourceSeconds -VirtualSeconds $targetVirtualSeconds)
     }
 
     function Set-PlayerTrimPoint {
@@ -6480,6 +6709,7 @@ function Open-PlayerTrimWindow {
                 $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
                 Sync-PlayerSegmentsList
                 Load-PlayerTrimFields
+                Refresh-PlayerTrimProjection
                 Set-PlayerTrimDialogDirty
                 return
             }
@@ -6501,6 +6731,7 @@ function Open-PlayerTrimWindow {
             $localState.TrimSegments = @()
             Sync-PlayerSegmentsList
             Update-PlayerCutDisplay
+            Refresh-PlayerTrimProjection
             Set-PlayerTrimDialogDirty
         }
         catch {
@@ -6537,6 +6768,7 @@ function Open-PlayerTrimWindow {
             Sync-PlayerSegmentsList
             $playerSegmentsListBox.SelectedIndex = [Math]::Max(0, $normalized.Count - 1)
             Load-PlayerTrimFields
+            Refresh-PlayerTrimProjection
             Set-PlayerTrimDialogDirty
         }
         catch {
@@ -6573,6 +6805,7 @@ function Open-PlayerTrimWindow {
 
         Sync-PlayerSegmentsList
         Load-PlayerTrimFields
+        Refresh-PlayerTrimProjection
         Set-PlayerTrimDialogDirty
     }
 
@@ -6582,6 +6815,7 @@ function Open-PlayerTrimWindow {
         $localState.TrimDurationSeconds = $null
         Sync-PlayerSegmentsList
         Update-PlayerCutDisplay
+        Refresh-PlayerTrimProjection
         Set-PlayerTrimDialogDirty
     }
 
@@ -6595,6 +6829,7 @@ function Open-PlayerTrimWindow {
         $playerTrimEndTextBox.Text = ""
         Sync-PlayerSegmentsList
         Update-PlayerCutDisplay
+        Refresh-PlayerTrimProjection
         Set-PlayerTrimDialogDirty
     }
 
@@ -9529,7 +9764,7 @@ $topWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $topWorkspaceLayout.Dock = "Fill"
 $topWorkspaceLayout.ColumnCount = 1
 $topWorkspaceLayout.RowCount = 3
-$topWorkspaceLayout.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8)
+$topWorkspaceLayout.Padding = New-Object System.Windows.Forms.Padding(12, 8, 12, 4)
 $topWorkspaceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $topWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $topWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
@@ -9539,33 +9774,41 @@ $workspaceSplit.Panel1.Controls.Add($topWorkspaceLayout)
 $sourceGroupBox = New-Object System.Windows.Forms.GroupBox
 $sourceGroupBox.Text = "Input / Output"
 $sourceGroupBox.Dock = "Fill"
+$sourceGroupBox.AutoSize = $true
+$sourceGroupBox.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$sourceGroupBox.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
 $topWorkspaceLayout.Controls.Add($sourceGroupBox, 0, 0)
 
 $sourceLayout = New-Object System.Windows.Forms.TableLayoutPanel
-$sourceLayout.Dock = "Fill"
+$sourceLayout.Dock = "Top"
+$sourceLayout.AutoSize = $true
+$sourceLayout.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $sourceLayout.ColumnCount = 2
 $sourceLayout.RowCount = 1
-$sourceLayout.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
+$sourceLayout.Padding = New-Object System.Windows.Forms.Padding(8, 2, 8, 2)
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
 $sourceLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
-$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$sourceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $sourceGroupBox.Controls.Add($sourceLayout)
 
 $inputFolderPanel = New-Object System.Windows.Forms.TableLayoutPanel
-$inputFolderPanel.Dock = "Fill"
+$inputFolderPanel.Dock = "Top"
+$inputFolderPanel.AutoSize = $true
+$inputFolderPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $inputFolderPanel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 6, 0)
 $inputFolderPanel.ColumnCount = 3
 $inputFolderPanel.RowCount = 1
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
 $inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
-$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$inputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
+$inputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 22)))
 $sourceLayout.Controls.Add($inputFolderPanel, 0, 0)
 
 $inputLabel = New-Object System.Windows.Forms.Label
 $inputLabel.Text = "Input folder"
-$inputLabel.Anchor = "Left"
-$inputLabel.AutoSize = $true
+$inputLabel.Dock = "Fill"
+$inputLabel.TextAlign = "MiddleLeft"
+$inputLabel.Margin = New-Object System.Windows.Forms.Padding(0)
 $inputFolderPanel.Controls.Add($inputLabel, 0, 0)
 
 $inputTextBox = New-Object System.Windows.Forms.TextBox
@@ -9577,7 +9820,7 @@ $browseInputButton = New-Object System.Windows.Forms.Button
 $browseInputButton.Text = "Browse..."
 $browseInputButton.Anchor = "Left,Top"
 $browseInputButton.Margin = New-Object System.Windows.Forms.Padding(0)
-$browseInputButton.Size = New-Object System.Drawing.Size(104, 20)
+$browseInputButton.Size = New-Object System.Drawing.Size(114, 22)
 $inputFolderPanel.Controls.Add($browseInputButton, 2, 0)
 
 $inputHelpLabel = New-Object System.Windows.Forms.Label
@@ -9585,20 +9828,23 @@ $inputHelpLabel.Text = "MP4 / AVI / MPG / MOV / MKV ulazi | prevuci folder ili f
 $inputHelpLabel.Visible = $false
 
 $outputFolderPanel = New-Object System.Windows.Forms.TableLayoutPanel
-$outputFolderPanel.Dock = "Fill"
+$outputFolderPanel.Dock = "Top"
+$outputFolderPanel.AutoSize = $true
+$outputFolderPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $outputFolderPanel.Margin = New-Object System.Windows.Forms.Padding(6, 0, 0, 0)
 $outputFolderPanel.ColumnCount = 3
 $outputFolderPanel.RowCount = 1
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 82)))
 $outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
-$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 24)))
+$outputFolderPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
+$outputFolderPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 22)))
 $sourceLayout.Controls.Add($outputFolderPanel, 1, 0)
 
 $outputLabel = New-Object System.Windows.Forms.Label
 $outputLabel.Text = "Output folder"
-$outputLabel.Anchor = "Left"
-$outputLabel.AutoSize = $true
+$outputLabel.Dock = "Fill"
+$outputLabel.TextAlign = "MiddleLeft"
+$outputLabel.Margin = New-Object System.Windows.Forms.Padding(0)
 $outputFolderPanel.Controls.Add($outputLabel, 0, 0)
 
 $outputTextBox = New-Object System.Windows.Forms.TextBox
@@ -9610,7 +9856,7 @@ $browseOutputButton = New-Object System.Windows.Forms.Button
 $browseOutputButton.Text = "Browse..."
 $browseOutputButton.Anchor = "Left,Top"
 $browseOutputButton.Margin = New-Object System.Windows.Forms.Padding(0)
-$browseOutputButton.Size = New-Object System.Drawing.Size(104, 20)
+$browseOutputButton.Size = New-Object System.Drawing.Size(114, 22)
 $outputFolderPanel.Controls.Add($browseOutputButton, 2, 0)
 
 $outputHelpLabel = New-Object System.Windows.Forms.Label
@@ -9640,10 +9886,15 @@ $ffmpegHelpNoteLabel.AutoEllipsis = $true
 $quickRunGroupBox = New-Object System.Windows.Forms.GroupBox
 $quickRunGroupBox.Text = "Quick Setup"
 $quickRunGroupBox.Dock = "Fill"
+$quickRunGroupBox.AutoSize = $true
+$quickRunGroupBox.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$quickRunGroupBox.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
 $topWorkspaceLayout.Controls.Add($quickRunGroupBox, 0, 1)
 
 $quickRunLayout = New-Object System.Windows.Forms.TableLayoutPanel
-$quickRunLayout.Dock = "Fill"
+$quickRunLayout.Dock = "Top"
+$quickRunLayout.AutoSize = $true
+$quickRunLayout.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $quickRunLayout.ColumnCount = 2
 $quickRunLayout.RowCount = 1
 $quickRunLayout.Padding = New-Object System.Windows.Forms.Padding(8, 6, 8, 8)
@@ -9770,6 +10021,7 @@ $queueToolbar.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 $advancedSettingsGroupBox = New-Object System.Windows.Forms.GroupBox
 $advancedSettingsGroupBox.Text = "Advanced Settings"
 $advancedSettingsGroupBox.Dock = "Fill"
+$advancedSettingsGroupBox.Margin = New-Object System.Windows.Forms.Padding(0)
 $advancedSettingsGroupBox.Visible = $true
 $topWorkspaceLayout.Controls.Add($advancedSettingsGroupBox, 0, 2)
 

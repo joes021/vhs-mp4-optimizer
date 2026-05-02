@@ -1332,6 +1332,138 @@ exit 0
     assert abs(payload["AfterPosition"] - 22.54) < 0.001
 
 
+def test_vhs_gui_player_cut_segments_project_virtual_timeline_navigation(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    modeless_return_pattern = re.compile(r"(?ms)^\s*if \(\$Modeless\) \{\s*return \$dialog\s*\}\s*")
+    modeless_return_replacement = """
+    if ($Modeless) {
+        $script:TestPlayerRuntime = $playerRuntime
+        $script:TestPlayerRuntimeLocalState = $localState
+        $script:TestPlayerTrimStartTextBox = $playerTrimStartTextBox
+        $script:TestPlayerTrimEndTextBox = $playerTrimEndTextBox
+        $script:TestPlayerTimelineTrackBar = $playerTimelineTrackBar
+        $script:TestPlayerPositionLabel = $playerPositionLabel
+        $script:TestPlayerPreviewTimeTextBox = $playerPreviewTimeTextBox
+        return $dialog
+    }
+"""
+    gui_script, modeless_replacements = modeless_return_pattern.subn(modeless_return_replacement, gui_script, count=1)
+    assert modeless_replacements == 1
+
+    probe = f"""
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mov,mp4,m4a,3gp,3g2,mj2'
+    ContainerLongName = 'QuickTime / MOV'
+    DurationSeconds = 2602.2
+    DurationText = '00:43:22.2'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '720x576'
+    DisplayAspectRatio = '4:3'
+    SampleAspectRatio = '16:15'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 65055
+    VideoBitrateText = '8864 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+}}
+$script:ResolvedFfmpegPath = ''
+$dialog = @(Open-PlayerTrimWindow -Item $item -Modeless) | Where-Object {{ $null -ne $_ -and $_ -is [System.Windows.Forms.Form] }} | Select-Object -Last 1
+$dialog.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$script:TestPlayerRuntimeLocalState.Mode = 'Preview mode'
+$script:TestPlayerTrimStartTextBox.Text = '00:00:00'
+$script:TestPlayerTrimEndTextBox.Text = '00:00:45.95'
+$script:TestPlayerRuntime.'Add-PlayerTrimSegmentFromFields'()
+$script:TestPlayerTrimStartTextBox.Text = '00:43:15.89'
+$script:TestPlayerTrimEndTextBox.Text = '00:43:22.2'
+$script:TestPlayerRuntime.'Add-PlayerTrimSegmentFromFields'()
+[System.Windows.Forms.Application]::DoEvents()
+$maximumAfterCuts = [int]$script:TestPlayerTimelineTrackBar.Maximum
+$valueAfterCuts = [int]$script:TestPlayerTimelineTrackBar.Value
+$positionAfterCuts = [double]$script:TestPlayerRuntimeLocalState.PreviewPositionSeconds
+$previewTextAfterCuts = [string]$script:TestPlayerPreviewTimeTextBox.Text
+$labelAfterCuts = [string]$script:TestPlayerPositionLabel.Text
+$script:TestPlayerRuntime.'Sync-PlayerTimelineValue'(1000)
+[System.Windows.Forms.Application]::DoEvents()
+$positionAfterVirtual10s = [double]$script:TestPlayerRuntimeLocalState.PreviewPositionSeconds
+$script:TestPlayerRuntime.'Sync-PlayerTimelineValue'([int]$script:TestPlayerTimelineTrackBar.Maximum)
+[System.Windows.Forms.Application]::DoEvents()
+$positionAfterTimelineEnd = [double]$script:TestPlayerRuntimeLocalState.PreviewPositionSeconds
+$labelAfterTimelineEnd = [string]$script:TestPlayerPositionLabel.Text
+$script:TestPlayerRuntimeLocalState.Dirty = $false
+$dialog.Close()
+[System.Windows.Forms.Application]::DoEvents()
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    MaximumAfterCuts = $maximumAfterCuts
+    ValueAfterCuts = $valueAfterCuts
+    PositionAfterCuts = $positionAfterCuts
+    PreviewTextAfterCuts = $previewTextAfterCuts
+    LabelAfterCuts = $labelAfterCuts
+    PositionAfterVirtual10s = $positionAfterVirtual10s
+    PositionAfterTimelineEnd = $positionAfterTimelineEnd
+    LabelAfterTimelineEnd = $labelAfterTimelineEnd
+}} | ConvertTo-Json -Depth 4
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+exit 0
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-player-virtual-timeline-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["MaximumAfterCuts"] == 254994
+    assert payload["ValueAfterCuts"] == 0
+    assert abs(payload["PositionAfterCuts"] - 45.95) < 0.001
+    assert payload["PreviewTextAfterCuts"] == "00:00:45.95"
+    assert payload["LabelAfterCuts"] == "00:00:00 / 00:42:29.94"
+    assert abs(payload["PositionAfterVirtual10s"] - 55.95) < 0.001
+    assert abs(payload["PositionAfterTimelineEnd"] - 2595.89) < 0.001
+    assert payload["LabelAfterTimelineEnd"] == "00:42:29.94 / 00:42:29.94"
+
+
 def test_vhs_gui_modeless_player_save_to_queue_can_compute_trim_plan(tmp_path: Path) -> None:
     source = tmp_path / "clip.mp4"
     source.write_text("source", encoding="utf-8")
@@ -1735,6 +1867,110 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["PreviewReachable"] is False
     assert payload["TrimReachable"] is False
     assert "Open Player" in payload["SummaryText"]
+
+
+def test_vhs_gui_top_input_output_row_is_tightly_aligned(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mp4'
+    ContainerLongName = 'MP4'
+    DurationSeconds = 754.485
+    DurationText = '00:12:34'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '1920x1080'
+    DisplayAspectRatio = '16:9'
+    SampleAspectRatio = '1:1'
+    FrameRate = 30.01
+    FrameRateText = '30.01 fps'
+    FrameCount = 22643
+    VideoSummary = 'h264 | 1920x1080 | 16:9 | 30.01 fps'
+    VideoBitrateText = '900 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioSummary = 'aac | 2 ch | 48000 Hz'
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    OutputPath = '{ps_quote(output_dir / "clip.mp4")}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+    Status = 'queued'
+}}
+Set-GridRows -Plan @($item)
+[void](Select-PlanGridRowBySourceName -SourceName 'clip.mp4')
+Update-PreviewTrimPanel
+$form.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$inputLabelCenter = $inputLabel.Top + ($inputLabel.Height / 2.0)
+$inputTextCenter = $inputTextBox.Top + ($inputTextBox.Height / 2.0)
+$outputLabelCenter = $outputLabel.Top + ($outputLabel.Height / 2.0)
+$outputTextCenter = $outputTextBox.Top + ($outputTextBox.Height / 2.0)
+$sourceBottom = $sourceGroupBox.Bottom
+$quickTop = $quickRunGroupBox.Top
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    InputLabelDelta = [math]::Abs($inputLabelCenter - $inputTextCenter)
+    OutputLabelDelta = [math]::Abs($outputLabelCenter - $outputTextCenter)
+    InputBrowseTop = [int]$browseInputButton.Top
+    OutputBrowseTop = [int]$browseOutputButton.Top
+    InputTextTop = [int]$inputTextBox.Top
+    OutputTextTop = [int]$outputTextBox.Top
+    InputBrowseHeight = [int]$browseInputButton.Height
+    OutputBrowseHeight = [int]$browseOutputButton.Height
+    SectionGap = [int]($quickTop - $sourceBottom)
+}} | ConvertTo-Json -Depth 4
+try {{ $form.Close() }} catch {{}}
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-top-row-layout-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["InputLabelDelta"] <= 3
+    assert payload["OutputLabelDelta"] <= 3
+    assert abs(payload["InputBrowseTop"] - payload["InputTextTop"]) <= 1
+    assert abs(payload["OutputBrowseTop"] - payload["OutputTextTop"]) <= 1
+    assert payload["InputBrowseHeight"] >= 22
+    assert payload["OutputBrowseHeight"] >= 22
+    assert payload["SectionGap"] <= 8
 
 
 def test_vhs_gui_has_manual_timeline_frame_and_cut_controls() -> None:
