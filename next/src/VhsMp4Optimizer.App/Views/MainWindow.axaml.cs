@@ -3,10 +3,15 @@ using System.Linq;
 using System.IO;
 using System.Reflection;
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using VhsMp4Optimizer.App.ViewModels;
+using VhsMp4Optimizer.App.Models;
+using VhsMp4Optimizer.App.Services;
 using VhsMp4Optimizer.Infrastructure.Services;
 
 namespace VhsMp4Optimizer.App.Views;
@@ -14,6 +19,7 @@ namespace VhsMp4Optimizer.App.Views;
 public partial class MainWindow : Window
 {
     private PlayerTrimWindow? _playerTrimWindow;
+    private readonly WorkspaceLayoutService _layoutService = new();
 
     public MainWindow()
     {
@@ -21,6 +27,8 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DragOverEvent, DragOverWindow);
         AddHandler(DragDrop.DropEvent, DropWindow);
         DragDrop.SetAllowDrop(this, true);
+        Opened += OnOpened;
+        Closing += OnClosing;
     }
 
     private void OpenPlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -30,9 +38,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        var editorViewModel = new PlayerTrimWindowViewModel(viewModel.SelectedQueueItem, viewModel.ResolvedFfmpegPath, (timeline, transformSettings) =>
+        var selectedItem = viewModel.SelectedQueueItem;
+
+        var editorViewModel = new PlayerTrimWindowViewModel(selectedItem, viewModel.ResolvedFfmpegPath, (timeline, transformSettings) =>
         {
-            viewModel.ApplyEditorState(viewModel.SelectedQueueItem.SourcePath, timeline, transformSettings);
+            viewModel.ApplyEditorState(selectedItem.SourcePath, timeline, transformSettings);
         });
 
         if (_playerTrimWindow is null || !_playerTrimWindow.IsVisible)
@@ -43,6 +53,26 @@ public partial class MainWindow : Window
         _playerTrimWindow.DataContext = editorViewModel;
         _playerTrimWindow.Show();
         _playerTrimWindow.Activate();
+    }
+
+    private void QueueListDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        if (sender is not Control control)
+        {
+            return;
+        }
+
+        var sourceControl = e.Source as Control;
+        if (sourceControl?.FindAncestorOfType<ListBoxItem>() is not null && viewModel.SelectedQueueItem is not null)
+        {
+            OpenPlayerTrimClick(sender, new RoutedEventArgs());
+            e.Handled = true;
+        }
     }
 
     private async void BrowseFfmpegClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -333,6 +363,26 @@ public partial class MainWindow : Window
         window.ShowDialog(this);
     }
 
+    private void SaveLayoutClick(object? sender, RoutedEventArgs e)
+    {
+        _layoutService.Save(CaptureLayoutState());
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.StatusMessage = "Layout je sacuvan.";
+        }
+    }
+
+    private void RestoreDefaultLayoutClick(object? sender, RoutedEventArgs e)
+    {
+        var state = _layoutService.CreateDefault();
+        ApplyLayoutState(state);
+        _layoutService.Save(state);
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.StatusMessage = "Vracen je podrazumevani layout.";
+        }
+    }
+
     private void DragOverWindow(object? sender, DragEventArgs e)
     {
         if (e.DataTransfer.TryGetFiles() is { Length: > 0 })
@@ -343,6 +393,8 @@ public partial class MainWindow : Window
         {
             e.DragEffects = DragDropEffects.None;
         }
+
+        e.Handled = true;
     }
 
     private async void DropWindow(object? sender, DragEventArgs e)
@@ -365,5 +417,56 @@ public partial class MainWindow : Window
         }
 
         await viewModel.UseDroppedPathsAsync(droppedPaths);
+        e.Handled = true;
+    }
+
+    private void OnOpened(object? sender, EventArgs e)
+    {
+        ApplyLayoutState(_layoutService.LoadOrDefault());
+    }
+
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        _layoutService.Save(CaptureLayoutState());
+    }
+
+    private void ApplyLayoutState(WorkspaceLayoutState state)
+    {
+        Width = state.WindowWidth;
+        Height = state.WindowHeight;
+
+        if (MainLayoutGrid.RowDefinitions.Count >= 10)
+        {
+            MainLayoutGrid.RowDefinitions[1].Height = new GridLength(state.InputPanelHeight);
+            MainLayoutGrid.RowDefinitions[3].Height = new GridLength(state.QuickSetupHeight);
+            MainLayoutGrid.RowDefinitions[5].Height = new GridLength(state.AdvancedPanelHeight);
+            MainLayoutGrid.RowDefinitions[9].Height = new GridLength(state.StatusPanelHeight);
+        }
+
+        if (WorkspaceGrid.ColumnDefinitions.Count >= 3)
+        {
+            var clampedRatio = Math.Clamp(state.QueuePaneRatio, 0.35, 0.75);
+            WorkspaceGrid.ColumnDefinitions[0].Width = new GridLength(clampedRatio, GridUnitType.Star);
+            WorkspaceGrid.ColumnDefinitions[2].Width = new GridLength(1 - clampedRatio, GridUnitType.Star);
+        }
+    }
+
+    private WorkspaceLayoutState CaptureLayoutState()
+    {
+        var rowDefinitions = MainLayoutGrid.RowDefinitions;
+        var columnDefinitions = WorkspaceGrid.ColumnDefinitions;
+        var totalWidth = Math.Max(1, columnDefinitions[0].ActualWidth + columnDefinitions[2].ActualWidth);
+        var queueRatio = columnDefinitions[0].ActualWidth / totalWidth;
+
+        return new WorkspaceLayoutState
+        {
+            WindowWidth = Bounds.Width,
+            WindowHeight = Bounds.Height,
+            InputPanelHeight = rowDefinitions[1].ActualHeight,
+            QuickSetupHeight = rowDefinitions[3].ActualHeight,
+            AdvancedPanelHeight = rowDefinitions[5].ActualHeight,
+            StatusPanelHeight = rowDefinitions[9].ActualHeight,
+            QueuePaneRatio = queueRatio
+        };
     }
 }

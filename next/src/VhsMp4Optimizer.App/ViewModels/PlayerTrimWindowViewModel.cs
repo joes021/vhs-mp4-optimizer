@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -19,17 +20,23 @@ namespace VhsMp4Optimizer.App.ViewModels;
 public partial class PlayerTrimWindowViewModel : ViewModelBase
 {
     private readonly Action<TimelineProject, ItemTransformSettings?> _saveAction;
-    private readonly PreviewFrameService _previewFrameService = new();
+    private readonly IPreviewFrameService _previewFrameService;
     private readonly CropDetectService _cropDetectService = new();
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
     private readonly DispatcherTimer _playbackTimer;
     private bool _previewBusy;
 
-    public PlayerTrimWindowViewModel(QueueItemSummary item, string? ffmpegPath, Action<TimelineProject, ItemTransformSettings?> saveAction)
+    public PlayerTrimWindowViewModel(
+        QueueItemSummary item,
+        string? ffmpegPath,
+        Action<TimelineProject, ItemTransformSettings?> saveAction,
+        IPreviewFrameService? previewFrameService = null,
+        bool autoLoadPreview = true)
     {
         ArgumentNullException.ThrowIfNull(item.MediaInfo);
 
+        _previewFrameService = previewFrameService ?? new PreviewFrameService();
         _saveAction = saveAction;
         _ffmpegPath = ffmpegPath;
         Item = item;
@@ -82,7 +89,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         _playbackTimer.Tick += PlaybackTimerOnTick;
 
         RefreshState();
-        _ = LoadPreviewAsync();
+        if (autoLoadPreview)
+        {
+            _ = LoadPreviewAsync();
+        }
     }
 
     public QueueItemSummary Item { get; }
@@ -194,6 +204,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     private Bitmap? _previewBitmap;
 
     [ObservableProperty]
+    private bool _isPreviewLoading;
+
+    [ObservableProperty]
     private bool _isPlaying;
 
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
@@ -295,13 +308,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         await LoadPreviewAsync();
     }
 
-    private bool CanStartPlayback() => !IsPlaying && PreviewVirtualMaximum > 0;
+    private bool CanStartPlayback() => !IsPlaying && PreviewVirtualMaximum > 0 && !_previewBusy;
 
     private bool CanPausePlayback() => IsPlaying;
 
     private void StartPlayback()
     {
-        if (IsPlaying)
+        if (IsPlaying || _previewBusy)
         {
             return;
         }
@@ -412,6 +425,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         try
         {
             _previewBusy = true;
+            IsPreviewLoading = true;
+            PlayCommand.NotifyCanExecuteChanged();
             EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
             var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token);
             if (token.IsCancellationRequested)
@@ -421,13 +436,19 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
             if (string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
             {
+                await RunOnUiThreadAsync(() =>
+                {
+                    var previous = PreviewBitmap;
+                    PreviewBitmap = null;
+                    previous?.Dispose();
+                });
                 EditorHint = "Preview frame nije renderovan. Proveri ffmpeg putanju i da li je ulazni fajl citljiv.";
                 return;
             }
 
             await using var stream = File.OpenRead(previewPath);
             var bitmap = new Bitmap(stream);
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await RunOnUiThreadAsync(() =>
             {
                 var previous = PreviewBitmap;
                 PreviewBitmap = bitmap;
@@ -440,11 +461,19 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            await RunOnUiThreadAsync(() =>
+            {
+                var previous = PreviewBitmap;
+                PreviewBitmap = null;
+                previous?.Dispose();
+            });
             EditorHint = $"Preview nije uspeo: {ex.Message}";
         }
         finally
         {
             _previewBusy = false;
+            IsPreviewLoading = false;
+            PlayCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -532,6 +561,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
     private static IReadOnlyList<string> AspectModesService() => CoreServices.AspectModes.All;
 
+    private static Task RunOnUiThreadAsync(Action action)
+    {
+        if (Application.Current is null || Dispatcher.UIThread.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return Dispatcher.UIThread.InvokeAsync(action).GetTask();
+    }
+
     private void SyncSelectedTimelineBlock()
     {
         var selectedId = SelectedSegment?.Id;
@@ -544,6 +584,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     private async void PlaybackTimerOnTick(object? sender, EventArgs e)
     {
         if (!IsPlaying)
+        {
+            return;
+        }
+
+        if (_previewBusy)
         {
             return;
         }

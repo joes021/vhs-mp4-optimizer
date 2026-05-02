@@ -4,13 +4,13 @@ using VhsMp4Optimizer.Core.Models;
 
 namespace VhsMp4Optimizer.Infrastructure.Services;
 
-public sealed class PreviewFrameService
+public sealed class PreviewFrameService : IPreviewFrameService
 {
     public async Task<string?> RenderPreviewAsync(string ffmpegPath, MediaInfo mediaInfo, double sourceSeconds, ItemTransformSettings? transformSettings = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
         {
-            return null;
+            throw new InvalidOperationException("ffmpeg.exe nije pronadjen za preview.");
         }
 
         var previewDirectory = Path.Combine(
@@ -37,9 +37,13 @@ public sealed class PreviewFrameService
         var args = new List<string>
         {
             "-y",
+            "-hide_banner",
+            "-loglevel", "error",
             "-ss", safeSeconds.ToString("0.###", CultureInfo.InvariantCulture),
             "-i", mediaInfo.SourcePath,
             "-frames:v", "1",
+            "-an",
+            "-sn",
             "-vf", string.Join(",", filters),
             previewPath
         };
@@ -63,6 +67,17 @@ public sealed class PreviewFrameService
 
         process.Start();
         await process.WaitForExitAsync(cancellationToken);
-        return process.ExitCode == 0 && File.Exists(previewPath) ? previewPath : null;
+        var errorText = await process.StandardError.ReadToEndAsync(cancellationToken);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"FFmpeg preview nije uspeo: {errorText}");
+        }
+
+        if (!File.Exists(previewPath))
+        {
+            throw new InvalidOperationException("FFmpeg preview nije napravio PNG frame.");
+        }
+
+        return previewPath;
     }
 }

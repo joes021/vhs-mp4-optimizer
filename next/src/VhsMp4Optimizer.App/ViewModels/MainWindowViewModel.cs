@@ -1053,6 +1053,10 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = $"ffmpeg putanja je postavljena: {ResolvedFfmpegPath}";
         LogMessage = $"FFmpeg: {ResolvedFfmpegPath}";
         SplitSelectedCopyCommand.NotifyCanExecuteChanged();
+        if (QueueItems.Count == 0 && !string.IsNullOrWhiteSpace(InputFolder))
+        {
+            _ = AutoScanAfterSelectionAsync();
+        }
     }
 
     public void AutoDetectFfmpeg()

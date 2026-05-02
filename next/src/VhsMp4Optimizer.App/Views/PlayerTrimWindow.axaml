@@ -8,10 +8,10 @@
         x:Name="RootWindow"
         x:Class="VhsMp4Optimizer.App.Views.PlayerTrimWindow"
         x:DataType="vm:PlayerTrimWindowViewModel"
-        Width="1400"
-        Height="900"
-        MinWidth="1160"
-        MinHeight="760"
+        Width="1440"
+        Height="940"
+        MinWidth="1200"
+        MinHeight="780"
         Title="{Binding WindowTitle}"
         Background="#F3F6FB"
         Foreground="#17212F">
@@ -21,8 +21,16 @@
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="#D6DEEA" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="12" />
             <Setter Property="Padding" Value="14" />
+        </Style>
+
+        <Style Selector="Border.subtle-group">
+            <Setter Property="Background" Value="#F7F9FC" />
+            <Setter Property="BorderBrush" Value="#E1E7F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="12" />
         </Style>
 
         <Style Selector="TextBlock.section-title">
@@ -31,8 +39,15 @@
             <Setter Property="Foreground" Value="#17212F" />
         </Style>
 
+        <Style Selector="TextBlock.field-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#445166" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+
         <Style Selector="Button.transport">
-            <Setter Property="MinWidth" Value="90" />
+            <Setter Property="MinWidth" Value="88" />
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="FontSize" Value="12" />
@@ -41,12 +56,13 @@
         <Style Selector="Button.primary">
             <Setter Property="Background" Value="#138AA6" />
             <Setter Property="Foreground" Value="White" />
-            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="MinHeight" Value="38" />
             <Setter Property="Padding" Value="12,8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,360" Margin="16">
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,380" Margin="16">
         <StackPanel Grid.ColumnSpan="2" Spacing="4" Margin="0,0,0,12">
             <TextBlock FontSize="22" FontWeight="SemiBold" Text="Player / Trim" />
             <TextBlock Opacity="0.75" Text="{Binding FileSummary}" />
@@ -54,11 +70,22 @@
 
         <Border Grid.Row="1" Classes="card" Margin="0,0,12,0">
             <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="10">
-                <TextBlock Classes="section-title" Text="Preview" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="section-title" Text="Preview" />
+                    <Border Grid.Column="1" Classes="subtle-group" Padding="8,6">
+                        <TextBlock Text="{Binding PreviewSourceTimeText}" FontWeight="SemiBold" />
+                    </Border>
+                </Grid>
 
-                <Border Grid.Row="1" Background="#111827" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                <Border Grid.Row="1" Background="#0F172A" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
                     <Grid>
                         <Image Source="{Binding PreviewBitmap}" Stretch="Uniform" />
+                        <Border VerticalAlignment="Bottom" Margin="12" Padding="10,8" CornerRadius="8" Background="#B30F172A">
+                            <StackPanel Spacing="2">
+                                <TextBlock Foreground="White" FontWeight="SemiBold" Text="Preview / Playback" />
+                                <TextBlock Foreground="#E5EDF8" TextWrapping="Wrap" Text="{Binding EditorHint}" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </Border>
 
@@ -73,23 +100,25 @@
                     <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding PreviewSourceTimeText}" />
                 </Grid>
 
-                <WrapPanel Grid.Row="3" Orientation="Horizontal" ItemWidth="104" ItemHeight="36" Margin="0,2,0,0">
-                    <Button Classes="transport" Content="START" Command="{Binding GoToStartCommand}" />
-                    <Button Classes="transport" Content="&lt; 250 Frames" Command="{Binding Back250FramesCommand}" />
-                    <Button Classes="transport" Content="&lt; 25 Frames" Command="{Binding Back25FramesCommand}" />
-                    <Button Classes="transport" Content="&lt; Frame" Command="{Binding BackFrameCommand}" />
-                    <Button Classes="transport" Content="Play" Command="{Binding PlayCommand}" />
-                    <Button Classes="transport" Content="Pause" Command="{Binding PauseCommand}" />
-                    <Button Classes="transport" Content="Frame &gt;" Command="{Binding ForwardFrameCommand}" />
-                    <Button Classes="transport" Content="25 Frames &gt;" Command="{Binding Forward25FramesCommand}" />
-                    <Button Classes="transport" Content="250 Frames &gt;" Command="{Binding Forward250FramesCommand}" />
-                    <Button Classes="transport" Content="In Point" Command="{Binding SetInPointCommand}" />
-                    <Button Classes="transport" Content="Out Point" Command="{Binding SetOutPointCommand}" />
-                    <Button Classes="transport" Content="END" Command="{Binding GoToEndCommand}" />
-                    <Button Classes="transport" Content="Preview Frame" Command="{Binding RefreshPreviewCommand}" />
-                </WrapPanel>
+                <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="transport" Content="START" Command="{Binding GoToStartCommand}" />
+                        <Button Classes="transport" Content="&lt; 250 Frames" Command="{Binding Back250FramesCommand}" />
+                        <Button Classes="transport" Content="&lt; 25 Frames" Command="{Binding Back25FramesCommand}" />
+                        <Button Classes="transport" Content="&lt; Frame" Command="{Binding BackFrameCommand}" />
+                        <Button Classes="transport" Content="Play" Command="{Binding PlayCommand}" />
+                        <Button Classes="transport" Content="Pause" Command="{Binding PauseCommand}" />
+                        <Button Classes="transport" Content="Frame &gt;" Command="{Binding ForwardFrameCommand}" />
+                        <Button Classes="transport" Content="25 Frames &gt;" Command="{Binding Forward25FramesCommand}" />
+                        <Button Classes="transport" Content="250 Frames &gt;" Command="{Binding Forward250FramesCommand}" />
+                        <Button Classes="transport" Content="In Point" Command="{Binding SetInPointCommand}" />
+                        <Button Classes="transport" Content="Out Point" Command="{Binding SetOutPointCommand}" />
+                        <Button Classes="transport" Content="END" Command="{Binding GoToEndCommand}" />
+                        <Button Classes="transport" Content="Preview Frame" Command="{Binding RefreshPreviewCommand}" />
+                    </StackPanel>
+                </ScrollViewer>
 
-                <Grid Grid.Row="4" ColumnDefinitions="150,*,150,*" ColumnSpacing="10">
+                <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="10">
                     <TextBlock VerticalAlignment="Center" Text="IN Point" />
                     <TextBox Grid.Column="1" Text="{Binding InPointText}" />
                     <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="OUT Point" />
@@ -98,80 +127,90 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Grid.Column="1" Classes="card">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
-                <TextBlock Classes="section-title" Text="Timeline segments" />
-                <TextBlock Grid.Row="1" Margin="0,6,0,12" Opacity="0.8" Text="{Binding TimelineSummary}" />
+        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="12">
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="section-title" Text="Timeline segments" />
+                    <TextBlock Opacity="0.8" Text="{Binding TimelineSummary}" />
 
-                <Border Grid.Row="2" Margin="0,0,0,12" Background="#F8FAFD" BorderBrush="#D6DEEA" BorderThickness="1" CornerRadius="8" Padding="8">
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                        <ItemsControl ItemsSource="{Binding TimelineBlocks}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="8" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
-                                    <Button Width="{Binding WidthPixels}"
-                                            MinWidth="72"
-                                            Height="84"
-                                            Padding="0"
-                                            Command="{Binding DataContext.SelectTimelineBlockCommand, ElementName=RootWindow}"
-                                            CommandParameter="{Binding .}"
-                                            Background="{Binding BackgroundBrush}"
-                                            Foreground="{Binding ForegroundBrush}"
-                                            BorderBrush="{Binding BorderBrush}"
-                                            BorderThickness="{Binding BorderThickness}">
-                                        <StackPanel Margin="8" Spacing="4">
-                                            <TextBlock FontWeight="Bold" Text="{Binding Label}" />
-                                            <TextBlock FontSize="11" TextWrapping="Wrap" Text="{Binding Summary}" />
-                                        </StackPanel>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Border>
+                    <Border Background="#F8FAFD" BorderBrush="#D6DEEA" BorderThickness="1" CornerRadius="8" Padding="8">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding TimelineBlocks}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
+                                        <Button Width="{Binding WidthPixels}"
+                                                MinWidth="84"
+                                                Height="82"
+                                                Padding="0"
+                                                Command="{Binding DataContext.SelectTimelineBlockCommand, ElementName=RootWindow}"
+                                                CommandParameter="{Binding .}"
+                                                Background="{Binding BackgroundBrush}"
+                                                Foreground="{Binding ForegroundBrush}"
+                                                BorderBrush="{Binding BorderBrush}"
+                                                BorderThickness="{Binding BorderThickness}">
+                                            <StackPanel Margin="8" Spacing="4">
+                                                <TextBlock FontWeight="Bold" Text="{Binding Label}" />
+                                                <TextBlock FontSize="11" TextWrapping="Wrap" Text="{Binding Summary}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
 
-                <Grid Grid.Row="3" ColumnDefinitions="110,*" ColumnSpacing="10" Margin="0,0,0,10">
-                    <TextBlock VerticalAlignment="Center" Text="Aspect" />
-                    <ComboBox Grid.Column="1" ItemsSource="{Binding AspectModes}" SelectedItem="{Binding SelectedAspectMode}" />
-                </Grid>
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
+                        <Button Grid.Column="1" Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
+                        <Button Grid.Column="2" Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+                    </Grid>
 
-                <Grid Grid.Row="4" ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8" Margin="0,0,0,10">
-                    <TextBlock VerticalAlignment="Center" Text="Crop L" />
-                    <NumericUpDown Grid.Column="1" Value="{Binding CropLeft}" Minimum="0" Maximum="2000" />
-                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Crop T" />
-                    <NumericUpDown Grid.Column="3" Value="{Binding CropTop}" Minimum="0" Maximum="2000" />
-                </Grid>
-
-                <Grid Grid.Row="5" ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8" Margin="0,0,0,10">
-                    <TextBlock VerticalAlignment="Center" Text="Crop R" />
-                    <NumericUpDown Grid.Column="1" Value="{Binding CropRight}" Minimum="0" Maximum="2000" />
-                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Crop B" />
-                    <NumericUpDown Grid.Column="3" Value="{Binding CropBottom}" Minimum="0" Maximum="2000" />
-                </Grid>
-
-                <StackPanel Grid.Row="6" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
-                    <Button Classes="transport" Content="Detect Crop" Command="{Binding DetectCropCommand}" />
-                    <Button Classes="transport" Content="Auto Crop" Command="{Binding AutoCropCommand}" />
-                    <Button Classes="transport" Content="Clear Crop" Command="{Binding ClearCropCommand}" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Classes="transport" Content="Move Left" Command="{Binding MoveLeftCommand}" />
+                        <Button Grid.Column="1" Classes="transport" Content="Move Right" Command="{Binding MoveRightCommand}" />
+                        <Button Grid.Column="2" Classes="primary" Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
+                    </Grid>
                 </StackPanel>
+            </Border>
 
-                <StackPanel Grid.Row="7" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
-                    <Button Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
-                    <Button Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
-                    <Button Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="section-title" Text="Crop / Aspect" />
+
+                    <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
+                        <TextBlock VerticalAlignment="Center" Text="Aspect" />
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding AspectModes}" SelectedItem="{Binding SelectedAspectMode}" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8">
+                        <TextBlock VerticalAlignment="Center" Text="Crop L" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding CropLeft}" Minimum="0" Maximum="2000" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Crop T" />
+                        <NumericUpDown Grid.Column="3" Value="{Binding CropTop}" Minimum="0" Maximum="2000" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8">
+                        <TextBlock VerticalAlignment="Center" Text="Crop R" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding CropRight}" Minimum="0" Maximum="2000" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Crop B" />
+                        <NumericUpDown Grid.Column="3" Value="{Binding CropBottom}" Minimum="0" Maximum="2000" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Classes="transport" Content="Detect Crop" Command="{Binding DetectCropCommand}" />
+                        <Button Grid.Column="1" Classes="transport" Content="Auto Crop" Command="{Binding AutoCropCommand}" />
+                        <Button Grid.Column="2" Classes="transport" Content="Clear Crop" Command="{Binding ClearCropCommand}" />
+                    </Grid>
                 </StackPanel>
+            </Border>
 
-                <StackPanel Grid.Row="8" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
-                    <Button Classes="transport" Content="Move Left" Command="{Binding MoveLeftCommand}" />
-                    <Button Classes="transport" Content="Move Right" Command="{Binding MoveRightCommand}" />
-                    <Button Classes="primary" Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
-                </StackPanel>
-
-                <ListBox Grid.Row="9" ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}" Background="Transparent" BorderThickness="0">
+            <Border Classes="card" Padding="10">
+                <ListBox ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}" Background="Transparent" BorderThickness="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="core:TimelineSegment">
                             <Border Margin="0,0,0,8" Padding="10" CornerRadius="8" Background="#F7F9FC" BorderBrush="#D6DEEA" BorderThickness="1">
@@ -189,8 +228,8 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-            </Grid>
-        </Border>
+            </Border>
+        </StackPanel>
 
         <Border Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card">
             <TextBlock TextWrapping="Wrap" Text="{Binding EditorHint}" />
