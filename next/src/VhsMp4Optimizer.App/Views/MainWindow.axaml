@@ -79,15 +79,16 @@
 
                 <StackPanel Grid.Column="6" Spacing="8" VerticalAlignment="Bottom">
                     <Button Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                    <Button Content="Open Output" />
+                    <Button Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="7" Spacing="8" VerticalAlignment="Bottom">
+                    <Button Content="Open Output" />
                     <Button Content="Test Sample" />
-                    <Button Content="Open Log" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="8" Spacing="8" VerticalAlignment="Bottom">
+                    <Button Content="Open Log" />
                     <Button Content="Start Conversion" Classes="accent" />
                     <Button Content="Pause / Resume" />
                 </StackPanel>

@@ -190,4 +190,63 @@ public partial class MainWindowViewModel : ViewModelBase
         VideoBitrate = VideoBitrate,
         AudioBitrate = AudioBitrate
     };
+
+    public void ApplyTimelineProject(string sourcePath, TimelineProject timeline)
+    {
+        var existingItems = QueueItems.ToList();
+        QueueItems.Clear();
+
+        foreach (var item in existingItems)
+        {
+            if (!string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
+            {
+                QueueItems.Add(item);
+                continue;
+            }
+
+            OutputPlanSummary? planned = item.PlannedOutput;
+            if (planned is not null)
+            {
+                planned = new OutputPlanSummary
+                {
+                    DisplayOutputName = planned.DisplayOutputName,
+                    Container = planned.Container,
+                    Resolution = planned.Resolution,
+                    DurationText = CoreServices.TimelineEditorService.FormatSeconds(CoreServices.TimelineEditorService.GetKeptDurationSeconds(timeline)),
+                    VideoCodecLabel = planned.VideoCodecLabel,
+                    VideoBitrateComparisonText = planned.VideoBitrateComparisonText,
+                    AudioCodecText = planned.AudioCodecText,
+                    AudioBitrateText = planned.AudioBitrateText,
+                    BitrateText = planned.BitrateText,
+                    EncodeEngineText = planned.EncodeEngineText,
+                    EstimatedSizeText = planned.EstimatedSizeText,
+                    UsbNoteText = planned.UsbNoteText,
+                    AspectText = planned.AspectText,
+                    OutputWidth = planned.OutputWidth,
+                    OutputHeight = planned.OutputHeight
+                };
+            }
+
+            QueueItems.Add(new QueueItemSummary
+            {
+                SourceFile = item.SourceFile,
+                SourcePath = item.SourcePath,
+                OutputFile = item.OutputFile,
+                OutputPath = item.OutputPath,
+                OutputPattern = item.OutputPattern,
+                Container = item.Container,
+                Resolution = item.Resolution,
+                Duration = item.Duration,
+                Video = item.Video,
+                Audio = item.Audio,
+                Status = "timeline edited",
+                MediaInfo = item.MediaInfo,
+                PlannedOutput = planned,
+                TimelineProject = timeline
+            });
+        }
+
+        SelectedQueueItem = QueueItems.FirstOrDefault(item => string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase));
+        StatusMessage = "Timeline izmene su vracene u batch queue.";
+    }
 }

@@ -15,4 +15,5 @@ public sealed class QueueItemSummary
     public required string Status { get; init; }
     public required MediaInfo? MediaInfo { get; init; }
     public required OutputPlanSummary? PlannedOutput { get; init; }
+    public TimelineProject? TimelineProject { get; init; }
 }
