@@ -124,7 +124,7 @@ Program ume da radi i sa modernijim i sa starijim fajlovima, a kada playback nij
 ### 1. Player / Trim
 
 - `Play / Pause`, timeline i frame-by-frame kontrola
-- `Set Start`, `Set End`, `Add Segment`, `Remove`, `Clear Seg`
+- `Set Start`, `Set End`, `Cut Segment`, `Remove`, `Clear Cuts`
 - `Save to Queue` vraca izmene nazad u glavni batch bez posebnog exporta
 
 ### 2. Crop / Overscan

@@ -40,6 +40,90 @@ Set-Content -LiteralPath $outputPath -Value "small delivery mp4" -Encoding UTF8
 """.strip(),
         encoding="utf-8",
     )
+    fake_ffprobe = tmp_path / "ffprobe.ps1"
+    fake_ffprobe.write_text(
+        """
+param(
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$Args
+)
+
+$payload = @{
+  format = @{
+    filename = $Args[-1]
+    duration = "300.0"
+    size = "1024"
+    bit_rate = "1000000"
+    format_name = "avi"
+    format_long_name = "AVI"
+  }
+  streams = @(
+    @{
+      codec_type = "video"
+      codec_name = "mpeg4"
+      width = 720
+      height = 576
+      display_aspect_ratio = "4:3"
+      sample_aspect_ratio = "1:1"
+      avg_frame_rate = "25/1"
+      nb_frames = "7500"
+      bit_rate = "900000"
+    },
+    @{
+      codec_type = "audio"
+      codec_name = "mp2"
+      channels = 2
+      sample_rate = "48000"
+      bit_rate = "128000"
+    }
+  )
+}
+$payload | ConvertTo-Json -Depth 6 -Compress
+""".strip(),
+        encoding="utf-8",
+    )
+    fake_ffprobe = tmp_path / "ffprobe.ps1"
+    fake_ffprobe.write_text(
+        """
+param(
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$Args
+)
+
+$payload = @{
+  format = @{
+    filename = $Args[-1]
+    duration = "300.0"
+    size = "1024"
+    bit_rate = "1000000"
+    format_name = "avi"
+    format_long_name = "AVI"
+  }
+  streams = @(
+    @{
+      codec_type = "video"
+      codec_name = "mpeg4"
+      width = 720
+      height = 576
+      display_aspect_ratio = "4:3"
+      sample_aspect_ratio = "1:1"
+      avg_frame_rate = "25/1"
+      nb_frames = "7500"
+      bit_rate = "900000"
+    },
+    @{
+      codec_type = "audio"
+      codec_name = "mp2"
+      channels = 2
+      sample_rate = "48000"
+      bit_rate = "128000"
+    }
+  )
+}
+$payload | ConvertTo-Json -Depth 6 -Compress
+""".strip(),
+        encoding="utf-8",
+    )
 
     fake_ffmpeg_log = tmp_path / "fake-ffmpeg.log"
     env = os.environ.copy()
@@ -274,6 +358,48 @@ if ($outputPath -ne "-version") {
 """.strip(),
         encoding="utf-8",
     )
+    fake_ffprobe = tmp_path / "ffprobe.ps1"
+    fake_ffprobe.write_text(
+        """
+param(
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$Args
+)
+
+$payload = @{
+  format = @{
+    filename = $Args[-1]
+    duration = "300.0"
+    size = "1024"
+    bit_rate = "1000000"
+    format_name = "avi"
+    format_long_name = "AVI"
+  }
+  streams = @(
+    @{
+      codec_type = "video"
+      codec_name = "mpeg4"
+      width = 720
+      height = 576
+      display_aspect_ratio = "4:3"
+      sample_aspect_ratio = "1:1"
+      avg_frame_rate = "25/1"
+      nb_frames = "7500"
+      bit_rate = "900000"
+    },
+    @{
+      codec_type = "audio"
+      codec_name = "mp2"
+      channels = 2
+      sample_rate = "48000"
+      bit_rate = "128000"
+    }
+  )
+}
+$payload | ConvertTo-Json -Depth 6 -Compress
+""".strip(),
+        encoding="utf-8",
+    )
 
     fake_ffmpeg_log = tmp_path / "fake-ffmpeg.log"
     env = os.environ.copy()
@@ -312,8 +438,10 @@ if ($outputPath -ne "-version") {
     assert (output_dir / "family_tape.mp4").exists()
 
     fake_invocation = fake_ffmpeg_log.read_text(encoding="utf-8")
-    assert "-ss\n00:01:00" in fake_invocation
-    assert "-t\n00:01:30" in fake_invocation
+    assert "-filter_complex" in fake_invocation
+    assert "trim=start=0:end=60" in fake_invocation
+    assert "trim=start=150:end=300" in fake_invocation
+    assert "concat=n=2:v=1:a=1[vout][aout]" in fake_invocation
     assert str(processed_source) in fake_invocation
     assert "Processed: 1" in run.stdout
 

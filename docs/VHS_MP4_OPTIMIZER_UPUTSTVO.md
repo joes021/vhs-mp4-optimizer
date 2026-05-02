@@ -45,7 +45,7 @@ Alat uzima velike video fajlove iz VHS/DVD digitalizacije i drugih izvora i prav
    - `Playback mode` radi za moderne fajlove kao `.mp4`, `.mov` i `.mkv`.
    - `Preview mode` je fallback za `.avi`, MSDV i `.mpg`, ili kada playback ne moze da se ucita.
    - `Play / Pause`, timeline i `Frame` dugmad sluze za precizno trazenje kadra.
-   - `Set Start`, `Set End`, `Add Segment`, `Remove` i `Clear Seg` rade trim i multi-cut unutar posebnog prozora.
+   - `Set Start`, `Set End`, `Cut Segment`, `Remove` i `Clear Cuts` rade trim i multi-cut unutar posebnog prozora.
    - `Aspect / Pixel shape` deo drzi lokalni `Aspect mode` izbor za taj fajl: `Auto`, `Keep Original`, `Force 4:3` i `Force 16:9`.
    - Linija `Detected: ... -> ...` pokazuje sta je alat procitao i na koju izlaznu sirinu/visinu planira da mapira video.
    - `DAR`, `SAR` i `Planned output aspect` u istom delu pomazu da odmah vidis da li je PAL/DV ili NTSC/DV snimak pravilno protumacen.
@@ -114,7 +114,7 @@ Ako kliknes `Open Player` ili uradis dupli klik na red u tabeli, otvara se poseb
 - `Preview Frame` ne menja originalni fajl; samo pravi sliku za proveru kadra
 - `Open Video` otvara originalni fajl u podrazumevanom Windows player-u
 - `Start`, `End` i `CUT` oznake su stalno vidljive iznad trim sekcije, tako da se lako prati aktivan opseg
-- `Apply Trim` upisuje jedan trim opseg, a `Add Segment` / `Remove` / `Clear Seg` rade multi-cut tok
+- `Apply Trim` upisuje jedan trim opseg, a `Cut Segment` / `Remove` / `Clear Cuts` rade multi-cut tok
 - `Clear Trim` brise aktivni trim za taj fajl
 - `Aspect / Pixel shape` sekcija u istom prozoru drzi lokalni `Aspect mode` za taj fajl:
   - `Auto` koristi metadata + PAL/DV ili NTSC/DV heuristiku.

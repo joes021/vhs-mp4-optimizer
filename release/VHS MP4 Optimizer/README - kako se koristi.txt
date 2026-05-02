@@ -32,7 +32,7 @@ Brzi start:
    - "Preview mode" je fallback za .avi, MSDV i .mpg, ili kad playback ne moze da se otvori.
    - "Preview Frame", "Auto preview", "Open Video", "Play / Pause", timeline i Frame dugmad sluze za precizno pomeranje kroz video.
    - veliki preview je levo, timeline je ispod preview-a, a trim/crop/aspect/properties alati su u desnoj koloni.
-   - "Set Start", "Set End", "Apply Trim", "Add Segment", "Remove", "Clear Seg" i "Clear Trim" rade trim unutar posebnog prozora.
+   - "Set Start", "Set End", "Apply Trim", "Cut Segment", "Remove", "Clear Cuts" i "Clear Trim" rade trim unutar posebnog prozora.
    - "Start", "End" i "CUT" oznake ostaju stalno vidljive iznad trim sekcije.
    - "Aspect / Pixel shape" deo drzi lokalni "Aspect mode" za izabrani fajl.
    - U "Aspect mode" imas "Auto", "Keep Original", "Force 4:3" i "Force 16:9".

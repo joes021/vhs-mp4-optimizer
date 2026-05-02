@@ -3120,7 +3120,7 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["TrimStart"] == "00:00:10"
     assert payload["TrimEnd"] == "00:00:20"
     assert payload["TrimSummary"] == "00:00:10 - 00:00:20"
-    assert payload["TrimDurationSeconds"] == 10
+    assert payload["TrimDurationSeconds"] == 170
     assert payload["AspectMode"] == "Force16x9"
     assert payload["OutputAspectWidth"] > 0
     assert payload["OutputAspectHeight"] > 0
@@ -4191,8 +4191,8 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert run.returncode == 0, run.stderr
     payload = json.loads(run.stdout.split("JSON_START", 1)[1])
     assert payload["SegmentCount"] == 2
-    assert payload["SegmentSummary"] == "2 seg | 00:00:10 - 00:00:20 ; 00:01:00 - 00:01:30"
-    assert payload["SegmentDurationSeconds"] == 40
+    assert payload["SegmentSummary"] == "2 cut seg | 00:00:10 - 00:00:20 ; 00:01:00 - 00:01:30"
+    assert payload["SegmentDurationSeconds"] == 200
     assert payload["ListCount"] == 2
     assert payload["FirstListItem"] == "1. 00:00:10 - 00:00:20"
     assert payload["SecondListItem"] == "2. 00:01:00 - 00:01:30"

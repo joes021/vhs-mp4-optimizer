@@ -124,6 +124,71 @@ $result = Get-VhsMp4TrimSegments -TrimSegments $segments
     assert payload["OverlapRejected"] is True
 
 
+def test_core_effective_trim_plan_treats_selected_ranges_as_cut_segments() -> None:
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$singleCut = Get-VhsMp4EffectiveTrimPlan -TrimStart '00:01:00' -TrimEnd '00:02:30' -SourceDurationSeconds 300
+$multiCut = Get-VhsMp4EffectiveTrimPlan -TrimSegments @(
+  [pscustomobject]@{{ StartText = '00:00:00'; EndText = '00:00:45.95' }},
+  [pscustomobject]@{{ StartText = '00:43:15.89'; EndText = '00:43:22.2' }}
+) -SourceDurationSeconds 2602.2
+[pscustomobject]@{{
+  SingleCut = [pscustomobject]@{{
+    Mode = $singleCut.Mode
+    Summary = $singleCut.Summary
+    DurationSeconds = $singleCut.DurationSeconds
+    EffectiveSegments = @($singleCut.EffectiveSegments | ForEach-Object {{ $_.Summary }})
+  }}
+  MultiCut = [pscustomobject]@{{
+    Mode = $multiCut.Mode
+    Summary = $multiCut.Summary
+    StartText = $multiCut.StartText
+    EndText = $multiCut.EndText
+    DurationSeconds = $multiCut.DurationSeconds
+    EffectiveSegments = @($multiCut.EffectiveSegments | ForEach-Object {{ $_.Summary }})
+  }}
+}} | ConvertTo-Json -Depth 8 -Compress
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+
+    single_cut = payload["SingleCut"]
+    assert single_cut["Mode"] == "multi"
+    assert single_cut["Summary"] == "00:01:00 - 00:02:30"
+    assert single_cut["DurationSeconds"] == 210
+    assert single_cut["EffectiveSegments"] == [
+        "00:00:00 - 00:01:00",
+        "00:02:30 - 00:05:00",
+    ]
+
+    multi_cut = payload["MultiCut"]
+    assert multi_cut["Mode"] == "single"
+    assert multi_cut["Summary"] == "2 cut seg | 00:00:00 - 00:00:45.95 ; 00:43:15.89 - 00:43:22.2"
+    assert multi_cut["StartText"] == "00:00:45.95"
+    assert multi_cut["EndText"] == "00:43:15.89"
+    assert multi_cut["DurationSeconds"] == 2549.94
+    assert multi_cut["EffectiveSegments"] == ["00:00:45.95 - 00:43:15.89"]
+
+
 def test_core_time_formatters_reject_nan_and_infinity_values() -> None:
     command = f"""
 $ErrorActionPreference = 'Stop'
@@ -1835,10 +1900,11 @@ def test_core_builds_ffmpeg_trim_args_without_breaking_split_output(tmp_path: Pa
     command = f"""
 $ErrorActionPreference = 'Stop'
 Import-Module '{MODULE}' -Force
-$startOnly = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "start.mp4"}' -QualityMode 'Standard VHS' -TrimStart '00:01:00'
-$endOnly = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "end.mp4"}' -QualityMode 'Standard VHS' -TrimEnd '00:02:30'
-$range = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "range.mp4"}' -QualityMode 'Standard VHS' -TrimStart '00:01:00' -TrimEnd '00:02:30'
-$split = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "range-part%03d.mp4"}' -QualityMode 'Standard VHS' -TrimStart '00:01:00' -TrimEnd '00:02:30' -SplitOutput -MaxPartGb 3.8
+$videoInfo = [pscustomobject]@{{ DurationSeconds = 300.0 }}
+$startOnly = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "start.mp4"}' -QualityMode 'Standard VHS' -TrimStart '00:01:00' -VideoInfo $videoInfo
+$endOnly = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "end.mp4"}' -QualityMode 'Standard VHS' -TrimEnd '00:02:30' -VideoInfo $videoInfo
+$range = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "range.mp4"}' -QualityMode 'Standard VHS' -TrimStart '00:01:00' -TrimEnd '00:02:30' -VideoInfo $videoInfo
+$split = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "range-part%03d.mp4"}' -QualityMode 'Standard VHS' -TrimStart '00:01:00' -TrimEnd '00:02:30' -VideoInfo $videoInfo -SplitOutput -MaxPartGb 3.8
 [pscustomobject]@{{
   StartOnly = $startOnly
   EndOnly = $endOnly
@@ -1872,21 +1938,29 @@ $split = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_d
     range_args = payload["Range"]
     split_args = payload["Split"]
 
-    assert start_only[start_only.index("-ss") + 1] == "00:01:00"
+    assert start_only[start_only.index("-ss") + 1] == "00:00:00"
+    assert start_only[start_only.index("-t") + 1] == "00:01:00"
     assert start_only.index("-ss") < start_only.index("-i")
     assert "-to" not in start_only
 
-    assert end_only[end_only.index("-to") + 1] == "00:02:30"
-    assert end_only.index("-to") < end_only.index("-i")
-    assert "-ss" not in end_only
+    assert end_only[end_only.index("-ss") + 1] == "00:02:30"
+    assert end_only[end_only.index("-t") + 1] == "00:02:30"
+    assert end_only.index("-ss") < end_only.index("-i")
+    assert "-to" not in end_only
 
-    assert range_args[range_args.index("-ss") + 1] == "00:01:00"
-    assert range_args[range_args.index("-t") + 1] == "00:01:30"
-    assert range_args.index("-ss") < range_args.index("-i")
-    assert range_args.index("-t") < range_args.index("-i")
+    assert "-filter_complex" in range_args
+    range_filter = range_args[range_args.index("-filter_complex") + 1]
+    assert "trim=start=0:end=60" in range_filter
+    assert "trim=start=150:end=300" in range_filter
+    assert "concat=n=2:v=1:a=1[vout][aout]" in range_filter
+    assert "-ss" not in range_args
+    assert "-to" not in range_args
 
-    assert split_args[split_args.index("-ss") + 1] == "00:01:00"
-    assert split_args[split_args.index("-t") + 1] == "00:01:30"
+    assert "-filter_complex" in split_args
+    split_filter = split_args[split_args.index("-filter_complex") + 1]
+    assert "trim=start=0:end=60" in split_filter
+    assert "trim=start=150:end=300" in split_filter
+    assert "concat=n=2:v=1:a=1[vout][aout]" in split_filter
     assert "-f" in split_args
     assert split_args[split_args.index("-f") + 1] == "segment"
     assert split_args[split_args.index("-segment_format") + 1] == "mp4"
@@ -1905,12 +1979,13 @@ def test_core_builds_filter_complex_concat_for_multi_trim_segments(tmp_path: Pat
     command = f"""
 $ErrorActionPreference = 'Stop'
 Import-Module '{MODULE}' -Force
+$videoInfo = [pscustomobject]@{{ DurationSeconds = 120.0 }}
 $segments = @(
   [pscustomobject]@{{ StartText = '00:00:10'; EndText = '00:00:20' }},
   [pscustomobject]@{{ StartText = '00:01:00'; EndText = '00:01:30' }}
 )
-$withAudio = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "kept.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimSegments $segments -SourceHasAudio $true -Deinterlace 'YADIF' -ScaleMode 'PAL 576p' -AudioNormalize
-$withoutAudio = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "video-only.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimSegments $segments -SourceHasAudio $false
+$withAudio = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "kept.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimSegments $segments -VideoInfo $videoInfo -SourceHasAudio $true -Deinterlace 'YADIF' -ScaleMode 'PAL 576p' -AudioNormalize
+$withoutAudio = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "video-only.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimSegments $segments -VideoInfo $videoInfo -SourceHasAudio $false
 [pscustomobject]@{{
   WithAudio = $withAudio
   WithoutAudio = $withoutAudio
@@ -1942,11 +2017,12 @@ $withoutAudio = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{o
     assert "-filter_complex" in with_audio
     assert "-ss" not in with_audio
     filter_complex = with_audio[with_audio.index("-filter_complex") + 1]
-    assert "trim=start=10:end=20" in filter_complex
-    assert "trim=start=60:end=90" in filter_complex
-    assert "concat=n=2:v=1:a=1[vout][aout]" in filter_complex
+    assert "trim=start=0:end=10" in filter_complex
+    assert "trim=start=20:end=60" in filter_complex
+    assert "trim=start=90:end=120" in filter_complex
+    assert "concat=n=3:v=1:a=1[vout][aout]" in filter_complex
     assert "yadif=0:-1:0" in filter_complex
-    assert "scale=-2:576:flags=lanczos" in filter_complex
+    assert "scale=576:576:flags=lanczos" in filter_complex
     assert "loudnorm=I=-16:TP=-1.5:LRA=11" in filter_complex
     assert with_audio[with_audio.index("-map") + 1] == "[vout]"
     assert "[aout]" in with_audio
@@ -1955,7 +2031,7 @@ $withoutAudio = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{o
 
     assert "-filter_complex" in without_audio
     no_audio_filter = without_audio[without_audio.index("-filter_complex") + 1]
-    assert "concat=n=2:v=1:a=0[vout]" in no_audio_filter
+    assert "concat=n=3:v=1:a=0[vout]" in no_audio_filter
     assert "[aout]" not in without_audio
 
 
@@ -1971,7 +2047,8 @@ def test_core_builds_video_and_audio_filter_args_with_trim_and_split(tmp_path: P
     command = f"""
 $ErrorActionPreference = 'Stop'
 Import-Module '{MODULE}' -Force
-$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "filtered-part%03d.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimStart '00:01:00' -TrimEnd '00:02:00' -SplitOutput -MaxPartGb 3.8 -Deinterlace 'YADIF' -Denoise 'Light' -RotateFlip '90 CW' -ScaleMode '720p' -AudioNormalize
+$videoInfo = [pscustomobject]@{{ DurationSeconds = 180.0 }}
+$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "filtered-part%03d.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimStart '00:01:00' -TrimEnd '00:02:00' -VideoInfo $videoInfo -SplitOutput -MaxPartGb 3.8 -Deinterlace 'YADIF' -Denoise 'Light' -RotateFlip '90 CW' -ScaleMode '720p' -AudioNormalize
 $videoChain = Get-VhsMp4VideoFilterChain -Deinterlace 'YADIF' -Denoise 'Light' -RotateFlip '90 CW' -ScaleMode '720p'
 $audioChain = Get-VhsMp4AudioFilterChain -AudioNormalize
 $summary = Get-VhsMp4FilterSummary -Deinterlace 'YADIF' -Denoise 'Light' -RotateFlip '90 CW' -ScaleMode '720p' -AudioNormalize
@@ -2008,13 +2085,15 @@ $summary = Get-VhsMp4FilterSummary -Deinterlace 'YADIF' -Denoise 'Light' -Rotate
     assert payload["AudioChain"] == "loudnorm=I=-16:TP=-1.5:LRA=11"
     assert payload["Summary"] == "Deinterlace: YADIF | Denoise: Light | Rotate/flip: 90 CW | Scale: 720p | Audio normalize: On"
 
-    assert args[args.index("-ss") + 1] == "00:01:00"
-    assert args[args.index("-t") + 1] == "00:01:00"
-    assert args[args.index("-vf") + 1] == payload["VideoChain"]
-    assert args[args.index("-af") + 1] == payload["AudioChain"]
-    assert args.index("-vf") > args.index("-i")
-    assert args.index("-vf") < args.index("-c:v")
-    assert args.index("-af") < args.index("-c:a")
+    assert "-filter_complex" in args
+    filter_complex = args[args.index("-filter_complex") + 1]
+    assert "trim=start=0:end=60" in filter_complex
+    assert "trim=start=120:end=180" in filter_complex
+    assert "yadif=0:-1:0,hqdn3d=1.5:1.5:6:6,transpose=1,scale=720:720:flags=lanczos" in filter_complex
+    assert payload["AudioChain"] in filter_complex
+    assert "concat=n=2:v=1:a=1[vout][aout]" in filter_complex
+    assert "-vf" not in args
+    assert "-af" not in args
     assert args[args.index("-f") + 1] == "segment"
     assert args[-1].endswith("filtered-part%03d.mp4")
 
@@ -2555,7 +2634,8 @@ $segments = @(
   [pscustomobject]@{{ StartText = '00:00:10'; EndText = '00:00:20' }},
   [pscustomobject]@{{ StartText = '00:01:00'; EndText = '00:01:30' }}
 )
-$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "multi-crop.mp4"}' -QualityMode 'Universal MP4 H.264' -CropState $cropState -TrimSegments $segments -SourceHasAudio $true -Deinterlace 'YADIF' -ScaleMode 'PAL 576p'
+$videoInfo = [pscustomobject]@{{ DurationSeconds = 120.0 }}
+$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "multi-crop.mp4"}' -QualityMode 'Universal MP4 H.264' -CropState $cropState -TrimSegments $segments -VideoInfo $videoInfo -SourceHasAudio $true -Deinterlace 'YADIF' -ScaleMode 'PAL 576p'
 [pscustomobject]@{{
   Args = $args
 }} | ConvertTo-Json -Depth 6
@@ -2586,9 +2666,10 @@ $args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_di
     assert "-vf" not in args
     filter_complex = args[args.index("-filter_complex") + 1]
     assert "crop=692:544:12:14" in filter_complex
-    assert "trim=start=10:end=20" in filter_complex
-    assert "trim=start=60:end=90" in filter_complex
-    assert "concat=n=2:v=1:a=1[vout][aout]" in filter_complex
+    assert "trim=start=0:end=10" in filter_complex
+    assert "trim=start=20:end=60" in filter_complex
+    assert "trim=start=90:end=120" in filter_complex
+    assert "concat=n=3:v=1:a=1[vout][aout]" in filter_complex
 
 
 def test_core_builds_pal_576p_scale_filter() -> None:
@@ -2879,11 +2960,13 @@ Import-Module '{MODULE}' -Force
 $plan = @(
   [pscustomobject]@{{
     SourceName = 'trimmed.avi'
-    SourcePath = '{trimmed_source}'
-    OutputPath = '{trimmed_output}'
-    Status = 'queued'
-    TrimStartText = '00:01:00'
-    TrimEndText = '00:02:30'
+      SourcePath = '{trimmed_source}'
+      OutputPath = '{trimmed_output}'
+      Status = 'queued'
+      HasAudio = $true
+      MediaInfo = [pscustomobject]@{{ DurationSeconds = 300.0 }}
+      TrimStartText = '00:01:00'
+      TrimEndText = '00:02:30'
   }},
   [pscustomobject]@{{
     SourceName = 'full.avi'
@@ -2928,8 +3011,10 @@ $summary = Invoke-VhsMp4Batch -InputDir '{input_dir}' -OutputDir '{output_dir}' 
     trimmed_section = next(section for section in conversion_sections if str(trimmed_source) in section)
     full_section = next(section for section in conversion_sections if str(full_source) in section)
 
-    assert "-ss\n00:01:00" in trimmed_section
-    assert "-t\n00:01:30" in trimmed_section
+    assert "-filter_complex" in trimmed_section
+    assert "trim=start=0:end=60" in trimmed_section
+    assert "trim=start=150:end=300" in trimmed_section
+    assert "concat=n=2:v=1:a=1[vout][aout]" in trimmed_section
     assert "-ss" not in full_section
     assert "-t\n00:01:30" not in full_section
 
@@ -2982,6 +3067,7 @@ $plan = @(
     SourcePath = '{segmented_source}'
     OutputPath = '{segmented_output}'
     Status = 'queued'
+    MediaInfo = [pscustomobject]@{{ DurationSeconds = 120.0 }}
     TrimSegments = @(
       [pscustomobject]@{{ StartText = '00:00:10'; EndText = '00:00:20' }},
       [pscustomobject]@{{ StartText = '00:01:00'; EndText = '00:01:30' }}
@@ -3026,8 +3112,8 @@ $summary = Invoke-VhsMp4Batch -InputDir '{input_dir}' -OutputDir '{output_dir}' 
     assert payload["Failed"] == 0
 
     segmented_item = next(item for item in payload["Items"] if item["SourceName"] == "segmented.avi")
-    assert segmented_item["TrimSummary"] == "2 seg | 00:00:10 - 00:00:20 ; 00:01:00 - 00:01:30"
-    assert segmented_item["TrimDurationSeconds"] == 40
+    assert segmented_item["TrimSummary"] == "2 cut seg | 00:00:10 - 00:00:20 ; 00:01:00 - 00:01:30"
+    assert segmented_item["TrimDurationSeconds"] == 80
 
     fake_invocation = fake_ffmpeg_log.read_text(encoding="utf-8")
     sections = [section.strip() for section in fake_invocation.split("---") if section.strip()]
@@ -3036,7 +3122,10 @@ $summary = Invoke-VhsMp4Batch -InputDir '{input_dir}' -OutputDir '{output_dir}' 
     full_section = next(section for section in conversion_sections if str(full_source) in section)
 
     assert "-filter_complex" in segmented_section
-    assert "concat=n=2:v=1:a=1[vout][aout]" in segmented_section
+    assert "trim=start=0:end=10" in segmented_section
+    assert "trim=start=20:end=60" in segmented_section
+    assert "trim=start=90:end=120" in segmented_section
+    assert "concat=n=3:v=1:a=1[vout][aout]" in segmented_section
     assert "-ss" not in segmented_section
     assert "-filter_complex" not in full_section
 

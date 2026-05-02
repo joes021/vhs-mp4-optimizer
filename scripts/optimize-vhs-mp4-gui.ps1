@@ -2914,8 +2914,9 @@ function Copy-PlanItemTrimState {
 
     if ($trimSegments.Count -gt 0) {
         $normalized = Get-VhsMp4TrimSegments -TrimSegments $trimSegments
-        $trimSummary = [string]$normalized.Summary
-        $trimDurationSeconds = [double]$normalized.TotalDurationSeconds
+        $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $Item -TrimSegments $normalized.Segments
+        $trimSummary = [string]$trimPlan.Summary
+        $trimDurationSeconds = $trimPlan.DurationSeconds
         if ([string]::IsNullOrWhiteSpace($trimStartText)) {
             $trimStartText = [string]$normalized.Segments[0].StartText
         }
@@ -2945,6 +2946,35 @@ function Copy-PlanItemTrimState {
         TrimSegments = @($trimSegments)
         PreviewPositionSeconds = $previewPositionSeconds
     }
+}
+
+function Get-PlanItemSourceDurationSeconds {
+    param(
+        [AllowNull()]
+        $Item
+    )
+
+    if ($null -eq $Item) {
+        return $null
+    }
+
+    if ($Item.PSObject.Properties["MediaInfo"] -and $null -ne $Item.MediaInfo -and $null -ne $Item.MediaInfo.DurationSeconds) {
+        return (Convert-ToVhsMp4FiniteDouble -Value $Item.MediaInfo.DurationSeconds -Default $null)
+    }
+
+    return $null
+}
+
+function Get-PlanItemEffectiveTrimPlan {
+    param(
+        [AllowNull()]
+        $Item,
+        [string]$TrimStart = "",
+        [string]$TrimEnd = "",
+        [object[]]$TrimSegments = @()
+    )
+
+    return (Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments -SourceDurationSeconds (Get-PlanItemSourceDurationSeconds -Item $Item))
 }
 
 function Get-PlanItemCropSourceDimensions {
@@ -3445,23 +3475,25 @@ function Apply-PlayerTrimStateToItem {
 
     if ($segments.Count -gt 0) {
         $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
+        $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $Item -TrimSegments $normalized.Segments
         $Item | Add-Member -NotePropertyName "TrimSegments" -NotePropertyValue $normalized.Segments -Force
         $Item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue "" -Force
         $Item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue "" -Force
         $Item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $null -Force
         $Item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $null -Force
-        $Item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $normalized.TotalDurationSeconds -Force
-        $Item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $normalized.Summary -Force
+        $Item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
+        $Item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
     }
     else {
-        $window = Get-VhsMp4TrimWindow -TrimStart ([string]$TrimState.TrimStartText) -TrimEnd ([string]$TrimState.TrimEndText)
-        if (-not [string]::IsNullOrWhiteSpace([string]$window.Summary)) {
-            $Item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue $window.StartText -Force
-            $Item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue $window.EndText -Force
-            $Item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $window.StartSeconds -Force
-            $Item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $window.EndSeconds -Force
-            $Item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $window.DurationSeconds -Force
-            $Item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $window.Summary -Force
+        $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $Item -TrimStart ([string]$TrimState.TrimStartText) -TrimEnd ([string]$TrimState.TrimEndText)
+        if (-not [string]::IsNullOrWhiteSpace([string]$trimPlan.Summary)) {
+            $cutSegment = @($trimPlan.Segments)[0]
+            $Item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue ([string]$cutSegment.StartText) -Force
+            $Item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue ([string]$cutSegment.EndText) -Force
+            $Item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $cutSegment.StartSeconds -Force
+            $Item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $cutSegment.EndSeconds -Force
+            $Item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
+            $Item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
         }
     }
 
@@ -4659,20 +4691,21 @@ function Save-SelectedTrimSegments {
     }
 
     $normalized = Get-VhsMp4TrimSegments -TrimSegments $Segments
+    $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $item -TrimSegments $normalized.Segments
     $item | Add-Member -NotePropertyName "TrimSegments" -NotePropertyValue $normalized.Segments -Force
     $item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue "" -Force
     $item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue "" -Force
     $item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $null -Force
     $item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $null -Force
-    $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $normalized.TotalDurationSeconds -Force
-    $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $normalized.Summary -Force
+    $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
+    $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
 
     $script:PendingTrimSegmentIndex = if ($PreferredIndex -ge 0) { [Math]::Min($PreferredIndex, $normalized.Count - 1) } else { 0 }
     Update-PlanItemTrimEstimate -Item $item
     Update-SelectedTrimGridRow -Item $item
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
-    Add-LogLine ($LogAction + ": " + $item.SourceName + " | " + $normalized.Summary)
+    Add-LogLine ($LogAction + ": " + $item.SourceName + " | " + $trimPlan.Summary)
 }
 
 function Add-TrimSegmentFromFields {
@@ -4684,7 +4717,7 @@ function Add-TrimSegmentFromFields {
     try {
         $window = Get-VhsMp4TrimWindow -TrimStart $trimStartTextBox.Text -TrimEnd $trimEndTextBox.Text
         if ([string]::IsNullOrWhiteSpace($window.Summary) -or [string]::IsNullOrWhiteSpace($window.StartText) -or [string]::IsNullOrWhiteSpace($window.EndText)) {
-            throw "Za Add Segment unesi i Start i End."
+            throw "Za Cut Segment unesi i Start i End."
         }
 
         $segments = New-Object System.Collections.Generic.List[object]
@@ -4706,10 +4739,10 @@ function Add-TrimSegmentFromFields {
             }
         }
 
-        Save-SelectedTrimSegments -Segments $normalized.Segments -PreferredIndex $preferredIndex -LogAction "Add Segment"
+        Save-SelectedTrimSegments -Segments $normalized.Segments -PreferredIndex $preferredIndex -LogAction "Cut Segment"
     }
     catch {
-        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Add Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Cut Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
     }
 }
 
@@ -4733,7 +4766,7 @@ function Remove-SelectedTrimSegment {
     }
 
     if ($remaining.Count -gt 0) {
-        Save-SelectedTrimSegments -Segments $remaining -PreferredIndex ([Math]::Min($selectedIndex, $remaining.Count - 1)) -LogAction "Remove Segment"
+        Save-SelectedTrimSegments -Segments $remaining -PreferredIndex ([Math]::Min($selectedIndex, $remaining.Count - 1)) -LogAction "Remove Cut"
         return
     }
 
@@ -4757,7 +4790,7 @@ function Clear-SelectedTrimSegments {
     Update-SelectedTrimGridRow -Item $item
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
-    Add-LogLine ("Clear Segments: " + $item.SourceName)
+    Add-LogLine ("Clear Cuts: " + $item.SourceName)
 }
 
 function Set-TrimPointFromPreview {
@@ -5339,7 +5372,7 @@ function Open-PlayerTrimWindow {
     $trimActionsFlow.Controls.Add($applyPlayerTrimButton)
 
     $addPlayerSegmentButton = New-Object System.Windows.Forms.Button
-    $addPlayerSegmentButton.Text = "Add Segment"
+    $addPlayerSegmentButton.Text = "Cut Segment"
     $addPlayerSegmentButton.AutoSize = $true
     $trimActionsFlow.Controls.Add($addPlayerSegmentButton)
 
@@ -5349,7 +5382,7 @@ function Open-PlayerTrimWindow {
     $trimActionsFlow.Controls.Add($removePlayerSegmentButton)
 
     $clearPlayerSegmentsButton = New-Object System.Windows.Forms.Button
-    $clearPlayerSegmentsButton.Text = "Clear Seg"
+    $clearPlayerSegmentsButton.Text = "Clear Cuts"
     $clearPlayerSegmentsButton.AutoSize = $true
     $trimActionsFlow.Controls.Add($clearPlayerSegmentsButton)
 
@@ -6336,29 +6369,31 @@ function Open-PlayerTrimWindow {
                     EndText = [string]$segmentWindow.EndText
                 }
                 $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
+                $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
                 $localState.TrimSegments = @($normalized.Segments)
                 $localState.TrimStartText = ""
                 $localState.TrimEndText = ""
-                $localState.TrimSummary = [string]$normalized.Summary
-                $localState.TrimDurationSeconds = [double]$normalized.TotalDurationSeconds
+                $localState.TrimSummary = [string]$trimPlan.Summary
+                $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
                 Sync-PlayerSegmentsList
                 Load-PlayerTrimFields
                 Set-PlayerTrimDialogDirty
                 return
             }
 
-            $window = Get-VhsMp4TrimWindow -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text
-            if ([string]::IsNullOrWhiteSpace([string]$window.Summary)) {
+            $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
+            if ([string]::IsNullOrWhiteSpace([string]$trimPlan.Summary)) {
                 $localState.TrimStartText = ""
                 $localState.TrimEndText = ""
                 $localState.TrimSummary = ""
                 $localState.TrimDurationSeconds = $null
             }
             else {
-                $localState.TrimStartText = [string]$window.StartText
-                $localState.TrimEndText = [string]$window.EndText
-                $localState.TrimSummary = [string]$window.Summary
-                $localState.TrimDurationSeconds = [double]$window.DurationSeconds
+                $cutSegment = @($trimPlan.Segments)[0]
+                $localState.TrimStartText = [string]$cutSegment.StartText
+                $localState.TrimEndText = [string]$cutSegment.EndText
+                $localState.TrimSummary = [string]$trimPlan.Summary
+                $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
             }
             $localState.TrimSegments = @()
             Sync-PlayerSegmentsList
@@ -6374,7 +6409,7 @@ function Open-PlayerTrimWindow {
         try {
             $window = Get-VhsMp4TrimWindow -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text
             if ([string]::IsNullOrWhiteSpace([string]$window.Summary) -or [string]::IsNullOrWhiteSpace([string]$window.StartText) -or [string]::IsNullOrWhiteSpace([string]$window.EndText)) {
-                throw "Za Add Segment unesi i Start i End."
+                throw "Za Cut Segment unesi i Start i End."
             }
 
             $segments = New-Object System.Collections.Generic.List[object]
@@ -6390,18 +6425,19 @@ function Open-PlayerTrimWindow {
             })
 
             $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
+            $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
             $localState.TrimSegments = @($normalized.Segments)
             $localState.TrimStartText = ""
             $localState.TrimEndText = ""
-            $localState.TrimSummary = [string]$normalized.Summary
-            $localState.TrimDurationSeconds = [double]$normalized.TotalDurationSeconds
+            $localState.TrimSummary = [string]$trimPlan.Summary
+            $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
             Sync-PlayerSegmentsList
             $playerSegmentsListBox.SelectedIndex = [Math]::Max(0, $normalized.Count - 1)
             Load-PlayerTrimFields
             Set-PlayerTrimDialogDirty
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Add Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Cut Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
         }
     }
 
@@ -6421,9 +6457,10 @@ function Open-PlayerTrimWindow {
 
         if ($remaining.Count -gt 0) {
             $normalized = Get-VhsMp4TrimSegments -TrimSegments $remaining
+            $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
             $localState.TrimSegments = @($normalized.Segments)
-            $localState.TrimSummary = [string]$normalized.Summary
-            $localState.TrimDurationSeconds = [double]$normalized.TotalDurationSeconds
+            $localState.TrimSummary = [string]$trimPlan.Summary
+            $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
         }
         else {
             $localState.TrimSegments = @()
@@ -6465,11 +6502,20 @@ function Open-PlayerTrimWindow {
 
         try {
             if (@($localState.TrimSegments).Count -eq 0) {
-                $window = Get-VhsMp4TrimWindow -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text
-                $localState.TrimStartText = [string]$window.StartText
-                $localState.TrimEndText = [string]$window.EndText
-                $localState.TrimSummary = [string]$window.Summary
-                $localState.TrimDurationSeconds = $window.DurationSeconds
+                $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
+                if ($trimPlan.Count -gt 0) {
+                    $cutSegment = @($trimPlan.Segments)[0]
+                    $localState.TrimStartText = [string]$cutSegment.StartText
+                    $localState.TrimEndText = [string]$cutSegment.EndText
+                    $localState.TrimSummary = [string]$trimPlan.Summary
+                    $localState.TrimDurationSeconds = $trimPlan.DurationSeconds
+                }
+                else {
+                    $localState.TrimStartText = ""
+                    $localState.TrimEndText = ""
+                    $localState.TrimSummary = ""
+                    $localState.TrimDurationSeconds = $null
+                }
             }
 
             $runtimeState.DialogResult = [pscustomobject]@{
@@ -7264,14 +7310,14 @@ function Apply-SelectedTrim {
         if ($segments.Count -gt 0 -and $selectedSegmentIndex -ge 0 -and $selectedSegmentIndex -lt $segments.Count) {
             $segmentWindow = Get-VhsMp4TrimWindow -TrimStart $trimStartTextBox.Text -TrimEnd $trimEndTextBox.Text
             if ([string]::IsNullOrWhiteSpace($segmentWindow.Summary) -or [string]::IsNullOrWhiteSpace($segmentWindow.StartText) -or [string]::IsNullOrWhiteSpace($segmentWindow.EndText)) {
-                throw "Za update segmenta unesi i Start i End."
+                throw "Za update cut-a unesi i Start i End."
             }
 
             $segments[$selectedSegmentIndex] = [pscustomobject]@{
                 StartText = $segmentWindow.StartText
                 EndText = $segmentWindow.EndText
             }
-            Save-SelectedTrimSegments -Segments $segments -PreferredIndex $selectedSegmentIndex -LogAction "Update Segment"
+            Save-SelectedTrimSegments -Segments $segments -PreferredIndex $selectedSegmentIndex -LogAction "Update Cut"
             return
         }
 
@@ -7281,20 +7327,22 @@ function Apply-SelectedTrim {
             return
         }
 
+        $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $item -TrimStart $trimStartTextBox.Text -TrimEnd $trimEndTextBox.Text
         if ($item.PSObject.Properties["TrimSegments"]) {
             $item.PSObject.Properties.Remove("TrimSegments")
         }
-        $item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue $window.StartText -Force
-        $item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue $window.EndText -Force
-        $item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $window.StartSeconds -Force
-        $item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $window.EndSeconds -Force
-        $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $window.DurationSeconds -Force
-        $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $window.Summary -Force
+        $cutSegment = @($trimPlan.Segments)[0]
+        $item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue ([string]$cutSegment.StartText) -Force
+        $item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue ([string]$cutSegment.EndText) -Force
+        $item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $cutSegment.StartSeconds -Force
+        $item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $cutSegment.EndSeconds -Force
+        $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
+        $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
         Update-PlanItemTrimEstimate -Item $item
         Update-SelectedTrimGridRow -Item $item
         Update-MediaInfoPanel
         Update-PreviewTrimPanel
-        Add-LogLine ("Apply Trim: " + $item.SourceName + " | " + $window.Summary)
+        Add-LogLine ("Apply Trim: " + $item.SourceName + " | " + $trimPlan.Summary)
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Apply Trim", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
@@ -10204,7 +10252,7 @@ $applyTrimButton.AutoSize = $true
 $trimButtonsFlow.Controls.Add($applyTrimButton)
 
 $addSegmentButton = New-Object System.Windows.Forms.Button
-$addSegmentButton.Text = "Add Segment"
+$addSegmentButton.Text = "Cut Segment"
 $addSegmentButton.AutoSize = $true
 $trimButtonsFlow.Controls.Add($addSegmentButton)
 
@@ -10214,7 +10262,7 @@ $removeSegmentButton.AutoSize = $true
 $trimButtonsFlow.Controls.Add($removeSegmentButton)
 
 $clearSegmentsButton = New-Object System.Windows.Forms.Button
-$clearSegmentsButton.Text = "Clear Seg"
+$clearSegmentsButton.Text = "Clear Cuts"
 $clearSegmentsButton.AutoSize = $true
 $trimButtonsFlow.Controls.Add($clearSegmentsButton)
 
