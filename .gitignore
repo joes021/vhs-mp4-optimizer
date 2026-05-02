@@ -1,5 +1,9 @@
 dist/
 .worktrees/
+.dotnet/
+.tools/
+bin/
+obj/
 __pycache__/
 .pytest_cache/
 *.pyc

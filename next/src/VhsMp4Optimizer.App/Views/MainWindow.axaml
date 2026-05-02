@@ -1,0 +1,225 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VhsMp4Optimizer.App.ViewModels"
+        xmlns:core="using:VhsMp4Optimizer.Core.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1440" d:DesignHeight="900"
+        x:Class="VhsMp4Optimizer.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{Binding WindowTitle}"
+        MinWidth="1200"
+        MinHeight="780">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,8,*,8,220" Margin="16">
+        <Grid Grid.Row="0" ColumnDefinitions="*,16,*" Margin="0,0,0,10">
+            <Border Grid.Column="0" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="12">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="110,*,130" ColumnSpacing="10" RowSpacing="10">
+                    <TextBlock Classes="section-title" Grid.Row="0" Grid.ColumnSpan="3" Text="Input folder" />
+                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Source" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
+                    <Button Grid.Row="1" Grid.Column="2" Content="Browse..." HorizontalAlignment="Stretch" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="12">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="110,*,130" ColumnSpacing="10" RowSpacing="10">
+                    <TextBlock Classes="section-title" Grid.Row="0" Grid.ColumnSpan="3" Text="Output folder" />
+                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Target" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
+                    <Button Grid.Row="1" Grid.Column="2" Content="Browse..." HorizontalAlignment="Stretch" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="1" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+            <Grid ColumnDefinitions="220,200,140,140,140,*,Auto,Auto,Auto" ColumnSpacing="10">
+                <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Classes="section-title" Text="Quick Setup" Margin="0,0,0,4" />
+                    <TextBlock Text="Workflow preset" Opacity="0.75" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="{Binding SelectedPreset}" />
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="section-title" Text="Quality mode" Margin="0,0,0,4" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="{Binding QualityMode}" />
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="4">
+                    <TextBlock Classes="section-title" Text="Scale" Margin="0,0,0,4" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="{Binding ScaleMode}" />
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Spacing="4">
+                    <TextBlock Classes="section-title" Text="Video bitrate" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding VideoBitrate}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="4" Spacing="4">
+                    <TextBlock Classes="section-title" Text="Audio bitrate" Margin="0,0,0,4" />
+                    <TextBox Text="{Binding AudioBitrate}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="6" Spacing="8" VerticalAlignment="Bottom">
+                    <Button Content="Scan Files" />
+                    <Button Content="Open Output" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="7" Spacing="8" VerticalAlignment="Bottom">
+                    <Button Content="Test Sample" />
+                    <Button Content="Open Log" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="8" Spacing="8" VerticalAlignment="Bottom">
+                    <Button Content="Start Conversion" Classes="accent" />
+                    <Button Content="Pause / Resume" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="12">
+            <Grid ColumnDefinitions="180,180,160,160,160,*" ColumnSpacing="10">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="section-title" Text="Advanced Settings" Margin="0,0,0,4" />
+                    <TextBlock Text="Deinterlace" Opacity="0.75" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Off" />
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
+                    <TextBlock Text="Denoise" Opacity="0.75" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Off" />
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Spacing="4">
+                    <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
+                    <TextBlock Text="Aspect mode" Opacity="0.75" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Auto" />
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Column="3" Spacing="4">
+                    <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
+                    <TextBlock Text="Encode engine" Opacity="0.75" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Auto" />
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Column="4" Spacing="4">
+                    <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
+                    <TextBlock Text="Split output" Opacity="0.75" />
+                    <CheckBox Content="Enable split" />
+                </StackPanel>
+                <StackPanel Grid.Column="5" Spacing="6">
+                    <TextBlock Classes="section-title" Text="Migration note" Margin="0,0,0,4" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                               Text="Ovo je nova Avalonia osnova. Sledece faze prenose scan, queue planiranje, player/trim i timeline editor iz stare verzije u novi cross-platform sistem." />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GridSplitter Grid.Row="3" Height="8" HorizontalAlignment="Stretch" Background="#293244" ResizeDirection="Rows"/>
+
+        <Grid Grid.Row="4" ColumnDefinitions="*,8,*">
+            <Border Grid.Column="0" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="10">
+                <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
+                    <TextBlock Classes="section-title" Text="Queue" />
+                    <Grid Grid.Row="1" ColumnDefinitions="2.3*,2.3*,1.1*,1.1*,1.1*,1.6*,1.4*,1.1*" ColumnSpacing="8">
+                        <TextBlock Text="Source file" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Output file" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Container" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Resolution" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="4" Text="Duration" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="5" Text="Video" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="6" Text="Audio" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="7" Text="Status" FontWeight="SemiBold" />
+                    </Grid>
+
+                    <ListBox Grid.Row="2" ItemsSource="{Binding QueueItems}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="core:QueueItemSummary">
+                                <Border Padding="6" BorderBrush="#202838" BorderThickness="0,0,0,1">
+                                    <Grid ColumnDefinitions="2.3*,2.3*,1.1*,1.1*,1.1*,1.6*,1.4*,1.1*" ColumnSpacing="8">
+                                        <TextBlock Text="{Binding SourceFile}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{Binding OutputFile}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Container}" />
+                                        <TextBlock Grid.Column="3" Text="{Binding Resolution}" />
+                                        <TextBlock Grid.Column="4" Text="{Binding Duration}" />
+                                        <TextBlock Grid.Column="5" Text="{Binding Video}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="6" Text="{Binding Audio}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="7" Text="{Binding Status}" TextWrapping="Wrap" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="8" VerticalAlignment="Stretch" Background="#293244" ResizeDirection="Columns"/>
+
+            <Border Grid.Column="2" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="10">
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Classes="section-title" Text="Input / Planned output" />
+                    <ScrollViewer Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding ComparisonRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="core:PropertyComparisonRow">
+                                    <Grid ColumnDefinitions="1.1*,1.7*,1.7*" ColumnSpacing="10" Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="1" Text="{Binding InputValue}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="2" Text="{Binding OutputValue}" TextWrapping="Wrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="5" Height="8" HorizontalAlignment="Stretch" Background="#293244" ResizeDirection="Rows"/>
+
+        <TabControl Grid.Row="6">
+            <TabItem Header="Status">
+                <Border Padding="12">
+                    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+                </Border>
+            </TabItem>
+            <TabItem Header="Progress">
+                <Border Padding="12">
+                    <TextBlock Text="{Binding ProgressMessage}" TextWrapping="Wrap" />
+                </Border>
+            </TabItem>
+            <TabItem Header="Log">
+                <Border Padding="12">
+                    <TextBlock Text="{Binding LogMessage}" TextWrapping="Wrap" />
+                </Border>
+            </TabItem>
+        </TabControl>
+    </Grid>
+
+</Window>
