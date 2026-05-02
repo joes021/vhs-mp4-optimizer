@@ -112,6 +112,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<string> AspectModes { get; }
 
+    public string? ResolvedFfmpegPath => _ffmpegPath;
+
     public IAsyncRelayCommand ScanFilesCommand { get; }
 
     public IAsyncRelayCommand StartConversionCommand { get; }

@@ -21,7 +21,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var editorViewModel = new PlayerTrimWindowViewModel(viewModel.SelectedQueueItem, timeline =>
+        var editorViewModel = new PlayerTrimWindowViewModel(viewModel.SelectedQueueItem, viewModel.ResolvedFfmpegPath, timeline =>
         {
             viewModel.ApplyTimelineProject(viewModel.SelectedQueueItem.SourcePath, timeline);
         });

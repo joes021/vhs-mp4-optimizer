@@ -9,47 +9,76 @@
         x:DataType="vm:PlayerTrimWindowViewModel"
         Width="1400"
         Height="900"
-        MinWidth="1100"
-        MinHeight="720"
+        MinWidth="1160"
+        MinHeight="760"
         Title="{Binding WindowTitle}">
 
-    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,340" Margin="16">
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,360" Margin="16">
         <StackPanel Grid.ColumnSpan="2" Spacing="4" Margin="0,0,0,12">
             <TextBlock FontSize="22" FontWeight="SemiBold" Text="Player / Trim" />
             <TextBlock Opacity="0.75" Text="{Binding FileSummary}" />
         </StackPanel>
 
         <Border Grid.Row="1" Background="#101622" BorderBrush="#2A3346" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,12,0">
-            <Grid RowDefinitions="Auto,*,Auto,Auto">
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Preview timeline foundation" />
-                <Border Grid.Row="1" Margin="0,12,0,12" Background="#05070B" CornerRadius="6">
-                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
-                               Text="Ovo je prva Avalonia timeline osnova za jedan fajl. Sledeca faza dodaje pravi preview engine i virtualni timeline koji krije isečene delove." />
+            <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="10">
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Preview" />
+
+                <Border Grid.Row="1" Background="#05070B" CornerRadius="6" ClipToBounds="True">
+                    <Image Source="{Binding PreviewBitmap}" Stretch="Uniform" />
                 </Border>
 
-                <Grid Grid.Row="2" ColumnDefinitions="150,*,150,*" ColumnSpacing="10" Margin="0,0,0,10">
+                <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+                    <TextBlock VerticalAlignment="Center" Text="Virtual" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding PreviewVirtualTimeText}" />
+                    <Slider Grid.Column="2"
+                            Minimum="0"
+                            Maximum="{Binding PreviewVirtualMaximum}"
+                            Value="{Binding PreviewVirtualSeconds, Mode=TwoWay}"
+                            PointerReleased="PreviewSliderPointerReleased" />
+                    <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding PreviewSourceTimeText}" />
+                </Grid>
+
+                <WrapPanel Grid.Row="3" Orientation="Horizontal" ItemWidth="104" ItemHeight="34">
+                    <Button Content="START" Command="{Binding GoToStartCommand}" />
+                    <Button Content="&lt; 250 Frames" Command="{Binding Back250FramesCommand}" />
+                    <Button Content="&lt; 25 Frames" Command="{Binding Back25FramesCommand}" />
+                    <Button Content="&lt; Frame" Command="{Binding BackFrameCommand}" />
+                    <Button Content="Preview Frame" Command="{Binding RefreshPreviewCommand}" />
+                    <Button Content="Frame &gt;" Command="{Binding ForwardFrameCommand}" />
+                    <Button Content="25 Frames &gt;" Command="{Binding Forward25FramesCommand}" />
+                    <Button Content="250 Frames &gt;" Command="{Binding Forward250FramesCommand}" />
+                    <Button Content="In Point" Command="{Binding SetInPointCommand}" />
+                    <Button Content="Out Point" Command="{Binding SetOutPointCommand}" />
+                    <Button Content="END" Command="{Binding GoToEndCommand}" />
+                </WrapPanel>
+
+                <Grid Grid.Row="4" ColumnDefinitions="150,*,150,*" ColumnSpacing="10">
                     <TextBlock VerticalAlignment="Center" Text="IN Point" />
                     <TextBox Grid.Column="1" Text="{Binding InPointText}" />
                     <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="OUT Point" />
                     <TextBox Grid.Column="3" Text="{Binding OutPointText}" />
                 </Grid>
-
-                <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
-                    <Button Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
-                    <Button Content="Delete" Command="{Binding DeleteSegmentCommand}" />
-                    <Button Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
-                    <Button Content="Move Left" Command="{Binding MoveLeftCommand}" />
-                    <Button Content="Move Right" Command="{Binding MoveRightCommand}" />
-                    <Button Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
-                </StackPanel>
             </Grid>
         </Border>
 
         <Border Grid.Row="1" Grid.Column="1" Background="#141A24" BorderBrush="#2A3346" BorderThickness="1" CornerRadius="8" Padding="12">
-            <Grid RowDefinitions="Auto,Auto,*">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="Timeline segments" />
                 <TextBlock Grid.Row="1" Margin="0,6,0,12" Opacity="0.8" Text="{Binding TimelineSummary}" />
-                <ListBox Grid.Row="2" ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}">
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+                    <Button Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
+                    <Button Content="Delete" Command="{Binding DeleteSegmentCommand}" />
+                    <Button Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+                    <Button Content="Move Left" Command="{Binding MoveLeftCommand}" />
+                    <Button Content="Move Right" Command="{Binding MoveRightCommand}" />
+                    <Button Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
+                </StackPanel>
+
+                <ListBox Grid.Row="4" ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="core:TimelineSegment">
                             <Border Margin="0,0,0,8" Padding="10" CornerRadius="6" Background="#1A2231">
@@ -60,7 +89,8 @@
                                     <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Margin="0,6,0,0"
                                                Text="{Binding SourceStartSeconds, StringFormat='Source {0:0.00}s'}" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,6,0,0"
-                                               Text="{Binding SourceEndSeconds, StringFormat='do {0:0.00}s'}" HorizontalAlignment="Right" />
+                                               Text="{Binding SourceEndSeconds, StringFormat='do {0:0.00}s'}"
+                                               HorizontalAlignment="Right" />
                                 </Grid>
                             </Border>
                         </DataTemplate>

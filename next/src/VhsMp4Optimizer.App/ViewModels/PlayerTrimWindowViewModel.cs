@@ -1,22 +1,31 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Core.Services;
+using VhsMp4Optimizer.Infrastructure.Services;
 
 namespace VhsMp4Optimizer.App.ViewModels;
 
 public partial class PlayerTrimWindowViewModel : ViewModelBase
 {
     private readonly Action<TimelineProject> _saveAction;
+    private readonly PreviewFrameService _previewFrameService = new();
+    private readonly string? _ffmpegPath;
+    private CancellationTokenSource? _previewCts;
 
-    public PlayerTrimWindowViewModel(QueueItemSummary item, Action<TimelineProject> saveAction)
+    public PlayerTrimWindowViewModel(QueueItemSummary item, string? ffmpegPath, Action<TimelineProject> saveAction)
     {
         ArgumentNullException.ThrowIfNull(item.MediaInfo);
 
         _saveAction = saveAction;
+        _ffmpegPath = ffmpegPath;
         Item = item;
         Timeline = item.TimelineProject ?? TimelineEditorService.CreateInitial(item.MediaInfo);
         Segments = new ObservableCollection<TimelineSegment>(Timeline.Segments);
@@ -26,31 +35,66 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         InPointText = "00:00:00.00";
         OutPointText = TimelineEditorService.FormatSeconds(item.MediaInfo.DurationSeconds);
 
-        CutSegmentCommand = new RelayCommand(ApplyCutSegment);
-        DeleteSegmentCommand = new RelayCommand(DeleteSegment, CanModifySelectedSegment);
-        RippleDeleteCommand = new RelayCommand(RippleDeleteSegment, CanModifySelectedSegment);
-        MoveLeftCommand = new RelayCommand(MoveLeft, CanModifySelectedSegment);
-        MoveRightCommand = new RelayCommand(MoveRight, CanModifySelectedSegment);
+        CutSegmentCommand = new AsyncRelayCommand(ApplyCutSegmentAsync);
+        DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
+        RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
+        MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
+        MoveRightCommand = new AsyncRelayCommand(MoveRightAsync, CanModifySelectedSegment);
         SaveToQueueCommand = new RelayCommand(SaveToQueue);
 
+        GoToStartCommand = new AsyncRelayCommand(GoToStartAsync);
+        GoToEndCommand = new AsyncRelayCommand(GoToEndAsync);
+        BackFrameCommand = new AsyncRelayCommand(() => StepFramesAsync(-1));
+        ForwardFrameCommand = new AsyncRelayCommand(() => StepFramesAsync(1));
+        Back25FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(-25));
+        Forward25FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(25));
+        Back250FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(-250));
+        Forward250FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(250));
+        RefreshPreviewCommand = new AsyncRelayCommand(LoadPreviewAsync);
+        SetInPointCommand = new RelayCommand(SetInPointFromCurrent);
+        SetOutPointCommand = new RelayCommand(SetOutPointFromCurrent);
+
         RefreshState();
+        _ = LoadPreviewAsync();
     }
 
     public QueueItemSummary Item { get; }
 
     public ObservableCollection<TimelineSegment> Segments { get; }
 
-    public IRelayCommand CutSegmentCommand { get; }
+    public IAsyncRelayCommand CutSegmentCommand { get; }
 
-    public IRelayCommand DeleteSegmentCommand { get; }
+    public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
-    public IRelayCommand RippleDeleteCommand { get; }
+    public IAsyncRelayCommand RippleDeleteCommand { get; }
 
-    public IRelayCommand MoveLeftCommand { get; }
+    public IAsyncRelayCommand MoveLeftCommand { get; }
 
-    public IRelayCommand MoveRightCommand { get; }
+    public IAsyncRelayCommand MoveRightCommand { get; }
 
     public IRelayCommand SaveToQueueCommand { get; }
+
+    public IAsyncRelayCommand GoToStartCommand { get; }
+
+    public IAsyncRelayCommand GoToEndCommand { get; }
+
+    public IAsyncRelayCommand BackFrameCommand { get; }
+
+    public IAsyncRelayCommand ForwardFrameCommand { get; }
+
+    public IAsyncRelayCommand Back25FramesCommand { get; }
+
+    public IAsyncRelayCommand Forward25FramesCommand { get; }
+
+    public IAsyncRelayCommand Back250FramesCommand { get; }
+
+    public IAsyncRelayCommand Forward250FramesCommand { get; }
+
+    public IAsyncRelayCommand RefreshPreviewCommand { get; }
+
+    public IRelayCommand SetInPointCommand { get; }
+
+    public IRelayCommand SetOutPointCommand { get; }
 
     [ObservableProperty]
     private string _windowTitle = string.Empty;
@@ -76,6 +120,21 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _editorHint = "Iseceni segment ostaje na liniji kao CUT dok ga ne obrises ili ripple-delete-ujes.";
 
+    [ObservableProperty]
+    private double _previewVirtualSeconds;
+
+    [ObservableProperty]
+    private double _previewVirtualMaximum;
+
+    [ObservableProperty]
+    private string _previewVirtualTimeText = "00:00:00.00";
+
+    [ObservableProperty]
+    private string _previewSourceTimeText = "00:00:00.00";
+
+    [ObservableProperty]
+    private Bitmap? _previewBitmap;
+
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
     {
         DeleteSegmentCommand.NotifyCanExecuteChanged();
@@ -84,7 +143,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         MoveRightCommand.NotifyCanExecuteChanged();
     }
 
-    private void ApplyCutSegment()
+    partial void OnPreviewVirtualSecondsChanged(double value) => UpdatePreviewTimeTexts();
+
+    public Task CommitPreviewSliderAsync() => LoadPreviewAsync();
+
+    private async Task ApplyCutSegmentAsync()
     {
         if (!TryParseTime(InPointText, out var inSeconds) || !TryParseTime(OutPointText, out var outSeconds))
         {
@@ -93,10 +156,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.CutSegment(Timeline, inSeconds, outSeconds);
-        RefreshState();
+        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
     }
 
-    private void DeleteSegment()
+    private async Task DeleteSegmentAsync()
     {
         if (SelectedSegment is null)
         {
@@ -104,10 +167,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.DeleteSegment(Timeline, SelectedSegment.Id);
-        RefreshState();
+        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
     }
 
-    private void RippleDeleteSegment()
+    private async Task RippleDeleteSegmentAsync()
     {
         if (SelectedSegment is null)
         {
@@ -115,10 +178,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.RippleDeleteSegment(Timeline, SelectedSegment.Id);
-        RefreshState();
+        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
     }
 
-    private void MoveLeft()
+    private async Task MoveLeftAsync()
     {
         if (SelectedSegment is null)
         {
@@ -126,10 +189,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.MoveSegmentLeft(Timeline, SelectedSegment.Id);
-        RefreshState();
+        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
     }
 
-    private void MoveRight()
+    private async Task MoveRightAsync()
     {
         if (SelectedSegment is null)
         {
@@ -137,12 +200,43 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.MoveSegmentRight(Timeline, SelectedSegment.Id);
-        RefreshState();
+        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
     }
 
     private void SaveToQueue() => _saveAction(Timeline);
 
     private bool CanModifySelectedSegment() => SelectedSegment is not null;
+
+    private async Task GoToStartAsync()
+    {
+        PreviewVirtualSeconds = 0;
+        await LoadPreviewAsync().ConfigureAwait(false);
+    }
+
+    private async Task GoToEndAsync()
+    {
+        PreviewVirtualSeconds = PreviewVirtualMaximum;
+        await LoadPreviewAsync().ConfigureAwait(false);
+    }
+
+    private async Task StepFramesAsync(int frameDelta)
+    {
+        var frameRate = Math.Max(1d, Item.MediaInfo?.FrameRate ?? 25d);
+        var stepSeconds = frameDelta / frameRate;
+        PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum);
+        await LoadPreviewAsync().ConfigureAwait(false);
+    }
+
+    private void SetInPointFromCurrent() => InPointText = PreviewSourceTimeText;
+
+    private void SetOutPointFromCurrent() => OutPointText = PreviewSourceTimeText;
+
+    private async Task RefreshStateAndPreviewAsync()
+    {
+        RefreshState();
+        PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum);
+        await LoadPreviewAsync().ConfigureAwait(false);
+    }
 
     private void RefreshState()
     {
@@ -155,7 +249,67 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
         SelectedSegment = Segments.FirstOrDefault(segment => segment.Id == selectedId) ?? Segments.FirstOrDefault();
         var keepDuration = TimelineEditorService.GetKeptDurationSeconds(Timeline);
+        PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
+        UpdatePreviewTimeTexts();
+    }
+
+    private async Task LoadPreviewAsync()
+    {
+        if (Item.MediaInfo is null)
+        {
+            EditorHint = "Media info nije dostupan za preview.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        {
+            EditorHint = "ffmpeg nije dostupan, pa preview frame jos ne moze da se renderuje.";
+            return;
+        }
+
+        _previewCts?.Cancel();
+        _previewCts = new CancellationTokenSource();
+        var token = _previewCts.Token;
+        var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+
+        try
+        {
+            EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+            var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, token).ConfigureAwait(false);
+            if (token.IsCancellationRequested || string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
+            {
+                return;
+            }
+
+            await using var stream = File.OpenRead(previewPath);
+            var bitmap = new Bitmap(stream);
+            var previous = PreviewBitmap;
+            PreviewBitmap = bitmap;
+            previous?.Dispose();
+            EditorHint = $"Preview spreman | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            EditorHint = $"Preview nije uspeo: {ex.Message}";
+        }
+    }
+
+    private void UpdatePreviewTimeTexts()
+    {
+        if (Item.MediaInfo is null)
+        {
+            PreviewVirtualTimeText = "00:00:00.00";
+            PreviewSourceTimeText = "00:00:00.00";
+            return;
+        }
+
+        PreviewVirtualTimeText = TimelineEditorService.FormatSeconds(PreviewVirtualSeconds);
+        var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+        PreviewSourceTimeText = TimelineEditorService.FormatSeconds(sourceSeconds);
     }
 
     private static bool TryParseTime(string text, out double seconds)
