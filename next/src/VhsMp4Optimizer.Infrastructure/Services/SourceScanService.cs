@@ -12,7 +12,7 @@ public sealed class SourceScanService
 
     private readonly FfprobeMediaProbeService _mediaProbeService = new();
 
-    public IReadOnlyList<QueueItemSummary> Scan(BatchSettings settings, string ffmpegPath)
+    public IReadOnlyList<QueueItemSummary> Scan(BatchSettings settings, string ffmpegPath, IReadOnlyList<string>? explicitSourcePaths = null)
     {
         var inputPath = settings.InputPath;
         if (string.IsNullOrWhiteSpace(inputPath))
@@ -20,7 +20,7 @@ public sealed class SourceScanService
             return Array.Empty<QueueItemSummary>();
         }
 
-        var sourceFiles = ResolveSourceFiles(inputPath);
+        var sourceFiles = ResolveSourceFiles(inputPath, explicitSourcePaths);
         var outputDirectory = ResolveOutputDirectory(inputPath, settings.OutputDirectory);
 
         return sourceFiles
@@ -75,8 +75,18 @@ public sealed class SourceScanService
         };
     }
 
-    private static IReadOnlyList<string> ResolveSourceFiles(string inputPath)
+    public static IReadOnlyList<string> ResolveSourceFiles(string inputPath, IReadOnlyList<string>? explicitSourcePaths = null)
     {
+        if (explicitSourcePaths is { Count: > 0 })
+        {
+            return explicitSourcePaths
+                .Where(File.Exists)
+                .Select(Path.GetFullPath)
+                .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         if (File.Exists(inputPath))
         {
             return SupportedExtensions.Contains(Path.GetExtension(inputPath))

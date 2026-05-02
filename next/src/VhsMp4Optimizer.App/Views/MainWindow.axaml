@@ -29,11 +29,13 @@
     <Grid RowDefinitions="Auto,Auto,Auto,8,*,8,220" Margin="16">
         <Grid Grid.Row="0" ColumnDefinitions="*,16,*" Margin="0,0,0,10">
             <Border Grid.Column="0" Background="#141A24" BorderBrush="#293244" BorderThickness="1" CornerRadius="8" Padding="12">
-                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="110,*,130" ColumnSpacing="10" RowSpacing="10">
-                    <TextBlock Classes="section-title" Grid.Row="0" Grid.ColumnSpan="3" Text="Input folder" />
+                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="110,*,86,86" ColumnSpacing="10" RowSpacing="10">
+                    <TextBlock Classes="section-title" Grid.Row="0" Grid.ColumnSpan="4" Text="Input folder" />
                     <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Source" />
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
-                    <Button Grid.Row="1" Grid.Column="2" Content="Browse..." HorizontalAlignment="Stretch" />
+                    <Button Grid.Row="1" Grid.Column="2" Content="Files..." HorizontalAlignment="Stretch" Click="BrowseInputFilesClick" />
+                    <Button Grid.Row="1" Grid.Column="3" Content="Folder..." HorizontalAlignment="Stretch" Click="BrowseInputFolderClick" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding SelectionHint}" Opacity="0.75" TextWrapping="Wrap" />
                 </Grid>
             </Border>
 
@@ -42,7 +44,7 @@
                     <TextBlock Classes="section-title" Grid.Row="0" Grid.ColumnSpan="3" Text="Output folder" />
                     <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Target" />
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
-                    <Button Grid.Row="1" Grid.Column="2" Content="Browse..." HorizontalAlignment="Stretch" />
+                    <Button Grid.Row="1" Grid.Column="2" Content="Browse..." HorizontalAlignment="Stretch" Click="BrowseOutputFolderClick" />
                 </Grid>
             </Border>
         </Grid>
@@ -83,7 +85,7 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="7" Spacing="8" VerticalAlignment="Bottom">
-                    <Button Content="Open Output" />
+                    <Button Content="Open Output" Command="{Binding OpenOutputCommand}" />
                     <Button Content="Test Sample" Command="{Binding TestSampleCommand}" />
                 </StackPanel>
 

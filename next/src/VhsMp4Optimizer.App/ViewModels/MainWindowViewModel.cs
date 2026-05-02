@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -17,6 +18,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly SourceScanService _sourceScanService = new();
     private readonly FfmpegConversionService _conversionService = new();
     private readonly string? _ffmpegPath;
+    private IReadOnlyList<string>? _explicitSourcePaths;
+    private bool _suppressSelectionReset;
 
     public MainWindowViewModel()
     {
@@ -30,6 +33,7 @@ public partial class MainWindowViewModel : ViewModelBase
         StartConversionCommand = new AsyncRelayCommand(StartConversionAsync);
         TestSampleCommand = new AsyncRelayCommand(TestSampleAsync);
         OpenSampleCommand = new RelayCommand(OpenSample, CanOpenSample);
+        OpenOutputCommand = new RelayCommand(OpenOutputFolder, CanOpenOutputFolder);
 
         if (!string.IsNullOrWhiteSpace(_ffmpegPath))
         {
@@ -49,6 +53,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _outputFolder = @"F:\Veliki avi\vhs-mp4-output";
+
+    [ObservableProperty]
+    private string _selectionHint = "Unesi putanju ili izaberi jedan fajl, vise fajlova ili ceo folder.";
 
     [ObservableProperty]
     private string _selectedPreset = "USB standard";
@@ -101,11 +108,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public IRelayCommand OpenSampleCommand { get; }
 
+    public IRelayCommand OpenOutputCommand { get; }
+
     partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
     {
         RefreshComparisonRows(value);
         OpenSampleCommand.NotifyCanExecuteChanged();
     }
+
+    partial void OnInputFolderChanged(string value)
+    {
+        if (_suppressSelectionReset)
+        {
+            return;
+        }
+
+        _explicitSourcePaths = null;
+        SelectionHint = "Rucno uneta putanja: scan ide nad ovim input putem.";
+    }
+
+    partial void OnOutputFolderChanged(string value) => OpenOutputCommand.NotifyCanExecuteChanged();
 
     partial void OnQualityModeChanged(string value) => RefreshPlannedOutput();
 
@@ -139,7 +161,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var settings = BuildSettings();
         var outputDirectory = _sourceScanService.ResolveOutputDirectory(InputFolder, OutputFolder);
         OutputFolder = outputDirectory;
-        var items = _sourceScanService.Scan(settings with { OutputDirectory = outputDirectory }, _ffmpegPath);
+        var items = _sourceScanService.Scan(settings with { OutputDirectory = outputDirectory }, _ffmpegPath, _explicitSourcePaths);
 
         foreach (var item in items)
         {
@@ -147,7 +169,10 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         SelectedQueueItem = QueueItems.FirstOrDefault();
-        ProgressMessage = $"Scan zavrsen. Pronadjeno: {QueueItems.Count} fajlova.";
+        var explicitCount = _explicitSourcePaths?.Count ?? 0;
+        ProgressMessage = explicitCount > 0
+            ? $"Scan zavrsen. Pronadjeno: {QueueItems.Count} fajlova | eksplicitno izabrano: {explicitCount}"
+            : $"Scan zavrsen. Pronadjeno: {QueueItems.Count} fajlova.";
         LogMessage = $"ffmpeg: {_ffmpegPath}{Environment.NewLine}Output: {outputDirectory}";
         StatusMessage = QueueItems.Count == 0
             ? "Nema podrzanih video fajlova za scan u zadatom input putu."
@@ -315,6 +340,75 @@ public partial class MainWindowViewModel : ViewModelBase
         AudioBitrate = AudioBitrate
     };
 
+    public void UseSelectedFiles(IReadOnlyList<string> filePaths)
+    {
+        var normalized = filePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count == 0)
+        {
+            return;
+        }
+
+        _explicitSourcePaths = normalized;
+        _suppressSelectionReset = true;
+        try
+        {
+            InputFolder = normalized[0];
+        }
+        finally
+        {
+            _suppressSelectionReset = false;
+        }
+
+        var parentFolder = Path.GetDirectoryName(normalized[0]);
+        if (string.IsNullOrWhiteSpace(OutputFolder) && !string.IsNullOrWhiteSpace(parentFolder))
+        {
+            OutputFolder = Path.Combine(parentFolder, "vhs-mp4-output");
+        }
+
+        SelectionHint = normalized.Count == 1
+            ? $"Izabran je 1 fajl: {Path.GetFileName(normalized[0])}"
+            : $"Izabrano je {normalized.Count} fajlova. Scan ce raditi samo nad tom listom.";
+    }
+
+    public void UseSelectedFolder(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath))
+        {
+            return;
+        }
+
+        _explicitSourcePaths = null;
+        _suppressSelectionReset = true;
+        try
+        {
+            InputFolder = Path.GetFullPath(folderPath);
+        }
+        finally
+        {
+            _suppressSelectionReset = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(OutputFolder))
+        {
+            OutputFolder = Path.Combine(InputFolder, "vhs-mp4-output");
+        }
+
+        SelectionHint = "Izabran je ceo folder. Scan ide kroz podrzane video fajlove u folderu i podfolderima.";
+    }
+
+    public void SetOutputFolderPath(string folderPath)
+    {
+        if (!string.IsNullOrWhiteSpace(folderPath))
+        {
+            OutputFolder = Path.GetFullPath(folderPath);
+        }
+    }
+
     public void ApplyTimelineProject(string sourcePath, TimelineProject timeline)
     {
         var existingItems = QueueItems.ToList();
@@ -429,6 +523,23 @@ public partial class MainWindowViewModel : ViewModelBase
         Process.Start(new ProcessStartInfo
         {
             FileName = LastSamplePath!,
+            UseShellExecute = true
+        });
+    }
+
+    private bool CanOpenOutputFolder() => !string.IsNullOrWhiteSpace(OutputFolder);
+
+    private void OpenOutputFolder()
+    {
+        if (string.IsNullOrWhiteSpace(OutputFolder))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(OutputFolder);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = OutputFolder,
             UseShellExecute = true
         });
     }

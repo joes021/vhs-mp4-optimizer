@@ -1,4 +1,6 @@
+using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using VhsMp4Optimizer.App.ViewModels;
 
 namespace VhsMp4Optimizer.App.Views;
@@ -32,5 +34,77 @@ public partial class MainWindow : Window
         _playerTrimWindow.DataContext = editorViewModel;
         _playerTrimWindow.Show();
         _playerTrimWindow.Activate();
+    }
+
+    private async void BrowseInputFilesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Izaberi video fajlove",
+            AllowMultiple = true,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Video files")
+                {
+                    Patterns = ["*.mp4", "*.avi", "*.mpg", "*.mpeg", "*.mov", "*.mkv", "*.m4v", "*.wmv", "*.ts", "*.m2ts", "*.vob"]
+                }
+            ]
+        });
+
+        var localPaths = files
+            .Select(file => file.TryGetLocalPath())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Cast<string>()
+            .ToList();
+
+        if (localPaths.Count > 0)
+        {
+            viewModel.UseSelectedFiles(localPaths);
+        }
+    }
+
+    private async void BrowseInputFolderClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Izaberi ulazni folder",
+            AllowMultiple = false
+        });
+
+        var folderPath = folders.FirstOrDefault()?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(folderPath))
+        {
+            viewModel.UseSelectedFolder(folderPath);
+        }
+    }
+
+    private async void BrowseOutputFolderClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Izaberi izlazni folder",
+            AllowMultiple = false
+        });
+
+        var folderPath = folders.FirstOrDefault()?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(folderPath))
+        {
+            viewModel.SetOutputFolderPath(folderPath);
+        }
     }
 }
