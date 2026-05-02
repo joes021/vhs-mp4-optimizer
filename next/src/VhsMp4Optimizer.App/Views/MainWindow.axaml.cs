@@ -187,6 +187,61 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void SaveQueueClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Sacuvaj queue stanje",
+            SuggestedFileName = "vhs-queue.json",
+            DefaultExtension = ".json",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("JSON")
+                {
+                    Patterns = ["*.json"]
+                }
+            ]
+        });
+
+        var outputPath = target?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(outputPath))
+        {
+            await viewModel.SaveQueueAsync(outputPath);
+        }
+    }
+
+    private async void LoadQueueClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Ucitaj queue stanje",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("JSON")
+                {
+                    Patterns = ["*.json"]
+                }
+            ]
+        });
+
+        var inputPath = files.FirstOrDefault()?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(inputPath))
+        {
+            await viewModel.LoadQueueAsync(inputPath);
+        }
+    }
+
     private void OpenAboutClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var assembly = typeof(MainWindow).Assembly;

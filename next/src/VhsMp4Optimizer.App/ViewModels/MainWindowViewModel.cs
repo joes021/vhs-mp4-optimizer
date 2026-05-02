@@ -18,6 +18,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly SourceScanService _sourceScanService = new();
     private readonly FfmpegConversionService _conversionService = new();
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
+    private readonly QueueSnapshotService _queueSnapshotService = new();
     private readonly string? _ffmpegPath;
     private IReadOnlyList<string>? _explicitSourcePaths;
     private bool _suppressSelectionReset;
@@ -45,6 +46,8 @@ public partial class MainWindowViewModel : ViewModelBase
         ClearCompletedCommand = new RelayCommand(ClearCompletedItems);
         SplitSelectedCopyCommand = new AsyncRelayCommand(SplitSelectedCopyAsync, CanSplitSelectedCopy);
         PauseResumeCommand = new AsyncRelayCommand(PauseResumeAsync, CanPauseOrResume);
+        SaveQueueCommand = new AsyncRelayCommand<string>(SaveQueueAsync);
+        LoadQueueCommand = new AsyncRelayCommand<string>(LoadQueueAsync);
 
         if (!string.IsNullOrWhiteSpace(_ffmpegPath))
         {
@@ -151,6 +154,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public IAsyncRelayCommand SplitSelectedCopyCommand { get; }
 
     public IAsyncRelayCommand PauseResumeCommand { get; }
+
+    public IAsyncRelayCommand<string> SaveQueueCommand { get; }
+
+    public IAsyncRelayCommand<string> LoadQueueCommand { get; }
 
     partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
     {
@@ -630,6 +637,98 @@ public partial class MainWindowViewModel : ViewModelBase
             StatusMessage = $"Copy join nije uspeo: {ex.Message}";
             LogMessage = ex.ToString();
         }
+    }
+
+    public async Task SaveQueueAsync(string? outputPath)
+    {
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            StatusMessage = "Izaberi putanju za queue fajl.";
+            return;
+        }
+
+        var snapshot = new QueueSessionSnapshot
+        {
+            InputFolder = InputFolder,
+            OutputFolder = OutputFolder,
+            SelectedPreset = SelectedPreset,
+            QualityMode = QualityMode,
+            ScaleMode = ScaleMode,
+            AspectMode = AspectMode,
+            VideoBitrate = VideoBitrate,
+            AudioBitrate = AudioBitrate,
+            SplitOutput = SplitOutput,
+            MaxPartGb = MaxPartGb,
+            ExplicitSourcePaths = _explicitSourcePaths,
+            QueueItems = QueueItems.ToList()
+        };
+
+        await _queueSnapshotService.SaveAsync(outputPath, snapshot);
+        StatusMessage = $"Queue sacuvan: {Path.GetFileName(outputPath)}";
+        LogMessage = outputPath;
+    }
+
+    public async Task LoadQueueAsync(string? inputPath)
+    {
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            StatusMessage = "Izaberi queue fajl za ucitavanje.";
+            return;
+        }
+
+        var snapshot = await _queueSnapshotService.LoadAsync(inputPath);
+        _explicitSourcePaths = snapshot.ExplicitSourcePaths?.ToList();
+
+        _applyingPreset = true;
+        try
+        {
+            InputFolder = snapshot.InputFolder;
+            OutputFolder = snapshot.OutputFolder;
+            SelectedPreset = snapshot.SelectedPreset;
+            QualityMode = snapshot.QualityMode;
+            ScaleMode = snapshot.ScaleMode;
+            AspectMode = snapshot.AspectMode;
+            VideoBitrate = snapshot.VideoBitrate;
+            AudioBitrate = snapshot.AudioBitrate;
+            SplitOutput = snapshot.SplitOutput;
+            MaxPartGb = snapshot.MaxPartGb;
+        }
+        finally
+        {
+            _applyingPreset = false;
+        }
+
+        QueueItems.Clear();
+        foreach (var item in snapshot.QueueItems)
+        {
+            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, BuildSettings(), item.TransformSettings);
+            QueueItems.Add(new QueueItemSummary
+            {
+                SourceFile = item.SourceFile,
+                SourcePath = item.SourcePath,
+                OutputFile = item.OutputFile,
+                OutputPath = item.OutputPath,
+                OutputPattern = item.OutputPattern,
+                Container = item.Container,
+                Resolution = item.Resolution,
+                Duration = item.Duration,
+                Video = item.Video,
+                Audio = item.Audio,
+                Status = item.Status,
+                MediaInfo = item.MediaInfo,
+                PlannedOutput = planned,
+                TimelineProject = item.TimelineProject,
+                TransformSettings = item.TransformSettings
+            });
+        }
+
+        SelectedQueueItem = QueueItems.FirstOrDefault();
+        SelectionHint = _explicitSourcePaths?.Count > 0
+            ? $"Ucitan queue sa eksplicitnih fajlova: {_explicitSourcePaths.Count}"
+            : "Ucitan queue iz sacuvanog batch stanja.";
+        StatusMessage = $"Queue ucitan: {Path.GetFileName(inputPath)} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+        LogMessage = inputPath;
+        RefreshComparisonRows(SelectedQueueItem);
     }
 
     private void SkipSelected()

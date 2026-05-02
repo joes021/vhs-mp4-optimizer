@@ -85,6 +85,7 @@
                 <StackPanel Grid.Column="7" Spacing="8" VerticalAlignment="Bottom">
                     <Button Content="Open Output" Command="{Binding OpenOutputCommand}" />
                     <Button Content="Test Sample" Command="{Binding TestSampleCommand}" />
+                    <Button Content="Save Queue" Click="SaveQueueClick" />
                     <Button Content="Open User Guide" Click="OpenUserGuideClick" />
                 </StackPanel>
 
@@ -92,6 +93,7 @@
                     <Button Content="Open Sample" Command="{Binding OpenSampleCommand}" />
                     <Button Content="Start Conversion" Classes="accent" Command="{Binding StartConversionCommand}" />
                     <Button Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                    <Button Content="Load Queue" Click="LoadQueueClick" />
                     <Button Content="About" Click="OpenAboutClick" />
                 </StackPanel>
             </Grid>
