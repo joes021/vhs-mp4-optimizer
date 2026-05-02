@@ -1125,6 +1125,112 @@ exit 0
     assert payload["TimeAfterFrame"] == "00:00:22.54"
 
 
+def test_vhs_gui_player_preview_time_text_syncs_timeline_before_trim_commit(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    modeless_return_pattern = re.compile(r"(?ms)^\s*if \(\$Modeless\) \{\s*return \$dialog\s*\}\s*")
+    modeless_return_replacement = """
+    if ($Modeless) {
+        $script:TestPlayerRuntime = $playerRuntime
+        $script:TestPlayerRuntimeLocalState = $localState
+        $script:TestPlayerPreviewTimeTextBox = $playerPreviewTimeTextBox
+        $script:TestPlayerTimelineTrackBar = $playerTimelineTrackBar
+        $script:TestPlayerTrimEndTextBox = $playerTrimEndTextBox
+        return $dialog
+    }
+"""
+    gui_script, modeless_replacements = modeless_return_pattern.subn(modeless_return_replacement, gui_script, count=1)
+    assert modeless_replacements == 1
+
+    probe = f"""
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mov,mp4,m4a,3gp,3g2,mj2'
+    ContainerLongName = 'QuickTime / MOV'
+    DurationSeconds = 2602.0
+    DurationText = '00:43:22'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '720x576'
+    DisplayAspectRatio = '4:3'
+    SampleAspectRatio = '16:15'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 65055
+    VideoBitrateText = '8864 kbps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    DisplayOutputName = 'clip.mp4'
+    MediaInfo = $mediaInfo
+}}
+$script:ResolvedFfmpegPath = ''
+$dialog = @(Open-PlayerTrimWindow -Item $item -Modeless) | Where-Object {{ $null -ne $_ -and $_ -is [System.Windows.Forms.Form] }} | Select-Object -Last 1
+$dialog.Show()
+[System.Windows.Forms.Application]::DoEvents()
+$script:TestPlayerPreviewTimeTextBox.Text = '00:40:00'
+[System.Windows.Forms.Application]::DoEvents()
+$timelineValueAfterText = [int]$script:TestPlayerTimelineTrackBar.Value
+$positionAfterText = [double]$script:TestPlayerRuntimeLocalState.PreviewPositionSeconds
+$script:TestPlayerRuntime.'Set-PlayerTrimPoint'('End')
+$trimEndAfterText = [string]$script:TestPlayerTrimEndTextBox.Text
+$script:TestPlayerRuntimeLocalState.Dirty = $false
+$dialog.Close()
+[System.Windows.Forms.Application]::DoEvents()
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    TimelineValueAfterText = $timelineValueAfterText
+    PositionAfterText = $positionAfterText
+    TrimEndAfterText = $trimEndAfterText
+}} | ConvertTo-Json -Depth 4
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+exit 0
+""".strip()
+
+    main_show_pattern = re.compile(r"(?m)^\s*\[void\]\$form\.ShowDialog\(\)\s*$")
+    gui_script, main_show_replacements = main_show_pattern.subn(lambda _: probe, gui_script, count=1)
+    assert main_show_replacements == 1
+    probe_script = tmp_path / "gui-player-preview-time-sync-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["TimelineValueAfterText"] == 240000
+    assert abs(payload["PositionAfterText"] - 2400.0) < 0.001
+    assert payload["TrimEndAfterText"] == "00:40:00"
+
+
 def test_vhs_gui_player_trim_frame_step_uses_manual_time_entry_as_current_position(tmp_path: Path) -> None:
     source = tmp_path / "clip.mp4"
     source.write_text("source", encoding="utf-8")
@@ -1231,12 +1337,15 @@ def test_vhs_gui_player_trim_timeline_uses_value_changed_navigation_handler() ->
 
     for token in [
         "function Sync-PlayerTimelineValue {",
+        "function Try-Sync-PlayerPreviewTimeText {",
         "function Set-PlayerTimelineFromPointerX {",
         "$playerTimelineTrackBar.Add_ValueChanged(({",
         "$playerTimelineTrackBar.Add_MouseDown(({",
         "$playerTimelineTrackBar.Add_MouseMove(({",
         "$playerTimelineTrackBar.Add_MouseUp(({",
+        "$playerPreviewTimeTextBox.Add_TextChanged(({",
         "$playerRuntime.'Sync-PlayerTimelineValue'([int]$playerTimelineTrackBar.Value)",
+        "$playerRuntime.'Try-Sync-PlayerPreviewTimeText'()",
         "$playerRuntime.'Set-PlayerTimelineFromPointerX'([int]$eventArgs.X)",
         "$playerTimelineTrackBar.Refresh()",
     ]:

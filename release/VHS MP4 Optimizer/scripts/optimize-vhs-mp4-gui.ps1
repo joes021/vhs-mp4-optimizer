@@ -5058,6 +5058,7 @@ function Open-PlayerTrimWindow {
         CropSummary = [string]$cropState.CropSummary
         CropFieldSync = $false
         TimelineSyncActive = $false
+        PreviewTimeTextSync = $false
         AspectMode = [string]$initialAspectMode
         DetectedAspectLabel = ""
         DetectedDisplayAspectRatio = ""
@@ -6124,7 +6125,13 @@ function Open-PlayerTrimWindow {
 
         $totalText = if ($durationSeconds -gt 0) { Format-VhsMp4FfmpegTime -Seconds $durationSeconds } else { "--:--:--" }
         $playerPositionLabel.Text = $positionText + " / " + $totalText
-        $playerPreviewTimeTextBox.Text = $positionText
+        $localState.PreviewTimeTextSync = $true
+        try {
+            $playerPreviewTimeTextBox.Text = $positionText
+        }
+        finally {
+            $localState.PreviewTimeTextSync = $false
+        }
 
         $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
         $timelineValue = [Math]::Min($playerTimelineTrackBar.Maximum, [Math]::Max($playerTimelineTrackBar.Minimum, [int][Math]::Round($position * $timelineScale, 0, [System.MidpointRounding]::AwayFromZero)))
@@ -6202,6 +6209,29 @@ function Open-PlayerTrimWindow {
 
         $timelineScale = [Math]::Max(1, [int][Math]::Round((Convert-ToVhsMp4FiniteDouble -Value $previewTimelineScale -Default 100.0), 0, [System.MidpointRounding]::AwayFromZero))
         Navigate-PlayerPositionSeconds -Seconds ([double]$TimelineValue / [double]$timelineScale)
+    }
+
+    function Try-Sync-PlayerPreviewTimeText {
+        if ($localState.PreviewTimeTextSync) {
+            return
+        }
+
+        $previewText = [string]$playerPreviewTimeTextBox.Text
+        if ([string]::IsNullOrWhiteSpace($previewText)) {
+            return
+        }
+
+        try {
+            $parsedSeconds = Convert-VhsMp4TimeTextToSeconds -Value $previewText
+            if ($null -eq $parsedSeconds) {
+                return
+            }
+        }
+        catch {
+            return
+        }
+
+        Set-PlayerPositionSeconds -Seconds ([double]$parsedSeconds) -SyncPlayer $false -RequestPreview $false
     }
 
     function Set-PlayerTimelineFromPointerX {
@@ -6566,6 +6596,10 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Sync-PlayerTimelineValue'($TimelineValue)
     }
 
+    function Try-Sync-PlayerPreviewTimeText {
+        $playerRuntime.'Try-Sync-PlayerPreviewTimeText'()
+    }
+
     function Set-PlayerTimelineFromPointerX {
         param([int]$PointerX)
         $playerRuntime.'Set-PlayerTimelineFromPointerX'($PointerX)
@@ -6744,6 +6778,10 @@ function Open-PlayerTrimWindow {
         else {
             $playerRuntime.'Sync-PlayerTimelineValue'([int]$playerTimelineTrackBar.Value)
         }
+    }).GetNewClosure())
+
+    $playerPreviewTimeTextBox.Add_TextChanged(({
+        $playerRuntime.'Try-Sync-PlayerPreviewTimeText'()
     }).GetNewClosure())
 
     $playerPreviewTimeTextBox.Add_Leave(({

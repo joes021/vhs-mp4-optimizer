@@ -391,7 +391,7 @@ function Get-VhsMp4TrimWindow {
         $summary = "from $startText"
     }
     elseif ($endText) {
-        $summary = "to $endText"
+        $summary = "00:00:00 - $endText"
     }
 
     return [pscustomobject]@{

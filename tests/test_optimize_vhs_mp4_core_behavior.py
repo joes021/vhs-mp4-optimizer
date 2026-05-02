@@ -17,6 +17,7 @@ $b = Convert-VhsMp4TimeTextToSeconds -Value '12:34'
 $c = Convert-VhsMp4TimeTextToSeconds -Value '90.5'
 $comma = Convert-VhsMp4TimeTextToSeconds -Value '90,5'
 $window = Get-VhsMp4TrimWindow -TrimStart '00:01:00' -TrimEnd '00:03:30'
+$endOnly = Get-VhsMp4TrimWindow -TrimStart '' -TrimEnd '00:40:00'
 $blank = Get-VhsMp4TrimWindow -TrimStart '' -TrimEnd ''
 $bad = $false
 try {{ Get-VhsMp4TrimWindow -TrimStart '00:03:30' -TrimEnd '00:01:00' | Out-Null }} catch {{ $bad = $true }}
@@ -27,6 +28,8 @@ try {{ Get-VhsMp4TrimWindow -TrimStart '00:03:30' -TrimEnd '00:01:00' | Out-Null
   Comma = $comma
   Duration = $window.DurationSeconds
   Summary = $window.Summary
+  EndOnlySummary = $endOnly.Summary
+  EndOnlyDuration = $endOnly.DurationSeconds
   BlankSummary = $blank.Summary
   BadRejected = $bad
 }} | ConvertTo-Json -Compress
@@ -58,6 +61,8 @@ try {{ Get-VhsMp4TrimWindow -TrimStart '00:03:30' -TrimEnd '00:01:00' | Out-Null
     assert payload["Comma"] == 90.5
     assert payload["Duration"] == 150
     assert payload["Summary"] == "00:01:00 - 00:03:30"
+    assert payload["EndOnlySummary"] == "00:00:00 - 00:40:00"
+    assert payload["EndOnlyDuration"] == 2400
     assert payload["BlankSummary"] == ""
     assert payload["BadRejected"] is True
 
