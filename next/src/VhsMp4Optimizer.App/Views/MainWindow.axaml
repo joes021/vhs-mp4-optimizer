@@ -54,9 +54,7 @@
                 <StackPanel Grid.Column="0" Spacing="4">
                     <TextBlock Classes="section-title" Text="Quick Setup" Margin="0,0,0,4" />
                     <TextBlock Text="Workflow preset" Opacity="0.75" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="{Binding SelectedPreset}" />
-                    </ComboBox>
+                    <ComboBox ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Spacing="4">

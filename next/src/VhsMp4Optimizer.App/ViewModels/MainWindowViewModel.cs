@@ -21,6 +21,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly string? _ffmpegPath;
     private IReadOnlyList<string>? _explicitSourcePaths;
     private bool _suppressSelectionReset;
+    private bool _applyingPreset;
     private bool _isConverting;
     private bool _pauseRequested;
     private bool _isBatchPaused;
@@ -30,6 +31,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _ffmpegPath = FfmpegLocator.Resolve();
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));
+        WorkflowPresets = new ObservableCollection<string>(CoreServices.WorkflowPresetService.Names);
         QualityModes = new ObservableCollection<string>(CoreServices.QualityModes.All);
         ScaleModes = new ObservableCollection<string>(CoreServices.ScaleModes.All);
         AspectModes = new ObservableCollection<string>(CoreServices.AspectModes.All);
@@ -52,6 +54,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             StatusMessage = "Faza 3: ffmpeg jos nije pronadjen. Scan i media info cekaju lokalni ffmpeg/fprobe.";
         }
+
+        ApplyPreset(SelectedPreset);
     }
 
     [ObservableProperty]
@@ -118,6 +122,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<PropertyComparisonRow> ComparisonRows { get; }
 
+    public ObservableCollection<string> WorkflowPresets { get; }
+
     public ObservableCollection<string> QualityModes { get; }
 
     public ObservableCollection<string> ScaleModes { get; }
@@ -181,6 +187,16 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnMaxPartGbChanged(double value) => RefreshPlannedOutput();
 
     partial void OnLastSamplePathChanged(string? value) => OpenSampleCommand.NotifyCanExecuteChanged();
+
+    partial void OnSelectedPresetChanged(string value)
+    {
+        if (_applyingPreset)
+        {
+            return;
+        }
+
+        ApplyPreset(value);
+    }
 
     private Task ScanFilesAsync()
     {
@@ -367,6 +383,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void RefreshPlannedOutput()
     {
+        if (!_applyingPreset && !string.Equals(SelectedPreset, CoreServices.WorkflowPresetService.Custom, StringComparison.Ordinal))
+        {
+            _applyingPreset = true;
+            SelectedPreset = CoreServices.WorkflowPresetService.Custom;
+            _applyingPreset = false;
+        }
+
         if (QueueItems.Count == 0)
         {
             RefreshComparisonRows(null);
@@ -426,6 +449,34 @@ public partial class MainWindowViewModel : ViewModelBase
         SplitOutput = SplitOutput,
         MaxPartGb = MaxPartGb
     };
+
+    private void ApplyPreset(string presetName)
+    {
+        var preset = CoreServices.WorkflowPresetService.TryGet(presetName);
+        if (preset is null)
+        {
+            return;
+        }
+
+        _applyingPreset = true;
+        try
+        {
+            QualityMode = preset.QualityMode;
+            ScaleMode = preset.ScaleMode;
+            AspectMode = preset.AspectMode;
+            VideoBitrate = preset.VideoBitrate;
+            AudioBitrate = preset.AudioBitrate;
+            SplitOutput = preset.SplitOutput;
+            MaxPartGb = preset.MaxPartGb;
+            RefreshPlannedOutput();
+        }
+        finally
+        {
+            _applyingPreset = false;
+        }
+
+        StatusMessage = $"Preset aktivan: {preset.Name}";
+    }
 
     public void UseSelectedFiles(IReadOnlyList<string> filePaths)
     {
