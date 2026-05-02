@@ -2915,10 +2915,12 @@ function Copy-PlanItemTrimState {
             TrimSummary = ""
             TrimDurationSeconds = $null
             TrimSegments = @()
+            TimelineSegments = @()
             PreviewPositionSeconds = 0.0
         }
     }
 
+    $sourceDurationSeconds = Convert-ToVhsMp4FiniteDouble -Value (Get-PlanItemSourceDurationSeconds -Item $Item) -Default 0.0
     $trimSegments = @()
     $segmentsProperty = $Item.PSObject.Properties["TrimSegments"]
     if ($segmentsProperty -and $null -ne $segmentsProperty.Value) {
@@ -2946,6 +2948,12 @@ function Copy-PlanItemTrimState {
                 }
             }
         }
+    }
+
+    $timelineSegments = @()
+    $timelineProperty = $Item.PSObject.Properties["TimelineSegments"]
+    if ($timelineProperty -and $null -ne $timelineProperty.Value) {
+        $timelineSegments = @(Get-TimelineEditorSegments -TimelineSegments @($timelineProperty.Value) -SourceDurationSeconds $sourceDurationSeconds)
     }
 
     $trimStartText = Get-PlanItemPropertyText -Item $Item -Name "TrimStartText" -Default ""
@@ -2977,6 +2985,10 @@ function Copy-PlanItemTrimState {
         }
     }
 
+    if ($timelineSegments.Count -eq 0 -and $trimSegments.Count -gt 0 -and $sourceDurationSeconds -gt 0) {
+        $timelineSegments = @(Get-TimelineEditorSegments -TrimSegments $trimSegments -SourceDurationSeconds $sourceDurationSeconds)
+    }
+
     $previewPositionSeconds = 0.0
     if ($Item.PSObject.Properties["PreviewPositionSeconds"] -and $null -ne $Item.PreviewPositionSeconds) {
         $previewPositionSeconds = [double]$Item.PreviewPositionSeconds
@@ -2988,6 +3000,7 @@ function Copy-PlanItemTrimState {
         TrimSummary = $trimSummary
         TrimDurationSeconds = $trimDurationSeconds
         TrimSegments = @($trimSegments)
+        TimelineSegments = @($timelineSegments)
         PreviewPositionSeconds = $previewPositionSeconds
     }
 }
@@ -3015,10 +3028,221 @@ function Get-PlanItemEffectiveTrimPlan {
         $Item,
         [string]$TrimStart = "",
         [string]$TrimEnd = "",
-        [object[]]$TrimSegments = @()
+        [object[]]$TrimSegments = @(),
+        [object[]]$TimelineSegments = @()
     )
 
+    if (@($TimelineSegments).Count -eq 0 -and $null -ne $Item -and $Item.PSObject.Properties["TimelineSegments"] -and $null -ne $Item.TimelineSegments) {
+        $TimelineSegments = @($Item.TimelineSegments)
+    }
+
+    if (@($TimelineSegments).Count -gt 0) {
+        return (Get-VhsMp4TimelinePlan -TimelineSegments $TimelineSegments)
+    }
+
     return (Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments -SourceDurationSeconds (Get-PlanItemSourceDurationSeconds -Item $Item))
+}
+
+function New-TimelineEditorSegment {
+    param(
+        [ValidateSet("keep", "cut", "gap")]
+        [string]$Kind,
+        [Parameter(Mandatory = $true)]
+        [string]$StartText,
+        [Parameter(Mandatory = $true)]
+        [string]$EndText
+    )
+
+    $window = Get-VhsMp4TrimWindow -TrimStart $StartText -TrimEnd $EndText
+    if ([string]::IsNullOrWhiteSpace([string]$window.Summary)) {
+        return $null
+    }
+
+    return [pscustomobject]@{
+        Kind = $Kind
+        StartSeconds = $window.StartSeconds
+        EndSeconds = $window.EndSeconds
+        DurationSeconds = $window.DurationSeconds
+        StartText = $window.StartText
+        EndText = $window.EndText
+        DurationText = $window.DurationText
+        Summary = $window.Summary
+    }
+}
+
+function Merge-TimelineEditorSegments {
+    param(
+        [object[]]$TimelineSegments = @()
+    )
+
+    $normalized = New-Object System.Collections.Generic.List[object]
+    foreach ($segment in @($TimelineSegments)) {
+        if ($null -eq $segment) {
+            continue
+        }
+
+        $kind = [string]$segment.Kind
+        if ([string]::IsNullOrWhiteSpace($kind)) {
+            continue
+        }
+
+        $current = New-TimelineEditorSegment -Kind $kind -StartText ([string]$segment.StartText) -EndText ([string]$segment.EndText)
+        if ($null -eq $current) {
+            continue
+        }
+
+        if ($normalized.Count -gt 0) {
+            $previous = $normalized[$normalized.Count - 1]
+            $previousKind = [string]$previous.Kind
+            $currentKind = [string]$current.Kind
+            $previousEnd = Convert-ToVhsMp4FiniteDouble -Value $previous.EndSeconds -Default $null
+            $currentStart = Convert-ToVhsMp4FiniteDouble -Value $current.StartSeconds -Default $null
+            if ($previousKind -eq $currentKind -and $null -ne $previousEnd -and $null -ne $currentStart -and [Math]::Abs($previousEnd - $currentStart) -lt 0.0001) {
+                $merged = New-TimelineEditorSegment -Kind $currentKind -StartText ([string]$previous.StartText) -EndText ([string]$current.EndText)
+                if ($null -ne $merged) {
+                    $normalized[$normalized.Count - 1] = $merged
+                    continue
+                }
+            }
+        }
+
+        $normalized.Add($current)
+    }
+
+    return @($normalized.ToArray())
+}
+
+function Convert-CutSegmentsToTimelineEditorSegments {
+    param(
+        [object[]]$TrimSegments = @(),
+        [double]$SourceDurationSeconds = 0.0
+    )
+
+    if ($SourceDurationSeconds -le 0) {
+        return @()
+    }
+
+    $cutSegmentsResult = Get-VhsMp4TrimSegments -TrimSegments $TrimSegments
+    $cutSegments = @()
+    if ($null -ne $cutSegmentsResult -and ($cutSegmentsResult.PSObject.Properties.Name -contains "Segments")) {
+        $cutSegments = @($cutSegmentsResult.Segments)
+    }
+    if ($cutSegments.Count -eq 0) {
+        $fullKeep = New-TimelineEditorSegment -Kind "keep" -StartText "00:00:00" -EndText (Format-VhsMp4FfmpegTime -Seconds $SourceDurationSeconds)
+        if ($null -ne $fullKeep) {
+            return @($fullKeep)
+        }
+        return @()
+    }
+
+    $timelineSegments = New-Object System.Collections.Generic.List[object]
+    $cursor = 0.0
+    foreach ($segment in @($cutSegments)) {
+        $segmentStart = Convert-ToVhsMp4FiniteDouble -Value $segment.StartSeconds -Default 0.0
+        $segmentEnd = Convert-ToVhsMp4FiniteDouble -Value $segment.EndSeconds -Default $segmentStart
+        if ($segmentStart -gt ($cursor + 0.0001)) {
+            $keepSegment = New-TimelineEditorSegment -Kind "keep" -StartText (Format-VhsMp4FfmpegTime -Seconds $cursor) -EndText (Format-VhsMp4FfmpegTime -Seconds $segmentStart)
+            if ($null -ne $keepSegment) {
+                $timelineSegments.Add($keepSegment)
+            }
+        }
+        $cutSegment = New-TimelineEditorSegment -Kind "cut" -StartText ([string]$segment.StartText) -EndText ([string]$segment.EndText)
+        if ($null -ne $cutSegment) {
+            $timelineSegments.Add($cutSegment)
+        }
+        $cursor = [Math]::Max($cursor, $segmentEnd)
+    }
+
+    if ($cursor -lt ($SourceDurationSeconds - 0.0001)) {
+        $tailKeep = New-TimelineEditorSegment -Kind "keep" -StartText (Format-VhsMp4FfmpegTime -Seconds $cursor) -EndText (Format-VhsMp4FfmpegTime -Seconds $SourceDurationSeconds)
+        if ($null -ne $tailKeep) {
+            $timelineSegments.Add($tailKeep)
+        }
+    }
+
+    return @(Merge-TimelineEditorSegments -TimelineSegments @($timelineSegments.ToArray()))
+}
+
+function Get-TimelineEditorSegments {
+    param(
+        [object[]]$TimelineSegments = @(),
+        [object[]]$TrimSegments = @(),
+        [double]$SourceDurationSeconds = 0.0
+    )
+
+    $normalizedTimelineSegments = New-Object System.Collections.Generic.List[object]
+    foreach ($segment in @($TimelineSegments)) {
+        if ($null -eq $segment) {
+            continue
+        }
+
+        $kind = [string]$segment.Kind
+        if ([string]::IsNullOrWhiteSpace($kind)) {
+            $kind = [string]$segment.Type
+        }
+        if ([string]::IsNullOrWhiteSpace($kind)) {
+            continue
+        }
+
+        $normalized = New-TimelineEditorSegment -Kind $kind.Trim().ToLowerInvariant() -StartText ([string]$segment.StartText) -EndText ([string]$segment.EndText)
+        if ($null -ne $normalized) {
+            $normalizedTimelineSegments.Add($normalized)
+        }
+    }
+
+    if ($normalizedTimelineSegments.Count -gt 0) {
+        return @(Merge-TimelineEditorSegments -TimelineSegments @($normalizedTimelineSegments.ToArray()))
+    }
+
+    return @(Convert-CutSegmentsToTimelineEditorSegments -TrimSegments $TrimSegments -SourceDurationSeconds $SourceDurationSeconds)
+}
+
+function Get-TimelineEditorCutSegments {
+    param(
+        [object[]]$TimelineSegments = @()
+    )
+
+    $cutSegments = New-Object System.Collections.Generic.List[object]
+    foreach ($segment in @(Merge-TimelineEditorSegments -TimelineSegments $TimelineSegments)) {
+        if ([string]$segment.Kind -eq "cut") {
+            $cutSegments.Add([pscustomobject]@{
+                StartText = [string]$segment.StartText
+                EndText = [string]$segment.EndText
+                Summary = [string]$segment.Summary
+            })
+        }
+    }
+
+    return @($cutSegments.ToArray())
+}
+
+function Test-IsIdentityTimelineSegments {
+    param(
+        [object[]]$TimelineSegments = @(),
+        [double]$SourceDurationSeconds = 0.0
+    )
+
+    $segments = @(Merge-TimelineEditorSegments -TimelineSegments $TimelineSegments)
+    if ($segments.Count -ne 1) {
+        return $false
+    }
+
+    $segment = $segments[0]
+    if ([string]$segment.Kind -ne "keep") {
+        return $false
+    }
+
+    $startSeconds = Convert-ToVhsMp4FiniteDouble -Value $segment.StartSeconds -Default -1.0
+    $durationSeconds = Convert-ToVhsMp4FiniteDouble -Value $segment.DurationSeconds -Default -1.0
+    if ($startSeconds -lt -0.0001 -or [Math]::Abs($startSeconds) -gt 0.0001) {
+        return $false
+    }
+
+    if ($SourceDurationSeconds -le 0) {
+        return $true
+    }
+
+    return [Math]::Abs($durationSeconds - $SourceDurationSeconds) -lt 0.0001
 }
 
 function Get-PlanItemCropSourceDimensions {
@@ -3506,12 +3730,30 @@ function Apply-PlayerTrimStateToItem {
         $TrimState
     )
 
-    foreach ($name in @("TrimSegments", "TrimStartText", "TrimEndText", "TrimStartSeconds", "TrimEndSeconds", "TrimDurationSeconds", "TrimSummary")) {
+    foreach ($name in @("TimelineSegments", "TrimSegments", "TrimStartText", "TrimEndText", "TrimStartSeconds", "TrimEndSeconds", "TrimDurationSeconds", "TrimSummary")) {
         if ($Item.PSObject.Properties[$name]) {
             $Item.PSObject.Properties.Remove($name)
         }
     }
 
+    $timelineSegments = @()
+    if ($TrimState.PSObject.Properties["TimelineSegments"] -and $null -ne $TrimState.TimelineSegments) {
+        $timelineSegments = @(Get-TimelineEditorSegments -TimelineSegments @($TrimState.TimelineSegments) -SourceDurationSeconds (Convert-ToVhsMp4FiniteDouble -Value (Get-PlanItemSourceDurationSeconds -Item $Item) -Default 0.0))
+    }
+
+    if ($timelineSegments.Count -gt 0 -and -not (Test-IsIdentityTimelineSegments -TimelineSegments $timelineSegments -SourceDurationSeconds (Convert-ToVhsMp4FiniteDouble -Value (Get-PlanItemSourceDurationSeconds -Item $Item) -Default 0.0))) {
+        $timelinePlan = Get-VhsMp4TimelinePlan -TimelineSegments $timelineSegments
+        $timelineCutSegments = @(Get-TimelineEditorCutSegments -TimelineSegments $timelineSegments)
+        $Item | Add-Member -NotePropertyName "TimelineSegments" -NotePropertyValue $timelineSegments -Force
+        $Item | Add-Member -NotePropertyName "TrimSegments" -NotePropertyValue $timelineCutSegments -Force
+        $Item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue "" -Force
+        $Item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue "" -Force
+        $Item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $null -Force
+        $Item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $null -Force
+        $Item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $timelinePlan.DurationSeconds -Force
+        $Item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $timelinePlan.Summary -Force
+    }
+    else {
     $segments = @()
     if ($TrimState.PSObject.Properties["TrimSegments"] -and $null -ne $TrimState.TrimSegments) {
         $segments = @($TrimState.TrimSegments)
@@ -3539,6 +3781,7 @@ function Apply-PlayerTrimStateToItem {
             $Item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
             $Item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
         }
+    }
     }
 
     if ($TrimState.PSObject.Properties["PreviewPositionSeconds"] -and $null -ne $TrimState.PreviewPositionSeconds) {
@@ -4744,6 +4987,9 @@ function Save-SelectedTrimSegments {
 
     $normalized = Get-VhsMp4TrimSegments -TrimSegments $Segments
     $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $item -TrimSegments $normalized.Segments
+    if ($item.PSObject.Properties["TimelineSegments"]) {
+        $item.PSObject.Properties.Remove("TimelineSegments")
+    }
     $item | Add-Member -NotePropertyName "TrimSegments" -NotePropertyValue $normalized.Segments -Force
     $item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue "" -Force
     $item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue "" -Force
@@ -4833,7 +5079,7 @@ function Clear-SelectedTrimSegments {
         return
     }
 
-    foreach ($name in @("TrimSegments", "TrimStartText", "TrimEndText", "TrimStartSeconds", "TrimEndSeconds", "TrimDurationSeconds", "TrimSummary")) {
+    foreach ($name in @("TimelineSegments", "TrimSegments", "TrimStartText", "TrimEndText", "TrimStartSeconds", "TrimEndSeconds", "TrimDurationSeconds", "TrimSummary")) {
         if ($item.PSObject.Properties[$name]) {
             $item.PSObject.Properties.Remove($name)
         }
@@ -5137,6 +5383,8 @@ function Open-PlayerTrimWindow {
         TrimSummary = [string]$trimState.TrimSummary
         TrimDurationSeconds = $trimState.TrimDurationSeconds
         TrimSegments = @($trimState.TrimSegments)
+        TimelineSegments = if ($trimState.PSObject.Properties["TimelineSegments"] -and $null -ne $trimState.TimelineSegments) { @($trimState.TimelineSegments) } else { @() }
+        SelectedTimelineSegmentIndex = -1
         PreviewPositionSeconds = Convert-ToVhsMp4FiniteDouble -Value $trimState.PreviewPositionSeconds -Default 0.0
         CropMode = [string]$cropState.CropMode
         CropLeft = [int]$cropState.CropLeft
@@ -5159,6 +5407,11 @@ function Open-PlayerTrimWindow {
 
     if ($localState.PreviewPositionSeconds -le 0) {
         $localState.PreviewPositionSeconds = if ($durationSeconds -gt 0) { [Math]::Min(5.0, $durationSeconds) } else { 0.0 }
+    }
+
+    $localState.TimelineSegments = @(Get-TimelineEditorSegments -TimelineSegments $localState.TimelineSegments -TrimSegments $localState.TrimSegments -SourceDurationSeconds $durationSeconds)
+    if ($localState.TimelineSegments.Count -gt 0) {
+        $localState.SelectedTimelineSegmentIndex = 0
     }
 
     $dialogResult = [pscustomobject]@{
@@ -5216,11 +5469,12 @@ function Open-PlayerTrimWindow {
     $playerWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $playerWorkspaceLayout.Dock = "Fill"
     $playerWorkspaceLayout.ColumnCount = 1
-    $playerWorkspaceLayout.RowCount = 5
+    $playerWorkspaceLayout.RowCount = 6
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 40)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 108)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
     $playerRootLayout.Controls.Add($playerWorkspaceLayout, 0, 1)
 
@@ -5378,6 +5632,52 @@ function Open-PlayerTrimWindow {
     $jumpToPlayerEndButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
     $transportFlow.Controls.Add($jumpToPlayerEndButton)
 
+    $playerTimelineEditorGroupBox = New-Object System.Windows.Forms.GroupBox
+    $playerTimelineEditorGroupBox.Text = "Timeline editor"
+    $playerTimelineEditorGroupBox.Dock = "Fill"
+    $playerWorkspaceLayout.Controls.Add($playerTimelineEditorGroupBox, 0, 4)
+
+    $playerTimelineEditorLayout = New-Object System.Windows.Forms.TableLayoutPanel
+    $playerTimelineEditorLayout.Dock = "Fill"
+    $playerTimelineEditorLayout.ColumnCount = 1
+    $playerTimelineEditorLayout.RowCount = 2
+    $playerTimelineEditorLayout.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
+    $playerTimelineEditorLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+    $playerTimelineEditorLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 32)))
+    $playerTimelineEditorGroupBox.Controls.Add($playerTimelineEditorLayout)
+
+    $playerTimelineSegmentsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+    $playerTimelineSegmentsFlow.Dock = "Fill"
+    $playerTimelineSegmentsFlow.WrapContents = $false
+    $playerTimelineSegmentsFlow.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
+    $playerTimelineSegmentsFlow.AutoScroll = $true
+    $playerTimelineEditorLayout.Controls.Add($playerTimelineSegmentsFlow, 0, 0)
+
+    $timelineSegmentActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+    $timelineSegmentActionsFlow.Dock = "Fill"
+    $timelineSegmentActionsFlow.WrapContents = $false
+    $playerTimelineEditorLayout.Controls.Add($timelineSegmentActionsFlow, 0, 1)
+
+    $deleteTimelineSegmentButton = New-Object System.Windows.Forms.Button
+    $deleteTimelineSegmentButton.Text = "Delete"
+    $deleteTimelineSegmentButton.AutoSize = $true
+    $timelineSegmentActionsFlow.Controls.Add($deleteTimelineSegmentButton)
+
+    $rippleDeleteTimelineSegmentButton = New-Object System.Windows.Forms.Button
+    $rippleDeleteTimelineSegmentButton.Text = "Ripple Delete"
+    $rippleDeleteTimelineSegmentButton.AutoSize = $true
+    $timelineSegmentActionsFlow.Controls.Add($rippleDeleteTimelineSegmentButton)
+
+    $moveTimelineSegmentLeftButton = New-Object System.Windows.Forms.Button
+    $moveTimelineSegmentLeftButton.Text = "Move Left"
+    $moveTimelineSegmentLeftButton.AutoSize = $true
+    $timelineSegmentActionsFlow.Controls.Add($moveTimelineSegmentLeftButton)
+
+    $moveTimelineSegmentRightButton = New-Object System.Windows.Forms.Button
+    $moveTimelineSegmentRightButton.Text = "Move Right"
+    $moveTimelineSegmentRightButton.AutoSize = $true
+    $timelineSegmentActionsFlow.Controls.Add($moveTimelineSegmentRightButton)
+
     $playerMarkersLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $playerMarkersLayout.Dock = "Fill"
     $playerMarkersLayout.ColumnCount = 3
@@ -5385,7 +5685,7 @@ function Open-PlayerTrimWindow {
     $playerMarkersLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
     $playerMarkersLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
     $playerMarkersLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-    $playerWorkspaceLayout.Controls.Add($playerMarkersLayout, 0, 4)
+    $playerWorkspaceLayout.Controls.Add($playerMarkersLayout, 0, 5)
 
     $playerStartMarkerLabel = New-Object System.Windows.Forms.Label
     $playerStartMarkerLabel.Text = "Start: --"
@@ -5703,8 +6003,13 @@ function Open-PlayerTrimWindow {
         PauseButton = $pausePlayerButton
         PlayerPreviewFrameButton = $playerPreviewFrameButton
         PlayerSegmentsListBox = $playerSegmentsListBox
+        PlayerTimelineSegmentsFlow = $playerTimelineSegmentsFlow
         RemovePlayerSegmentButton = $removePlayerSegmentButton
         ClearPlayerSegmentsButton = $clearPlayerSegmentsButton
+        DeleteTimelineSegmentButton = $deleteTimelineSegmentButton
+        RippleDeleteTimelineSegmentButton = $rippleDeleteTimelineSegmentButton
+        MoveTimelineSegmentLeftButton = $moveTimelineSegmentLeftButton
+        MoveTimelineSegmentRightButton = $moveTimelineSegmentRightButton
         PlayerTrimStartTextBox = $playerTrimStartTextBox
         PlayerTrimEndTextBox = $playerTrimEndTextBox
         PlayerCutRangeLabel = $playerCutRangeLabel
@@ -5746,8 +6051,13 @@ function Open-PlayerTrimWindow {
         $pauseButton = $ctx.PauseButton
         $playerPreviewFrameButton = $ctx.PlayerPreviewFrameButton
         $playerSegmentsListBox = $ctx.PlayerSegmentsListBox
+        $playerTimelineSegmentsFlow = $ctx.PlayerTimelineSegmentsFlow
         $removePlayerSegmentButton = $ctx.RemovePlayerSegmentButton
         $clearPlayerSegmentsButton = $ctx.ClearPlayerSegmentsButton
+        $deleteTimelineSegmentButton = $ctx.DeleteTimelineSegmentButton
+        $rippleDeleteTimelineSegmentButton = $ctx.RippleDeleteTimelineSegmentButton
+        $moveTimelineSegmentLeftButton = $ctx.MoveTimelineSegmentLeftButton
+        $moveTimelineSegmentRightButton = $ctx.MoveTimelineSegmentRightButton
         $playerTrimStartTextBox = $ctx.PlayerTrimStartTextBox
         $playerTrimEndTextBox = $ctx.PlayerTrimEndTextBox
         $playerCutRangeLabel = $ctx.PlayerCutRangeLabel
@@ -5876,6 +6186,172 @@ function Open-PlayerTrimWindow {
         $clearPlayerSegmentsButton.Enabled = $segments.Count -gt 0
     }
 
+    function Sync-PlayerTimelineDerivedState {
+        $localState.TimelineSegments = @(Get-TimelineEditorSegments -TimelineSegments $localState.TimelineSegments -TrimSegments $localState.TrimSegments -SourceDurationSeconds $runtimeState.DurationSeconds)
+        if (Test-IsIdentityTimelineSegments -TimelineSegments $localState.TimelineSegments -SourceDurationSeconds $runtimeState.DurationSeconds) {
+            $localState.TrimSegments = @()
+            $localState.TrimSummary = ""
+            $localState.TrimDurationSeconds = $null
+            $localState.TrimStartText = ""
+            $localState.TrimEndText = ""
+        }
+        else {
+        $localState.TrimSegments = @(Get-TimelineEditorCutSegments -TimelineSegments $localState.TimelineSegments)
+
+        if ($localState.TimelineSegments.Count -gt 0) {
+            $timelinePlan = Get-VhsMp4TimelinePlan -TimelineSegments $localState.TimelineSegments
+            $localState.TrimSummary = [string]$timelinePlan.Summary
+            $localState.TrimDurationSeconds = [double]$timelinePlan.DurationSeconds
+        }
+        else {
+            $localState.TrimSummary = ""
+            $localState.TrimDurationSeconds = $null
+        }
+        }
+
+        if ($localState.SelectedTimelineSegmentIndex -ge $localState.TimelineSegments.Count) {
+            $localState.SelectedTimelineSegmentIndex = $localState.TimelineSegments.Count - 1
+        }
+        if ($localState.SelectedTimelineSegmentIndex -lt 0 -and $localState.TimelineSegments.Count -gt 0) {
+            $localState.SelectedTimelineSegmentIndex = 0
+        }
+    }
+
+    function Get-SelectedPlayerTimelineSegment {
+        if ($localState.SelectedTimelineSegmentIndex -lt 0 -or $localState.SelectedTimelineSegmentIndex -ge @($localState.TimelineSegments).Count) {
+            return $null
+        }
+
+        return @($localState.TimelineSegments)[$localState.SelectedTimelineSegmentIndex]
+    }
+
+    function Sync-PlayerTimelineActionButtons {
+        $segmentCount = @($localState.TimelineSegments).Count
+        $selectedIndex = [int]$localState.SelectedTimelineSegmentIndex
+        $hasSelection = $selectedIndex -ge 0 -and $selectedIndex -lt $segmentCount
+        $deleteTimelineSegmentButton.Enabled = $hasSelection
+        $rippleDeleteTimelineSegmentButton.Enabled = $hasSelection
+        $moveTimelineSegmentLeftButton.Enabled = $hasSelection -and $selectedIndex -gt 0
+        $moveTimelineSegmentRightButton.Enabled = $hasSelection -and $selectedIndex -lt ($segmentCount - 1)
+    }
+
+    function Select-PlayerTimelineSegment {
+        param(
+            [int]$Index,
+            [bool]$JumpPreview = $false
+        )
+
+        if ($Index -lt 0 -or $Index -ge @($localState.TimelineSegments).Count) {
+            $localState.SelectedTimelineSegmentIndex = -1
+            Sync-PlayerTimelineActionButtons
+            return
+        }
+
+        $localState.SelectedTimelineSegmentIndex = $Index
+        $segment = Get-SelectedPlayerTimelineSegment
+        if ($null -eq $segment) {
+            Sync-PlayerTimelineActionButtons
+            return
+        }
+
+        if ([string]$segment.Kind -eq "cut") {
+            $playerTrimStartTextBox.Text = [string]$segment.StartText
+            $playerTrimEndTextBox.Text = [string]$segment.EndText
+            Update-PlayerCutDisplay
+            $cutIndex = 0
+            for ($index = 0; $index -lt @($localState.TrimSegments).Count; $index++) {
+                $cutSegment = @($localState.TrimSegments)[$index]
+                if ([string]$cutSegment.StartText -eq [string]$segment.StartText -and [string]$cutSegment.EndText -eq [string]$segment.EndText) {
+                    $cutIndex = $index
+                    break
+                }
+            }
+            if ($playerSegmentsListBox.Items.Count -gt $cutIndex) {
+                $playerSegmentsListBox.SelectedIndex = $cutIndex
+            }
+        }
+
+        if ($JumpPreview -and [string]$segment.Kind -ne "gap") {
+            Navigate-PlayerPositionSeconds -Seconds (Convert-ToVhsMp4FiniteDouble -Value $segment.StartSeconds -Default $localState.PreviewPositionSeconds)
+        }
+
+        Sync-PlayerTimelineActionButtons
+    }
+
+    function Sync-PlayerTimelineEditorStrip {
+        $playerTimelineSegmentsFlow.SuspendLayout()
+        try {
+            foreach ($control in @($playerTimelineSegmentsFlow.Controls)) {
+                $playerTimelineSegmentsFlow.Controls.Remove($control)
+                $control.Dispose()
+            }
+
+            $segments = @($localState.TimelineSegments)
+            if ($segments.Count -eq 0) {
+                $emptyLabel = New-Object System.Windows.Forms.Label
+                $emptyLabel.Text = "Timeline jos nema segmente. Cut Segment ce ih napraviti iz izvornog klipa."
+                $emptyLabel.AutoSize = $true
+                $emptyLabel.Margin = New-Object System.Windows.Forms.Padding(3, 10, 3, 3)
+                $playerTimelineSegmentsFlow.Controls.Add($emptyLabel)
+                Sync-PlayerTimelineActionButtons
+                return
+            }
+
+            $durationBase = [Math]::Max(1.0, (Convert-ToVhsMp4FiniteDouble -Value $runtimeState.DurationSeconds -Default 1.0))
+            for ($index = 0; $index -lt $segments.Count; $index++) {
+                $segment = $segments[$index]
+                $segmentKind = [string]$segment.Kind
+                $durationSeconds = [Math]::Max(0.01, (Convert-ToVhsMp4FiniteDouble -Value $segment.DurationSeconds -Default 0.01))
+                $width = [int][Math]::Round(([Math]::Min(0.35, ($durationSeconds / $durationBase)) * 420.0) + 76.0, 0, [System.MidpointRounding]::AwayFromZero)
+                $width = [Math]::Max(76, [Math]::Min(220, $width))
+
+                $button = New-Object System.Windows.Forms.Button
+                $button.AutoSize = $false
+                $button.Width = $width
+                $button.Height = 42
+                $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+                $button.Margin = New-Object System.Windows.Forms.Padding(3)
+                $button.Tag = $index
+                $button.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+
+                switch ($segmentKind) {
+                    "cut" {
+                        $button.Text = "CUT`r`n" + [string]$segment.DurationText
+                        $button.BackColor = [System.Drawing.Color]::FromArgb(254, 226, 226)
+                    }
+                    "gap" {
+                        $button.Text = "GAP`r`n" + [string]$segment.DurationText
+                        $button.BackColor = [System.Drawing.Color]::FromArgb(229, 231, 235)
+                    }
+                    default {
+                        $button.Text = "KEEP`r`n" + [string]$segment.DurationText
+                        $button.BackColor = [System.Drawing.Color]::FromArgb(220, 252, 231)
+                    }
+                }
+
+                if ($index -eq $localState.SelectedTimelineSegmentIndex) {
+                    $button.FlatAppearance.BorderSize = 2
+                    $button.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+                }
+                else {
+                    $button.FlatAppearance.BorderSize = 1
+                }
+
+                $button.Add_Click(({
+                    param($sender, $eventArgs)
+                    Select-PlayerTimelineSegment -Index ([int]$sender.Tag) -JumpPreview $true
+                    Sync-PlayerTimelineEditorStrip
+                }).GetNewClosure())
+                $playerTimelineSegmentsFlow.Controls.Add($button)
+            }
+        }
+        finally {
+            $playerTimelineSegmentsFlow.ResumeLayout()
+        }
+
+        Sync-PlayerTimelineActionButtons
+    }
+
     function Update-PlayerCutDisplay {
         $cutText = Format-CutTimelineMarkerText -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -DurationSeconds $runtimeState.DurationSeconds
         $playerCutRangeLabel.Text = $cutText
@@ -5889,6 +6365,13 @@ function Open-PlayerTrimWindow {
         if ($segments.Count -gt 0 -and $playerSegmentsListBox.SelectedIndex -ge 0 -and $playerSegmentsListBox.SelectedIndex -lt $segments.Count) {
             $playerTrimStartTextBox.Text = [string]$segments[$playerSegmentsListBox.SelectedIndex].StartText
             $playerTrimEndTextBox.Text = [string]$segments[$playerSegmentsListBox.SelectedIndex].EndText
+            for ($index = 0; $index -lt @($localState.TimelineSegments).Count; $index++) {
+                $timelineSegment = @($localState.TimelineSegments)[$index]
+                if ([string]$timelineSegment.Kind -eq "cut" -and [string]$timelineSegment.StartText -eq $playerTrimStartTextBox.Text -and [string]$timelineSegment.EndText -eq $playerTrimEndTextBox.Text) {
+                    $localState.SelectedTimelineSegmentIndex = $index
+                    break
+                }
+            }
         }
         else {
             $playerTrimStartTextBox.Text = [string]$localState.TrimStartText
@@ -5896,6 +6379,9 @@ function Open-PlayerTrimWindow {
         }
 
         Update-PlayerCutDisplay
+        if (Get-Command -Name Sync-PlayerTimelineEditorStrip -ErrorAction SilentlyContinue) {
+            Sync-PlayerTimelineEditorStrip
+        }
     }
 
     function Get-PlayerCurrentTrimProjection {
@@ -5917,6 +6403,11 @@ function Open-PlayerTrimWindow {
         }
 
         try {
+            $timelineSegments = @($localState.TimelineSegments)
+            if ($timelineSegments.Count -gt 0) {
+                return (Get-VhsMp4TimelinePlan -TimelineSegments $timelineSegments)
+            }
+
             $segments = @($localState.TrimSegments)
             if ($segments.Count -gt 0) {
                 return (& $getEffectiveTrimPlan -TrimSegments $segments -SourceDurationSeconds $sourceDuration)
@@ -6687,52 +7178,181 @@ function Open-PlayerTrimWindow {
         Update-PlayerCutDisplay
     }
 
+    function Apply-CutWindowToPlayerTimeline {
+        param(
+            [Parameter(Mandatory = $true)]
+            $Window
+        )
+
+        $segments = @(Get-TimelineEditorSegments -TimelineSegments $localState.TimelineSegments -TrimSegments $localState.TrimSegments -SourceDurationSeconds $runtimeState.DurationSeconds)
+        if ($segments.Count -eq 0) {
+            throw "Timeline nema aktivne segmente za sečenje."
+        }
+
+        $timelineSegments = New-Object System.Collections.Generic.List[object]
+        $selectedIndex = -1
+        $cutStartSeconds = Convert-ToVhsMp4FiniteDouble -Value $Window.StartSeconds -Default 0.0
+        $cutEndSeconds = Convert-ToVhsMp4FiniteDouble -Value $Window.EndSeconds -Default $cutStartSeconds
+        $overlapFound = $false
+        foreach ($segment in $segments) {
+            $segmentKind = [string]$segment.Kind
+            if ($segmentKind -ne "keep") {
+                $timelineSegments.Add($segment)
+                continue
+            }
+
+            $segmentStart = Convert-ToVhsMp4FiniteDouble -Value $segment.StartSeconds -Default 0.0
+            $segmentEnd = Convert-ToVhsMp4FiniteDouble -Value $segment.EndSeconds -Default $segmentStart
+            $overlapStart = [Math]::Max($segmentStart, $cutStartSeconds)
+            $overlapEnd = [Math]::Min($segmentEnd, $cutEndSeconds)
+            if ($overlapEnd -le ($overlapStart + 0.0001)) {
+                $timelineSegments.Add($segment)
+                continue
+            }
+
+            $overlapFound = $true
+            if ($segmentStart -lt ($overlapStart - 0.0001)) {
+                $preKeep = New-TimelineEditorSegment -Kind "keep" -StartText (Format-VhsMp4FfmpegTime -Seconds $segmentStart) -EndText (Format-VhsMp4FfmpegTime -Seconds $overlapStart)
+                if ($null -ne $preKeep) {
+                    $timelineSegments.Add($preKeep)
+                }
+            }
+
+            $cutSegment = New-TimelineEditorSegment -Kind "cut" -StartText (Format-VhsMp4FfmpegTime -Seconds $overlapStart) -EndText (Format-VhsMp4FfmpegTime -Seconds $overlapEnd)
+            if ($null -ne $cutSegment) {
+                $timelineSegments.Add($cutSegment)
+                if ($selectedIndex -lt 0) {
+                    $selectedIndex = $timelineSegments.Count - 1
+                }
+            }
+
+            if ($overlapEnd -lt ($segmentEnd - 0.0001)) {
+                $postKeep = New-TimelineEditorSegment -Kind "keep" -StartText (Format-VhsMp4FfmpegTime -Seconds $overlapEnd) -EndText (Format-VhsMp4FfmpegTime -Seconds $segmentEnd)
+                if ($null -ne $postKeep) {
+                    $timelineSegments.Add($postKeep)
+                }
+            }
+        }
+
+        if (-not $overlapFound) {
+            throw "Cut Segment ne pada unutar vidljivog dela videa."
+        }
+
+        $localState.TimelineSegments = @(Merge-TimelineEditorSegments -TimelineSegments @($timelineSegments.ToArray()))
+        $localState.SelectedTimelineSegmentIndex = $selectedIndex
+        Sync-PlayerTimelineDerivedState
+        Sync-PlayerSegmentsList
+        Sync-PlayerTimelineEditorStrip
+        Select-PlayerTimelineSegment -Index $localState.SelectedTimelineSegmentIndex -JumpPreview $false
+        Refresh-PlayerTrimProjection
+        Set-PlayerTrimDialogDirty
+    }
+
+    function Delete-PlayerTimelineSegment {
+        $selectedSegment = Get-SelectedPlayerTimelineSegment
+        if ($null -eq $selectedSegment) {
+            return
+        }
+
+        $keepCount = @($localState.TimelineSegments | Where-Object { [string]$_.Kind -eq "keep" }).Count
+        if ([string]$selectedSegment.Kind -eq "keep" -and $keepCount -le 1) {
+            [System.Windows.Forms.MessageBox]::Show("Timeline mora da zadrzi bar jedan aktivan keep segment.", "Delete", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            return
+        }
+
+        $segments = @($localState.TimelineSegments)
+        $replacement = New-TimelineEditorSegment -Kind "gap" -StartText ([string]$selectedSegment.StartText) -EndText ([string]$selectedSegment.EndText)
+        if ($null -eq $replacement) {
+            return
+        }
+        $segments[$localState.SelectedTimelineSegmentIndex] = $replacement
+        $localState.TimelineSegments = @(Merge-TimelineEditorSegments -TimelineSegments $segments)
+        Sync-PlayerTimelineDerivedState
+        Sync-PlayerSegmentsList
+        Sync-PlayerTimelineEditorStrip
+        Select-PlayerTimelineSegment -Index ([Math]::Min($localState.SelectedTimelineSegmentIndex, @($localState.TimelineSegments).Count - 1)) -JumpPreview $false
+        Refresh-PlayerTrimProjection
+        Set-PlayerTrimDialogDirty
+    }
+
+    function RippleDelete-PlayerTimelineSegment {
+        $selectedIndex = [int]$localState.SelectedTimelineSegmentIndex
+        $segments = @($localState.TimelineSegments)
+        if ($selectedIndex -lt 0 -or $selectedIndex -ge $segments.Count) {
+            return
+        }
+
+        $selectedSegment = $segments[$selectedIndex]
+        $keepCount = @($segments | Where-Object { [string]$_.Kind -eq "keep" }).Count
+        if ([string]$selectedSegment.Kind -eq "keep" -and $keepCount -le 1) {
+            [System.Windows.Forms.MessageBox]::Show("Timeline mora da zadrzi bar jedan aktivan keep segment.", "Ripple Delete", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            return
+        }
+
+        $remaining = New-Object System.Collections.Generic.List[object]
+        for ($index = 0; $index -lt $segments.Count; $index++) {
+            if ($index -ne $selectedIndex) {
+                $remaining.Add($segments[$index])
+            }
+        }
+
+        $localState.TimelineSegments = @(Merge-TimelineEditorSegments -TimelineSegments @($remaining.ToArray()))
+        $localState.SelectedTimelineSegmentIndex = [Math]::Min($selectedIndex, @($localState.TimelineSegments).Count - 1)
+        Sync-PlayerTimelineDerivedState
+        Sync-PlayerSegmentsList
+        Sync-PlayerTimelineEditorStrip
+        if ($localState.SelectedTimelineSegmentIndex -ge 0) {
+            Select-PlayerTimelineSegment -Index $localState.SelectedTimelineSegmentIndex -JumpPreview $false
+        }
+        else {
+            Update-PlayerCutDisplay
+        }
+        Refresh-PlayerTrimProjection
+        Set-PlayerTrimDialogDirty
+    }
+
+    function Move-PlayerTimelineSegment {
+        param([int]$Direction)
+
+        $selectedIndex = [int]$localState.SelectedTimelineSegmentIndex
+        $segments = @($localState.TimelineSegments)
+        if ($selectedIndex -lt 0 -or $selectedIndex -ge $segments.Count) {
+            return
+        }
+
+        $targetIndex = $selectedIndex + $Direction
+        if ($targetIndex -lt 0 -or $targetIndex -ge $segments.Count) {
+            return
+        }
+
+        $buffer = $segments[$selectedIndex]
+        $segments[$selectedIndex] = $segments[$targetIndex]
+        $segments[$targetIndex] = $buffer
+        $localState.TimelineSegments = @($segments)
+        $localState.SelectedTimelineSegmentIndex = $targetIndex
+        Sync-PlayerTimelineDerivedState
+        Sync-PlayerSegmentsList
+        Sync-PlayerTimelineEditorStrip
+        Select-PlayerTimelineSegment -Index $localState.SelectedTimelineSegmentIndex -JumpPreview $false
+        Refresh-PlayerTrimProjection
+        Set-PlayerTrimDialogDirty
+    }
+
     function Apply-PlayerTrimFields {
         try {
-            $segments = @($localState.TrimSegments)
-            if ($segments.Count -gt 0 -and $playerSegmentsListBox.SelectedIndex -ge 0 -and $playerSegmentsListBox.SelectedIndex -lt $segments.Count) {
-                $segmentWindow = Get-VhsMp4TrimWindow -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text
-                if ([string]::IsNullOrWhiteSpace([string]$segmentWindow.Summary)) {
-                    throw "Za update segmenta unesi i Start i End."
-                }
-
-                $segments[$playerSegmentsListBox.SelectedIndex] = [pscustomobject]@{
-                    StartText = [string]$segmentWindow.StartText
-                    EndText = [string]$segmentWindow.EndText
-                }
-                $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
-                $trimPlan = & $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
-                $localState.TrimSegments = @($normalized.Segments)
-                $localState.TrimStartText = ""
-                $localState.TrimEndText = ""
-                $localState.TrimSummary = [string]$trimPlan.Summary
-                $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
-                Sync-PlayerSegmentsList
-                Load-PlayerTrimFields
-                Refresh-PlayerTrimProjection
-                Set-PlayerTrimDialogDirty
-                return
+            $segmentWindow = Get-VhsMp4TrimWindow -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text
+            if ([string]::IsNullOrWhiteSpace([string]$segmentWindow.Summary)) {
+                throw "Za Cut Segment unesi i In/Out point."
             }
 
-            $trimPlan = & $getEffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
-            if ([string]::IsNullOrWhiteSpace([string]$trimPlan.Summary)) {
-                $localState.TrimStartText = ""
-                $localState.TrimEndText = ""
-                $localState.TrimSummary = ""
-                $localState.TrimDurationSeconds = $null
+            $selectedSegment = Get-SelectedPlayerTimelineSegment
+            if ($null -ne $selectedSegment -and [string]$selectedSegment.Kind -eq "cut") {
+                $segments = @($localState.TimelineSegments)
+                $segments[$localState.SelectedTimelineSegmentIndex] = (New-TimelineEditorSegment -Kind "keep" -StartText ([string]$selectedSegment.StartText) -EndText ([string]$selectedSegment.EndText))
+                $localState.TimelineSegments = @(Merge-TimelineEditorSegments -TimelineSegments $segments)
             }
-            else {
-                $cutSegment = @($trimPlan.Segments)[0]
-                $localState.TrimStartText = [string]$cutSegment.StartText
-                $localState.TrimEndText = [string]$cutSegment.EndText
-                $localState.TrimSummary = [string]$trimPlan.Summary
-                $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
-            }
-            $localState.TrimSegments = @()
-            Sync-PlayerSegmentsList
-            Update-PlayerCutDisplay
-            Refresh-PlayerTrimProjection
-            Set-PlayerTrimDialogDirty
+
+            Apply-CutWindowToPlayerTimeline -Window $segmentWindow
         }
         catch {
             [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Cut Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
@@ -6745,31 +7365,7 @@ function Open-PlayerTrimWindow {
             if ([string]::IsNullOrWhiteSpace([string]$window.Summary) -or [string]::IsNullOrWhiteSpace([string]$window.StartText) -or [string]::IsNullOrWhiteSpace([string]$window.EndText)) {
                 throw "Za Cut Segment unesi i Start i End."
             }
-
-            $segments = New-Object System.Collections.Generic.List[object]
-            foreach ($segment in @($localState.TrimSegments)) {
-                $segments.Add([pscustomobject]@{
-                    StartText = [string]$segment.StartText
-                    EndText = [string]$segment.EndText
-                })
-            }
-            $segments.Add([pscustomobject]@{
-                StartText = [string]$window.StartText
-                EndText = [string]$window.EndText
-            })
-
-            $normalized = Get-VhsMp4TrimSegments -TrimSegments $segments
-            $trimPlan = & $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
-            $localState.TrimSegments = @($normalized.Segments)
-            $localState.TrimStartText = ""
-            $localState.TrimEndText = ""
-            $localState.TrimSummary = [string]$trimPlan.Summary
-            $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
-            Sync-PlayerSegmentsList
-            $playerSegmentsListBox.SelectedIndex = [Math]::Max(0, $normalized.Count - 1)
-            Load-PlayerTrimFields
-            Refresh-PlayerTrimProjection
-            Set-PlayerTrimDialogDirty
+            Apply-CutWindowToPlayerTimeline -Window $window
         }
         catch {
             [System.Windows.Forms.MessageBox]::Show((Get-VhsMp4ErrorMessage -ErrorObject $_), "Cut Segment", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
@@ -6777,49 +7373,25 @@ function Open-PlayerTrimWindow {
     }
 
     function Remove-PlayerTrimSegment {
-        $segments = @($localState.TrimSegments)
-        $selectedIndex = $playerSegmentsListBox.SelectedIndex
-        if ($selectedIndex -lt 0 -or $selectedIndex -ge $segments.Count) {
-            return
-        }
-
-        $remaining = New-Object System.Collections.Generic.List[object]
-        for ($index = 0; $index -lt $segments.Count; $index++) {
-            if ($index -ne $selectedIndex) {
-                $remaining.Add($segments[$index])
-            }
-        }
-
-        if ($remaining.Count -gt 0) {
-            $normalized = Get-VhsMp4TrimSegments -TrimSegments $remaining
-            $trimPlan = & $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds
-            $localState.TrimSegments = @($normalized.Segments)
-            $localState.TrimSummary = [string]$trimPlan.Summary
-            $localState.TrimDurationSeconds = [double]$trimPlan.DurationSeconds
-        }
-        else {
-            $localState.TrimSegments = @()
-            $localState.TrimSummary = ""
-            $localState.TrimDurationSeconds = $null
-        }
-
-        Sync-PlayerSegmentsList
-        Load-PlayerTrimFields
-        Refresh-PlayerTrimProjection
-        Set-PlayerTrimDialogDirty
+        Delete-PlayerTimelineSegment
     }
 
     function Clear-PlayerTrimSegments {
+        $localState.TimelineSegments = @(Get-TimelineEditorSegments -SourceDurationSeconds $runtimeState.DurationSeconds)
+        $localState.SelectedTimelineSegmentIndex = if (@($localState.TimelineSegments).Count -gt 0) { 0 } else { -1 }
         $localState.TrimSegments = @()
         $localState.TrimSummary = ""
         $localState.TrimDurationSeconds = $null
         Sync-PlayerSegmentsList
+        Sync-PlayerTimelineEditorStrip
         Update-PlayerCutDisplay
         Refresh-PlayerTrimProjection
         Set-PlayerTrimDialogDirty
     }
 
     function Clear-PlayerTrimFields {
+        $localState.TimelineSegments = @(Get-TimelineEditorSegments -SourceDurationSeconds $runtimeState.DurationSeconds)
+        $localState.SelectedTimelineSegmentIndex = if (@($localState.TimelineSegments).Count -gt 0) { 0 } else { -1 }
         $localState.TrimSegments = @()
         $localState.TrimStartText = ""
         $localState.TrimEndText = ""
@@ -6828,6 +7400,7 @@ function Open-PlayerTrimWindow {
         $playerTrimStartTextBox.Text = ""
         $playerTrimEndTextBox.Text = ""
         Sync-PlayerSegmentsList
+        Sync-PlayerTimelineEditorStrip
         Update-PlayerCutDisplay
         Refresh-PlayerTrimProjection
         Set-PlayerTrimDialogDirty
@@ -6839,7 +7412,10 @@ function Open-PlayerTrimWindow {
         )
 
         try {
-            if (@($localState.TrimSegments).Count -eq 0) {
+            Sync-PlayerTimelineDerivedState
+
+            $hasIdentityTimeline = Test-IsIdentityTimelineSegments -TimelineSegments $localState.TimelineSegments -SourceDurationSeconds $runtimeState.DurationSeconds
+            if (@($localState.TrimSegments).Count -eq 0 -and ($hasIdentityTimeline -or @($localState.TimelineSegments).Count -eq 0)) {
                 $trimPlan = & $getEffectiveTrimPlan -TrimStart $playerTrimStartTextBox.Text -TrimEnd $playerTrimEndTextBox.Text -SourceDurationSeconds $runtimeState.DurationSeconds
                 if ($trimPlan.Count -gt 0) {
                     $cutSegment = @($trimPlan.Segments)[0]
@@ -6873,6 +7449,7 @@ function Open-PlayerTrimWindow {
                     TrimSummary = [string]$localState.TrimSummary
                     TrimDurationSeconds = $localState.TrimDurationSeconds
                     TrimSegments = @($localState.TrimSegments)
+                    TimelineSegments = @($localState.TimelineSegments)
                     PreviewPositionSeconds = [double]$localState.PreviewPositionSeconds
                 }
                 CropState = (Get-PlayerCropStateFromFields)
@@ -7022,6 +7599,23 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Clear-PlayerTrimFields'()
     }
 
+    function Sync-PlayerTimelineEditorStrip {
+        $playerRuntime.'Sync-PlayerTimelineEditorStrip'()
+    }
+
+    function Delete-PlayerTimelineSegment {
+        $playerRuntime.'Delete-PlayerTimelineSegment'()
+    }
+
+    function RippleDelete-PlayerTimelineSegment {
+        $playerRuntime.'RippleDelete-PlayerTimelineSegment'()
+    }
+
+    function Move-PlayerTimelineSegment {
+        param([int]$Direction)
+        $playerRuntime.'Move-PlayerTimelineSegment'($Direction)
+    }
+
     function Save-PlayerTrimChanges {
         param(
             [switch]$CloseAfterSave
@@ -7038,6 +7632,8 @@ function Open-PlayerTrimWindow {
                 $playerTimelineTrackBar.Maximum = [Math]::Max(1, [int][Math]::Round($runtimeState.DurationSeconds * $script:PreviewTimelineScale, 0, [System.MidpointRounding]::AwayFromZero))
             }
         }
+        $playerRuntime.'Sync-PlayerTimelineDerivedState'()
+        $playerRuntime.'Sync-PlayerTimelineEditorStrip'()
         $playerRuntime.'Set-PlayerPositionSeconds'($localState.PreviewPositionSeconds, $false, $false)
     }).GetNewClosure())
 
@@ -7095,6 +7691,22 @@ function Open-PlayerTrimWindow {
 
     $clearPlayerTrimButton.Add_Click(({
         $playerRuntime.'Clear-PlayerTrimFields'()
+    }).GetNewClosure())
+
+    $deleteTimelineSegmentButton.Add_Click(({
+        $playerRuntime.'Delete-PlayerTimelineSegment'()
+    }).GetNewClosure())
+
+    $rippleDeleteTimelineSegmentButton.Add_Click(({
+        $playerRuntime.'RippleDelete-PlayerTimelineSegment'()
+    }).GetNewClosure())
+
+    $moveTimelineSegmentLeftButton.Add_Click(({
+        $playerRuntime.'Move-PlayerTimelineSegment'(-1)
+    }).GetNewClosure())
+
+    $moveTimelineSegmentRightButton.Add_Click(({
+        $playerRuntime.'Move-PlayerTimelineSegment'(1)
     }).GetNewClosure())
 
     $playerSegmentsListBox.Add_SelectedIndexChanged(({
@@ -7223,7 +7835,7 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $jumpToPlayerEndButton.Add_Click(({
-        $playerRuntime.'Navigate-PlayerPositionSeconds'([double]$localState.DurationSeconds)
+        $playerRuntime.'Navigate-PlayerPositionSeconds'([double]$runtimeState.DurationSeconds)
     }).GetNewClosure())
 
     $playerPreviewFrameButton.Add_Click(({
@@ -7312,7 +7924,9 @@ function Open-PlayerTrimWindow {
     }).GetNewClosure())
 
     $playerRuntime.'Set-PlayerTrimDialogMode'($localState.Mode)
+    $playerRuntime.'Sync-PlayerTimelineDerivedState'()
     $playerRuntime.'Sync-PlayerSegmentsList'()
+    $playerRuntime.'Sync-PlayerTimelineEditorStrip'()
     $playerRuntime.'Load-PlayerTrimFields'()
     $playerRuntime.'Load-PlayerCropFields'()
     $localState.AspectModeControlSync = $true
@@ -7693,6 +8307,9 @@ function Apply-SelectedTrim {
         }
 
         $trimPlan = Get-PlanItemEffectiveTrimPlan -Item $item -TrimStart $trimStartTextBox.Text -TrimEnd $trimEndTextBox.Text
+        if ($item.PSObject.Properties["TimelineSegments"]) {
+            $item.PSObject.Properties.Remove("TimelineSegments")
+        }
         if ($item.PSObject.Properties["TrimSegments"]) {
             $item.PSObject.Properties.Remove("TrimSegments")
         }
@@ -7722,7 +8339,7 @@ function Clear-SelectedTrim {
         return
     }
 
-    foreach ($name in @("TrimSegments", "TrimStartText", "TrimEndText", "TrimStartSeconds", "TrimEndSeconds", "TrimDurationSeconds", "TrimSummary")) {
+    foreach ($name in @("TimelineSegments", "TrimSegments", "TrimStartText", "TrimEndText", "TrimStartSeconds", "TrimEndSeconds", "TrimDurationSeconds", "TrimSummary")) {
         if ($item.PSObject.Properties[$name]) {
             $item.PSObject.Properties.Remove($name)
         }
@@ -9028,6 +9645,7 @@ function Invoke-TestSample {
         $samplePath = Get-VhsMp4SampleOutputPath -OutputDir $context.OutputDir -SourceName $item.SourceName
         $sampleCropState = Copy-PlanItemCropState -Item $item
         $sampleAspectMode = Get-PlanItemPropertyText -Item $item -Name "AspectMode" -Default "Auto"
+        $sampleTimelineSegments = if ($item.PSObject.Properties["TimelineSegments"] -and $null -ne $item.TimelineSegments) { @($item.TimelineSegments) } else { @() }
         Add-LogLine ("Test Sample: " + $item.SourcePath + " -> " + $samplePath)
         Set-StatusText ("Pravim Test Sample od 120 sekundi: " + $item.SourceName)
 
@@ -9041,6 +9659,7 @@ function Invoke-TestSample {
             -AudioBitrate $context.AudioBitrate `
             -VideoBitrate $context.VideoBitrate `
             -SampleSeconds 120 `
+            -TimelineSegments $sampleTimelineSegments `
             -Deinterlace $context.Deinterlace `
             -Denoise $context.Denoise `
             -RotateFlip $context.RotateFlip `
@@ -9378,6 +9997,8 @@ function Start-NextQueuedItem {
             $trimEndForItem = Get-PlanItemPropertyText -Item $item -Name "TrimEndText" -Default ""
             $trimSegmentsProperty = $item.PSObject.Properties["TrimSegments"]
             $trimSegmentsForItem = if ($trimSegmentsProperty -and $null -ne $trimSegmentsProperty.Value) { @($trimSegmentsProperty.Value) } else { @() }
+            $timelineSegmentsProperty = $item.PSObject.Properties["TimelineSegments"]
+            $timelineSegmentsForItem = if ($timelineSegmentsProperty -and $null -ne $timelineSegmentsProperty.Value) { @($timelineSegmentsProperty.Value) } else { @() }
             $itemHasAudio = $true
             $itemCropState = Copy-PlanItemCropState -Item $item
             $itemAspectMode = Get-PlanItemPropertyText -Item $item -Name "AspectMode" -Default "Auto"
@@ -9401,6 +10022,7 @@ function Start-NextQueuedItem {
                 -TrimStart $trimStartForItem `
                 -TrimEnd $trimEndForItem `
                 -TrimSegments $trimSegmentsForItem `
+                -TimelineSegments $timelineSegmentsForItem `
                 -SourceHasAudio $itemHasAudio `
                 -Deinterlace $script:BatchContext.Context.Deinterlace `
                 -Denoise $script:BatchContext.Context.Denoise `
@@ -9974,9 +10596,8 @@ $actionsColumnLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $actionsColumnLayout.Dock = "Fill"
 $actionsColumnLayout.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.ColumnCount = 1
-$actionsColumnLayout.RowCount = 4
+$actionsColumnLayout.RowCount = 3
 $actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 16)))
-$actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $actionsColumnLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $quickRunLayout.Controls.Add($actionsColumnLayout, 1, 0)
@@ -10003,14 +10624,6 @@ $secondaryActionsFlow.AutoSize = $true
 $secondaryActionsFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $secondaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
 $actionsColumnLayout.Controls.Add($secondaryActionsFlow, 0, 2)
-
-$tertiaryActionsFlow = New-Object System.Windows.Forms.FlowLayoutPanel
-$tertiaryActionsFlow.Dock = "Fill"
-$tertiaryActionsFlow.WrapContents = $true
-$tertiaryActionsFlow.AutoSize = $true
-$tertiaryActionsFlow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$tertiaryActionsFlow.Margin = New-Object System.Windows.Forms.Padding(0)
-$actionsColumnLayout.Controls.Add($tertiaryActionsFlow, 0, 3)
 
 $queueToolbar = New-Object System.Windows.Forms.FlowLayoutPanel
 $queueToolbar.Dock = "Fill"
@@ -10384,22 +10997,22 @@ $secondaryActionsFlow.Controls.Add($openOutputButton)
 $openLogButton = New-Object System.Windows.Forms.Button
 $openLogButton.Text = "Open Log"
 $openLogButton.AutoSize = $true
-$tertiaryActionsFlow.Controls.Add($openLogButton)
+$secondaryActionsFlow.Controls.Add($openLogButton)
 
 $openReportButton = New-Object System.Windows.Forms.Button
 $openReportButton.Text = "Open Report"
 $openReportButton.AutoSize = $true
-$tertiaryActionsFlow.Controls.Add($openReportButton)
+$secondaryActionsFlow.Controls.Add($openReportButton)
 
 $openSampleButton = New-Object System.Windows.Forms.Button
 $openSampleButton.Text = "Open Sample"
 $openSampleButton.AutoSize = $true
-$tertiaryActionsFlow.Controls.Add($openSampleButton)
+$secondaryActionsFlow.Controls.Add($openSampleButton)
 
 $advancedToggleButton = New-Object System.Windows.Forms.Button
 $advancedToggleButton.Text = "Hide Advanced"
 $advancedToggleButton.AutoSize = $true
-$tertiaryActionsFlow.Controls.Add($advancedToggleButton)
+$secondaryActionsFlow.Controls.Add($advancedToggleButton)
 
 $statusPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $statusPanel.Dock = "Fill"

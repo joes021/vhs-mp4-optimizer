@@ -189,6 +189,82 @@ $multiCut = Get-VhsMp4EffectiveTrimPlan -TrimSegments @(
     assert multi_cut["EffectiveSegments"] == ["00:00:45.95 - 00:43:15.89"]
 
 
+def test_core_builds_keep_timeline_plan_and_ffmpeg_order_from_timeline_segments(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    output_dir.mkdir()
+
+    source = input_dir / "timeline-source.avi"
+    source.write_text("source", encoding="utf-8")
+
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$segments = @(
+  [pscustomobject]@{{ Kind = 'keep'; StartText = '00:01:00'; EndText = '00:01:20' }},
+  [pscustomobject]@{{ Kind = 'cut'; StartText = '00:00:10'; EndText = '00:00:15' }},
+  [pscustomobject]@{{ Kind = 'gap'; StartText = '00:00:30'; EndText = '00:00:40' }},
+  [pscustomobject]@{{ Kind = 'keep'; StartText = '00:00:00'; EndText = '00:00:10' }}
+)
+$plan = Get-VhsMp4TimelinePlan -TimelineSegments $segments
+$videoInfo = [pscustomobject]@{{ DurationSeconds = 120.0 }}
+$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "timeline-out.mp4"}' -QualityMode 'Universal MP4 H.264' -TimelineSegments $segments -VideoInfo $videoInfo -SourceHasAudio $true
+[pscustomobject]@{{
+  Plan = [pscustomobject]@{{
+    Mode = $plan.Mode
+    Summary = $plan.Summary
+    KeepCount = $plan.KeepCount
+    CutCount = $plan.CutCount
+    GapCount = $plan.GapCount
+    DurationSeconds = $plan.DurationSeconds
+    EffectiveSegments = @($plan.EffectiveSegments | ForEach-Object {{ $_.Summary }})
+  }}
+  Args = $args
+}} | ConvertTo-Json -Depth 8
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout)
+    plan = payload["Plan"]
+    args = payload["Args"]
+
+    assert plan["Mode"] == "timeline-multi"
+    assert plan["KeepCount"] == 2
+    assert plan["CutCount"] == 1
+    assert plan["GapCount"] == 1
+    assert plan["DurationSeconds"] == 30
+    assert plan["EffectiveSegments"] == [
+        "00:01:00 - 00:01:20",
+        "00:00:00 - 00:00:10",
+    ]
+    assert "Timeline: 2 keep | 1 cut | 1 gap | out 00:00:30" == plan["Summary"]
+
+    assert "-filter_complex" in args
+    filter_complex = args[args.index("-filter_complex") + 1]
+    assert "trim=start=60:end=80" in filter_complex
+    assert "trim=start=0:end=10" in filter_complex
+    assert filter_complex.index("trim=start=60:end=80") < filter_complex.index("trim=start=0:end=10")
+    assert "concat=n=2:v=1:a=1[vout][aout]" in filter_complex
+
+
 def test_core_time_formatters_reject_nan_and_infinity_values() -> None:
     command = f"""
 $ErrorActionPreference = 'Stop'

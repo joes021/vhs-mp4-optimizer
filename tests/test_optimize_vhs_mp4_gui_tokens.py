@@ -2107,7 +2107,8 @@ def test_vhs_gui_contains_player_trim_window_tokens() -> None:
         "Move-PlayerFrame'(-1, 250)",
         "Move-PlayerFrame'(1, 250)",
         "GetEffectiveTrimPlan = ${function:Get-VhsMp4EffectiveTrimPlan}",
-        "& $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds",
+        "Get-VhsMp4TimelinePlan -TimelineSegments $localState.TimelineSegments",
+        "Apply-CutWindowToPlayerTimeline -Window $window",
     ]:
         assert token in script, f"missing player/trim token: {token}"
 
@@ -2132,6 +2133,46 @@ def test_vhs_gui_player_transport_order_includes_end() -> None:
 
     indices = [script.index(token) for token in ordered_tokens]
     assert indices == sorted(indices)
+
+
+def test_vhs_gui_quick_actions_use_two_rows() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    required_tokens = [
+        "$actionsColumnLayout.RowCount = 3",
+        '$actionsColumnLayout.Controls.Add($primaryActionsFlow, 0, 1)',
+        '$actionsColumnLayout.Controls.Add($secondaryActionsFlow, 0, 2)',
+        '$secondaryActionsFlow.Controls.Add($openLogButton)',
+        '$secondaryActionsFlow.Controls.Add($openReportButton)',
+        '$secondaryActionsFlow.Controls.Add($openSampleButton)',
+        '$secondaryActionsFlow.Controls.Add($advancedToggleButton)',
+    ]
+
+    for token in required_tokens:
+        assert token in script, f"missing two-row quick action token: {token}"
+
+    assert "$tertiaryActionsFlow =" not in script
+
+
+def test_vhs_gui_contains_player_timeline_editor_tokens() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    for token in [
+        '$playerTimelineEditorGroupBox.Text = "Timeline editor"',
+        '$playerTimelineSegmentsFlow = New-Object System.Windows.Forms.FlowLayoutPanel',
+        '$deleteTimelineSegmentButton.Text = "Delete"',
+        '$rippleDeleteTimelineSegmentButton.Text = "Ripple Delete"',
+        '$moveTimelineSegmentLeftButton.Text = "Move Left"',
+        '$moveTimelineSegmentRightButton.Text = "Move Right"',
+        'TimelineSegments = if ($trimState.PSObject.Properties["TimelineSegments"] -and $null -ne $trimState.TimelineSegments) { @($trimState.TimelineSegments) } else { @() }',
+        'TimelineSegments = @($localState.TimelineSegments)',
+        'function Sync-PlayerTimelineEditorStrip {',
+        'function Delete-PlayerTimelineSegment {',
+        'function RippleDelete-PlayerTimelineSegment {',
+        'function Move-PlayerTimelineSegment {',
+        'Get-VhsMp4TimelinePlan',
+    ]:
+        assert token in script, f"missing player timeline editor token: {token}"
 
 
 def test_vhs_gui_contains_player_trim_crop_tokens() -> None:
@@ -5543,7 +5584,7 @@ def test_vhs_gui_floating_editor_layout_uses_large_preview_left_and_tools_right(
         "$playerRootLayout.ColumnCount = 2",
         "$playerRootLayout.RowCount = 2",
         "$playerWorkspaceLayout = New-Object System.Windows.Forms.TableLayoutPanel",
-        "$playerWorkspaceLayout.RowCount = 5",
+        "$playerWorkspaceLayout.RowCount = 6",
         "$timelineInfoLayout = New-Object System.Windows.Forms.TableLayoutPanel",
         "$playerTimelineTrackBar = New-Object System.Windows.Forms.TrackBar",
         "$playerMarkersLayout = New-Object System.Windows.Forms.TableLayoutPanel",

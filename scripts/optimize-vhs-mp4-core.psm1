@@ -643,6 +643,149 @@ function Get-VhsMp4EffectiveTrimPlan {
     }
 }
 
+function Get-VhsMp4TimelinePlan {
+    param(
+        [object[]]$TimelineSegments
+    )
+
+    $normalizedSegments = New-Object System.Collections.Generic.List[object]
+    $effectiveSegments = New-Object System.Collections.Generic.List[object]
+    $keepCount = 0
+    $cutCount = 0
+    $gapCount = 0
+    $remainingDuration = 0.0
+
+    foreach ($segment in @($TimelineSegments)) {
+        if ($null -eq $segment) {
+            continue
+        }
+
+        $kind = [string](Get-VhsMp4ObjectPropertyValue -Object $segment -Name "Kind")
+        if ([string]::IsNullOrWhiteSpace($kind)) {
+            $kind = [string](Get-VhsMp4ObjectPropertyValue -Object $segment -Name "Type")
+        }
+        if ([string]::IsNullOrWhiteSpace($kind)) {
+            $kind = "keep"
+        }
+
+        switch ($kind.Trim().ToLowerInvariant()) {
+            "keep" { $normalizedKind = "keep" }
+            "cut" { $normalizedKind = "cut" }
+            "gap" { $normalizedKind = "gap" }
+            default { throw ("Nepoznat timeline segment kind: " + $kind) }
+        }
+
+        $startText = [string](Get-VhsMp4ObjectPropertyValue -Object $segment -Name "StartText")
+        if ([string]::IsNullOrWhiteSpace($startText)) {
+            $startText = [string](Get-VhsMp4ObjectPropertyValue -Object $segment -Name "TrimStart")
+        }
+        $endText = [string](Get-VhsMp4ObjectPropertyValue -Object $segment -Name "EndText")
+        if ([string]::IsNullOrWhiteSpace($endText)) {
+            $endText = [string](Get-VhsMp4ObjectPropertyValue -Object $segment -Name "TrimEnd")
+        }
+
+        $window = Get-VhsMp4TrimWindow -TrimStart $startText -TrimEnd $endText
+        if ([string]::IsNullOrWhiteSpace([string]$window.Summary)) {
+            continue
+        }
+
+        $normalizedSegment = [pscustomobject]@{
+            Kind = $normalizedKind
+            StartSeconds = $window.StartSeconds
+            EndSeconds = $window.EndSeconds
+            DurationSeconds = $window.DurationSeconds
+            StartText = $window.StartText
+            EndText = $window.EndText
+            DurationText = $window.DurationText
+            Summary = $window.Summary
+        }
+        $normalizedSegments.Add($normalizedSegment)
+
+        switch ($normalizedKind) {
+            "keep" {
+                $keepCount++
+                $remainingDuration += [double]$window.DurationSeconds
+                $effectiveSegments.Add($normalizedSegment)
+            }
+            "cut" { $cutCount++ }
+            "gap" { $gapCount++ }
+        }
+    }
+
+    if ($normalizedSegments.Count -eq 0) {
+        return [pscustomobject]@{
+            Mode = "none"
+            Segments = @()
+            EffectiveSegments = @()
+            Count = 0
+            SegmentCount = 0
+            KeepCount = 0
+            CutCount = 0
+            GapCount = 0
+            StartSeconds = $null
+            EndSeconds = $null
+            DurationSeconds = $null
+            StartText = ""
+            EndText = ""
+            DurationText = ""
+            Summary = ""
+        }
+    }
+
+    if ($effectiveSegments.Count -eq 0) {
+        throw "Timeline nema nijedan aktivan keep segment."
+    }
+
+    $summary = "Timeline: $keepCount keep"
+    if ($cutCount -gt 0) {
+        $summary += " | $cutCount cut"
+    }
+    if ($gapCount -gt 0) {
+        $summary += " | $gapCount gap"
+    }
+    $summary += " | out " + (Format-VhsMp4FfmpegTime -Seconds $remainingDuration)
+
+    $effectiveArray = @($effectiveSegments.ToArray())
+    if ($effectiveArray.Count -gt 1) {
+        return [pscustomobject]@{
+            Mode = "timeline-multi"
+            Segments = @($normalizedSegments.ToArray())
+            EffectiveSegments = $effectiveArray
+            Count = $effectiveArray.Count
+            SegmentCount = $normalizedSegments.Count
+            KeepCount = $keepCount
+            CutCount = $cutCount
+            GapCount = $gapCount
+            StartSeconds = $null
+            EndSeconds = $null
+            DurationSeconds = $remainingDuration
+            StartText = ""
+            EndText = ""
+            DurationText = Format-VhsMp4FfmpegTime -Seconds $remainingDuration
+            Summary = $summary
+        }
+    }
+
+    $keepSegment = $effectiveArray[0]
+    return [pscustomobject]@{
+        Mode = "timeline-single"
+        Segments = @($normalizedSegments.ToArray())
+        EffectiveSegments = $effectiveArray
+        Count = 1
+        SegmentCount = $normalizedSegments.Count
+        KeepCount = $keepCount
+        CutCount = $cutCount
+        GapCount = $gapCount
+        StartSeconds = $keepSegment.StartSeconds
+        EndSeconds = $keepSegment.EndSeconds
+        DurationSeconds = $remainingDuration
+        StartText = $keepSegment.StartText
+        EndText = $keepSegment.EndText
+        DurationText = $keepSegment.DurationText
+        Summary = $summary
+    }
+}
+
 function Get-VhsMp4CropState {
     param(
         [Parameter(Mandatory = $true)]
@@ -1261,15 +1404,22 @@ function New-VhsMp4MultiTrimFilterComplex {
         [bool]$SourceHasAudio = $true
     )
 
-    if (@($TrimSegments).Count -lt 1) {
+    $normalizedTrimSegmentsList = New-Object System.Collections.Generic.List[object]
+    foreach ($segment in @($TrimSegments)) {
+        if ($null -ne $segment) {
+            $normalizedTrimSegmentsList.Add($segment)
+        }
+    }
+    $normalizedTrimSegments = @($normalizedTrimSegmentsList.ToArray())
+    if ($normalizedTrimSegmentsList.Count -lt 1) {
         return ""
     }
 
     $filterParts = New-Object System.Collections.Generic.List[string]
     $concatInputs = New-Object System.Collections.Generic.List[string]
 
-    for ($index = 0; $index -lt $TrimSegments.Count; $index++) {
-        $segment = $TrimSegments[$index]
+    for ($index = 0; $index -lt $normalizedTrimSegmentsList.Count; $index++) {
+        $segment = $normalizedTrimSegments[$index]
         $startValue = Format-VhsMp4FilterTimeValue -Seconds $segment.StartSeconds
         $endValue = Format-VhsMp4FilterTimeValue -Seconds $segment.EndSeconds
         $videoLabel = "v$index"
@@ -1293,7 +1443,7 @@ function New-VhsMp4MultiTrimFilterComplex {
         }
     }
 
-    if ($TrimSegments.Count -eq 1) {
+    if ($normalizedTrimSegmentsList.Count -eq 1) {
         if ($SourceHasAudio) {
             $filterParts.Add(($concatInputs -join "") + "concat=n=1:v=1:a=1[vout][aout]")
         }
@@ -1302,10 +1452,10 @@ function New-VhsMp4MultiTrimFilterComplex {
         }
     }
     elseif ($SourceHasAudio) {
-        $filterParts.Add(($concatInputs -join "") + "concat=n=$($TrimSegments.Count):v=1:a=1[vout][aout]")
+        $filterParts.Add(($concatInputs -join "") + "concat=n=$($normalizedTrimSegmentsList.Count):v=1:a=1[vout][aout]")
     }
     else {
-        $filterParts.Add(($concatInputs -join "") + "concat=n=$($TrimSegments.Count):v=1:a=0[vout]")
+        $filterParts.Add(($concatInputs -join "") + "concat=n=$($normalizedTrimSegmentsList.Count):v=1:a=0[vout]")
     }
 
     return ($filterParts -join ";")
@@ -2848,6 +2998,7 @@ function New-VhsMp4RunContext {
         [string]$TrimStart = "",
         [string]$TrimEnd = "",
         [object[]]$TrimSegments,
+        [object[]]$TimelineSegments,
         [bool]$SourceHasAudio = $true,
         [ValidateSet("Off", "YADIF", "YADIF Bob")]
         [string]$Deinterlace = "Off",
@@ -3567,6 +3718,7 @@ function Get-VhsMp4FfmpegArguments {
         [string]$TrimStart = "",
         [string]$TrimEnd = "",
         [object[]]$TrimSegments,
+        [object[]]$TimelineSegments,
         [string]$AspectMode = "Auto",
         [object]$VideoInfo,
         [object]$CropState,
@@ -3592,10 +3744,37 @@ function Get-VhsMp4FfmpegArguments {
     if ($null -ne $VideoInfo -and $null -ne (Get-VhsMp4ObjectPropertyValue -Object $VideoInfo -Name "DurationSeconds")) {
         $sourceDurationSeconds = Get-VhsMp4ObjectPropertyValue -Object $VideoInfo -Name "DurationSeconds"
     }
-    $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments -SourceDurationSeconds $sourceDurationSeconds
+    $timelinePlan = $null
+    $normalizedTimelineSegmentsList = New-Object System.Collections.Generic.List[object]
+    foreach ($segment in @($TimelineSegments)) {
+        if ($null -ne $segment) {
+            $normalizedTimelineSegmentsList.Add($segment)
+        }
+    }
+    $normalizedTimelineSegments = @($normalizedTimelineSegmentsList.ToArray())
+    $timelineSegmentCount = $normalizedTimelineSegmentsList.Count
+    if ($timelineSegmentCount -gt 0) {
+        $timelinePlan = Get-VhsMp4TimelinePlan -TimelineSegments $normalizedTimelineSegments
+    }
+    $timelineEffectiveSegments = @()
+    if ($null -ne $timelinePlan -and ($timelinePlan.PSObject.Properties.Name -contains "EffectiveSegments")) {
+        $timelineEffectiveSegments = @($timelinePlan.EffectiveSegments)
+    }
+    $timelineEffectiveCount = $timelineEffectiveSegments.Count
+    $trimPlan = if ($timelineEffectiveCount -gt 0) {
+        $timelinePlan
+    }
+    else {
+        Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments -SourceDurationSeconds $sourceDurationSeconds
+    }
     $videoFilterChain = Get-VhsMp4VideoFilterChain -InputObject $VideoInfo -CropState $CropState -AspectMode $AspectMode -Deinterlace $Deinterlace -Denoise $Denoise -RotateFlip $RotateFlip -ScaleMode $ScaleMode
     $audioFilterChain = Get-VhsMp4AudioFilterChain -AudioNormalize:$AudioNormalize
-    $useFilterTrim = ($trimPlan.Mode -eq "multi") -or ($trimPlan.Count -gt 1)
+    $trimPlanEffectiveSegments = @()
+    if ($null -ne $trimPlan -and ($trimPlan.PSObject.Properties.Name -contains "EffectiveSegments")) {
+        $trimPlanEffectiveSegments = @($trimPlan.EffectiveSegments)
+    }
+    $trimPlanCount = if ($null -ne $trimPlan -and ($trimPlan.PSObject.Properties.Name -contains "Count")) { [int]$trimPlan.Count } else { $trimPlanEffectiveSegments.Count }
+    $useFilterTrim = ($timelineEffectiveCount -gt 0) -or ($trimPlan.Mode -eq "multi") -or ($trimPlanCount -gt 1)
 
     $ffmpegArgs = @(
         "-hide_banner",
@@ -4047,6 +4226,7 @@ function Start-VhsMp4FileProcess {
         [string]$TrimStart = "",
         [string]$TrimEnd = "",
         [object[]]$TrimSegments,
+        [object[]]$TimelineSegments,
         [bool]$SourceHasAudio = $true,
         [ValidateSet("Off", "YADIF", "YADIF Bob")]
         [string]$Deinterlace = "Off",
@@ -4082,6 +4262,7 @@ function Start-VhsMp4FileProcess {
         -TrimStart $TrimStart `
         -TrimEnd $TrimEnd `
         -TrimSegments $TrimSegments `
+        -TimelineSegments $TimelineSegments `
         -SourceHasAudio $SourceHasAudio `
         -Deinterlace $Deinterlace `
         -Denoise $Denoise `
@@ -4193,6 +4374,7 @@ function Invoke-VhsMp4File {
         [string]$TrimStart = "",
         [string]$TrimEnd = "",
         [object[]]$TrimSegments,
+        [object[]]$TimelineSegments,
         [bool]$SourceHasAudio = $true,
         [ValidateSet("Off", "YADIF", "YADIF Bob")]
         [string]$Deinterlace = "Off",
@@ -4226,6 +4408,7 @@ function Invoke-VhsMp4File {
         -TrimStart $TrimStart `
         -TrimEnd $TrimEnd `
         -TrimSegments $TrimSegments `
+        -TimelineSegments $TimelineSegments `
         -SourceHasAudio $SourceHasAudio `
         -Deinterlace $Deinterlace `
         -Denoise $Denoise `
@@ -4351,6 +4534,7 @@ function Invoke-VhsMp4Batch {
         $itemTrimStart = [string](Get-VhsMp4ObjectPropertyValue -Object $item -Name "TrimStartText")
         $itemTrimEnd = [string](Get-VhsMp4ObjectPropertyValue -Object $item -Name "TrimEndText")
         $itemTrimSegments = @(Get-VhsMp4ObjectPropertyValue -Object $item -Name "TrimSegments")
+        $itemTimelineSegments = @(Get-VhsMp4ObjectPropertyValue -Object $item -Name "TimelineSegments")
         if ([string]::IsNullOrWhiteSpace($itemTrimStart)) {
             $itemTrimStart = $context.TrimStart
         }
@@ -4362,12 +4546,31 @@ function Invoke-VhsMp4Batch {
         if ($item.PSObject.Properties["MediaInfo"] -and $null -ne $item.MediaInfo) {
             $itemSourceDuration = Get-VhsMp4ObjectPropertyValue -Object $item.MediaInfo -Name "DurationSeconds"
         }
-        $itemTrimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $itemTrimStart -TrimEnd $itemTrimEnd -TrimSegments $itemTrimSegments -SourceDurationSeconds $itemSourceDuration
-        $itemCutSegmentsForExecution = if ($itemTrimPlan.Count -gt 0) { @($itemTrimPlan.Segments) } else { @() }
+        $itemTimelinePlan = $null
+        if ($itemTimelineSegments.Count -gt 0) {
+            $itemTimelinePlan = Get-VhsMp4TimelinePlan -TimelineSegments $itemTimelineSegments
+        }
+        $itemTimelineEffectiveSegments = @()
+        if ($null -ne $itemTimelinePlan -and ($itemTimelinePlan.PSObject.Properties.Name -contains "EffectiveSegments")) {
+            $itemTimelineEffectiveSegments = @($itemTimelinePlan.EffectiveSegments)
+        }
+        $itemTimelineEffectiveCount = $itemTimelineEffectiveSegments.Count
+        $itemTrimPlan = if ($itemTimelineEffectiveCount -gt 0) {
+            $itemTimelinePlan
+        }
+        else {
+            Get-VhsMp4EffectiveTrimPlan -TrimStart $itemTrimStart -TrimEnd $itemTrimEnd -TrimSegments $itemTrimSegments -SourceDurationSeconds $itemSourceDuration
+        }
+        $itemTrimPlanSegments = @()
+        if ($null -ne $itemTrimPlan -and ($itemTrimPlan.PSObject.Properties.Name -contains "Segments")) {
+            $itemTrimPlanSegments = @($itemTrimPlan.Segments)
+        }
+        $itemTrimPlanCount = if ($null -ne $itemTrimPlan -and ($itemTrimPlan.PSObject.Properties.Name -contains "Count")) { [int]$itemTrimPlan.Count } else { $itemTrimPlanSegments.Count }
+        $itemCutSegmentsForExecution = if ($itemTimelineEffectiveCount -gt 0) { @() } elseif ($itemTrimPlanCount -gt 0) { $itemTrimPlanSegments } else { @() }
         if (-not [string]::IsNullOrWhiteSpace([string]$itemTrimPlan.Summary)) {
-            if ($itemTrimPlan.Count -gt 0) {
+            if ($itemTimelineEffectiveCount -le 0 -and $itemTrimPlanCount -gt 0) {
                 $firstCutSegment = @($itemTrimPlan.Segments)[0]
-                if ($itemTrimPlan.Count -eq 1) {
+                if ($itemTrimPlanCount -eq 1) {
                     $item | Add-Member -NotePropertyName "TrimStartText" -NotePropertyValue ([string]$firstCutSegment.StartText) -Force
                     $item | Add-Member -NotePropertyName "TrimEndText" -NotePropertyValue ([string]$firstCutSegment.EndText) -Force
                     $item | Add-Member -NotePropertyName "TrimStartSeconds" -NotePropertyValue $firstCutSegment.StartSeconds -Force
@@ -4382,8 +4585,11 @@ function Invoke-VhsMp4Batch {
             }
             $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $itemTrimPlan.DurationSeconds -Force
             $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $itemTrimPlan.Summary -Force
-            if ($itemTrimPlan.Count -gt 0) {
+            if ($itemTrimSegments.Count -gt 0) {
                 $item | Add-Member -NotePropertyName "TrimSegments" -NotePropertyValue $itemTrimSegments -Force
+            }
+            if ($itemTimelineSegments.Count -gt 0) {
+                $item | Add-Member -NotePropertyName "TimelineSegments" -NotePropertyValue $itemTimelineSegments -Force
             }
         }
 
@@ -4413,6 +4619,7 @@ function Invoke-VhsMp4Batch {
                 -TrimStart "" `
                 -TrimEnd "" `
                 -TrimSegments $itemCutSegmentsForExecution `
+                -TimelineSegments $itemTimelineSegments `
                 -SourceHasAudio $itemHasAudio `
                 -Deinterlace $context.Deinterlace `
                 -Denoise $context.Denoise `
@@ -4515,6 +4722,7 @@ Export-ModuleMember -Function @(
     "Get-VhsMp4TrimWindow",
     "Get-VhsMp4TrimSegments",
     "Get-VhsMp4EffectiveTrimPlan",
+    "Get-VhsMp4TimelinePlan",
     "Get-VhsMp4CropState",
     "Get-VhsMp4NormalizedAspectMode",
     "Get-VhsMp4AspectConfidence",
