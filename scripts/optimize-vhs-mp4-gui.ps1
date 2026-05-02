@@ -2376,6 +2376,44 @@ function Test-HasQueuedPlanItems {
     return $false
 }
 
+function Mark-PlanItemQueuedAfterEdit {
+    param(
+        [AllowNull()]
+        $Item
+    )
+
+    if ($null -eq $Item) {
+        return $false
+    }
+
+    $itemSourceName = [string](Get-PlanItemPropertyText -Item $Item -Name "SourceName" -Default "")
+    if ([string]::IsNullOrWhiteSpace($itemSourceName)) {
+        return $false
+    }
+
+    $wasUpdated = $false
+    if ((Get-PlanItemStatusText -Item $Item) -ne "queued") {
+        $Item | Add-Member -NotePropertyName "Status" -NotePropertyValue "queued" -Force
+        $wasUpdated = $true
+    }
+
+    foreach ($row in $grid.Rows) {
+        if ([string]$row.Cells["SourceName"].Value -eq $itemSourceName) {
+            if ([string]$row.Cells["Status"].Value -ne "queued") {
+                $row.Cells["Status"].Value = "queued"
+                $wasUpdated = $true
+            }
+            break
+        }
+    }
+
+    if ($wasUpdated) {
+        Update-ProgressBar
+    }
+
+    return $wasUpdated
+}
+
 function Get-PlanItemStatusText {
     param(
         [AllowNull()]
@@ -3507,6 +3545,7 @@ function Apply-PlayerTrimStateToItem {
         $Item | Add-Member -NotePropertyName "PreviewPositionSeconds" -NotePropertyValue ([double]$TrimState.PreviewPositionSeconds) -Force
     }
 
+    [void](Mark-PlanItemQueuedAfterEdit -Item $Item)
     Update-PlanItemTrimEstimate -Item $Item
     Update-SelectedTrimGridRow -Item $Item
     $Item | Add-Member -NotePropertyName "MediaDetails" -NotePropertyValue (Format-VhsMp4MediaDetails -Item $Item) -Force
@@ -3524,6 +3563,7 @@ function Clear-PlanItemCropState {
         }
     }
 
+    [void](Mark-PlanItemQueuedAfterEdit -Item $Item)
     Sync-PlanItemAspectSnapshot -Item $Item | Out-Null
     $Item | Add-Member -NotePropertyName "MediaDetails" -NotePropertyValue (Format-VhsMp4MediaDetails -Item $Item) -Force
     Update-SelectedTrimGridRow -Item $Item
@@ -3775,10 +3815,12 @@ function Set-SelectedPlanItemAspectMode {
 
     $normalizedAspectMode = Get-VhsMp4NormalizedAspectMode -AspectMode $AspectMode
     $item | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue $normalizedAspectMode -Force
+    [void](Mark-PlanItemQueuedAfterEdit -Item $item)
     Update-PlanItemAspectPresentation -Item $item
     Update-PlanItemTrimEstimate -Item $item
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
+    Update-ActionButtons
     return $true
 }
 
@@ -3800,6 +3842,7 @@ function Copy-SelectedAspectModeToAll {
         }
 
         $item | Add-Member -NotePropertyName "AspectMode" -NotePropertyValue $aspectMode -Force
+        [void](Mark-PlanItemQueuedAfterEdit -Item $item)
         Update-PlanItemAspectPresentation -Item $item
         Update-PlanItemTrimEstimate -Item $item
     }
@@ -3807,6 +3850,7 @@ function Copy-SelectedAspectModeToAll {
     [void](Select-PlanGridRowBySourceName -SourceName $sourceName)
     Update-MediaInfoPanel
     Update-PreviewTrimPanel
+    Update-ActionButtons
     return $true
 }
 
@@ -4708,6 +4752,7 @@ function Save-SelectedTrimSegments {
     $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
     $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
 
+    [void](Mark-PlanItemQueuedAfterEdit -Item $item)
     $script:PendingTrimSegmentIndex = if ($PreferredIndex -ge 0) { [Math]::Min($PreferredIndex, $normalized.Count - 1) } else { 0 }
     Update-PlanItemTrimEstimate -Item $item
     Update-SelectedTrimGridRow -Item $item
@@ -4794,6 +4839,7 @@ function Clear-SelectedTrimSegments {
         }
     }
 
+    [void](Mark-PlanItemQueuedAfterEdit -Item $item)
     $script:PendingTrimSegmentIndex = -1
     Update-PlanItemTrimEstimate -Item $item
     Update-SelectedTrimGridRow -Item $item
@@ -5174,7 +5220,7 @@ function Open-PlayerTrimWindow {
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)))
-    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 72)))
+    $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 40)))
     $playerWorkspaceLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 28)))
     $playerRootLayout.Controls.Add($playerWorkspaceLayout, 0, 1)
 
@@ -5257,63 +5303,80 @@ function Open-PlayerTrimWindow {
 
     $transportFlow = New-Object System.Windows.Forms.FlowLayoutPanel
     $transportFlow.Dock = "Fill"
-    $transportFlow.WrapContents = $true
+    $transportFlow.WrapContents = $false
+    $transportFlow.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
+    $transportFlow.AutoScroll = $false
     $playerWorkspaceLayout.Controls.Add($transportFlow, 0, 3)
 
+    $playerTransportButtonFont = New-Object System.Drawing.Font("Segoe UI", 8.0)
+    $applyPlayerTransportButtonStyle = {
+        param([System.Windows.Forms.Button]$Button)
+        $Button.AutoSize = $true
+        $Button.Font = $playerTransportButtonFont
+        $Button.Margin = New-Object System.Windows.Forms.Padding(0, 2, 4, 2)
+        $Button.Padding = New-Object System.Windows.Forms.Padding(5, 1, 5, 1)
+    }
+
     $jumpToPlayerStartButton = New-Object System.Windows.Forms.Button
-    $jumpToPlayerStartButton.Text = "Start"
-    $jumpToPlayerStartButton.AutoSize = $true
+    $jumpToPlayerStartButton.Text = "START"
+    & $applyPlayerTransportButtonStyle $jumpToPlayerStartButton
     $transportFlow.Controls.Add($jumpToPlayerStartButton)
 
     $previous250PlayerFramesButton = New-Object System.Windows.Forms.Button
     $previous250PlayerFramesButton.Text = "< 250 Frames"
-    $previous250PlayerFramesButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $previous250PlayerFramesButton
     $transportFlow.Controls.Add($previous250PlayerFramesButton)
 
     $previous25PlayerFramesButton = New-Object System.Windows.Forms.Button
     $previous25PlayerFramesButton.Text = "< 25 Frames"
-    $previous25PlayerFramesButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $previous25PlayerFramesButton
     $transportFlow.Controls.Add($previous25PlayerFramesButton)
 
     $previousPlayerFrameButton = New-Object System.Windows.Forms.Button
     $previousPlayerFrameButton.Text = "< Frame"
-    $previousPlayerFrameButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $previousPlayerFrameButton
     $transportFlow.Controls.Add($previousPlayerFrameButton)
 
     $playPlayerButton = New-Object System.Windows.Forms.Button
     $playPlayerButton.Text = "Play"
-    $playPlayerButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $playPlayerButton
     $transportFlow.Controls.Add($playPlayerButton)
 
     $pausePlayerButton = New-Object System.Windows.Forms.Button
     $pausePlayerButton.Text = "Pause"
-    $pausePlayerButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $pausePlayerButton
     $transportFlow.Controls.Add($pausePlayerButton)
 
     $nextPlayerFrameButton = New-Object System.Windows.Forms.Button
     $nextPlayerFrameButton.Text = "Frame >"
-    $nextPlayerFrameButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $nextPlayerFrameButton
     $transportFlow.Controls.Add($nextPlayerFrameButton)
 
     $next25PlayerFramesButton = New-Object System.Windows.Forms.Button
     $next25PlayerFramesButton.Text = "25 Frames >"
-    $next25PlayerFramesButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $next25PlayerFramesButton
     $transportFlow.Controls.Add($next25PlayerFramesButton)
 
     $next250PlayerFramesButton = New-Object System.Windows.Forms.Button
     $next250PlayerFramesButton.Text = "250 Frames >"
-    $next250PlayerFramesButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $next250PlayerFramesButton
     $transportFlow.Controls.Add($next250PlayerFramesButton)
 
     $setPlayerTrimStartButton = New-Object System.Windows.Forms.Button
     $setPlayerTrimStartButton.Text = "In Point"
-    $setPlayerTrimStartButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $setPlayerTrimStartButton
     $transportFlow.Controls.Add($setPlayerTrimStartButton)
 
     $setPlayerTrimEndButton = New-Object System.Windows.Forms.Button
     $setPlayerTrimEndButton.Text = "Out Point"
-    $setPlayerTrimEndButton.AutoSize = $true
+    & $applyPlayerTransportButtonStyle $setPlayerTrimEndButton
     $transportFlow.Controls.Add($setPlayerTrimEndButton)
+
+    $jumpToPlayerEndButton = New-Object System.Windows.Forms.Button
+    $jumpToPlayerEndButton.Text = "END"
+    & $applyPlayerTransportButtonStyle $jumpToPlayerEndButton
+    $jumpToPlayerEndButton.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
+    $transportFlow.Controls.Add($jumpToPlayerEndButton)
 
     $playerMarkersLayout = New-Object System.Windows.Forms.TableLayoutPanel
     $playerMarkersLayout.Dock = "Fill"
@@ -6924,6 +6987,10 @@ function Open-PlayerTrimWindow {
         $playerRuntime.'Navigate-PlayerPositionSeconds'(0)
     }).GetNewClosure())
 
+    $jumpToPlayerEndButton.Add_Click(({
+        $playerRuntime.'Navigate-PlayerPositionSeconds'([double]$localState.DurationSeconds)
+    }).GetNewClosure())
+
     $playerPreviewFrameButton.Add_Click(({
         $playerRuntime.'Commit-PlayerPreviewTimeText'($true)
     }).GetNewClosure())
@@ -7401,6 +7468,7 @@ function Apply-SelectedTrim {
         $item | Add-Member -NotePropertyName "TrimEndSeconds" -NotePropertyValue $cutSegment.EndSeconds -Force
         $item | Add-Member -NotePropertyName "TrimDurationSeconds" -NotePropertyValue $trimPlan.DurationSeconds -Force
         $item | Add-Member -NotePropertyName "TrimSummary" -NotePropertyValue $trimPlan.Summary -Force
+        [void](Mark-PlanItemQueuedAfterEdit -Item $item)
         Update-PlanItemTrimEstimate -Item $item
         Update-SelectedTrimGridRow -Item $item
         Update-MediaInfoPanel
@@ -7425,6 +7493,7 @@ function Clear-SelectedTrim {
         }
     }
 
+    [void](Mark-PlanItemQueuedAfterEdit -Item $item)
     $script:PendingTrimSegmentIndex = -1
     $trimStartTextBox.Text = ""
     $trimEndTextBox.Text = ""

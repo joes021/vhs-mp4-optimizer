@@ -1862,7 +1862,10 @@ def test_vhs_gui_contains_player_trim_window_tokens() -> None:
         '$next25PlayerFramesButton.Text = "25 Frames >"',
         '$previous250PlayerFramesButton.Text = "< 250 Frames"',
         '$next250PlayerFramesButton.Text = "250 Frames >"',
-        '$jumpToPlayerStartButton.Text = "Start"',
+        '$jumpToPlayerStartButton.Text = "START"',
+        '$jumpToPlayerEndButton.Text = "END"',
+        "$transportFlow.WrapContents = $false",
+        '$playerTransportButtonFont = New-Object System.Drawing.Font("Segoe UI", 8.0)',
         "Move-PlayerFrame'(-1, 25)",
         "Move-PlayerFrame'(1, 25)",
         "Move-PlayerFrame'(-1, 250)",
@@ -1871,6 +1874,28 @@ def test_vhs_gui_contains_player_trim_window_tokens() -> None:
         "& $getEffectiveTrimPlan -TrimSegments $normalized.Segments -SourceDurationSeconds $runtimeState.DurationSeconds",
     ]:
         assert token in script, f"missing player/trim token: {token}"
+
+
+def test_vhs_gui_player_transport_order_includes_end() -> None:
+    script = Path("scripts/optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+
+    ordered_tokens = [
+        '$jumpToPlayerStartButton.Text = "START"',
+        '$previous250PlayerFramesButton.Text = "< 250 Frames"',
+        '$previous25PlayerFramesButton.Text = "< 25 Frames"',
+        '$previousPlayerFrameButton.Text = "< Frame"',
+        '$playPlayerButton.Text = "Play"',
+        '$pausePlayerButton.Text = "Pause"',
+        '$nextPlayerFrameButton.Text = "Frame >"',
+        '$next25PlayerFramesButton.Text = "25 Frames >"',
+        '$next250PlayerFramesButton.Text = "250 Frames >"',
+        '$setPlayerTrimStartButton.Text = "In Point"',
+        '$setPlayerTrimEndButton.Text = "Out Point"',
+        '$jumpToPlayerEndButton.Text = "END"',
+    ]
+
+    indices = [script.index(token) for token in ordered_tokens]
+    assert indices == sorted(indices)
 
 
 def test_vhs_gui_contains_player_trim_crop_tokens() -> None:
@@ -4337,6 +4362,107 @@ try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catc
     assert payload["ListCount"] == 2
     assert payload["FirstListItem"] == "1. 00:00:10 - 00:00:20"
     assert payload["SecondListItem"] == "2. 00:01:00 - 00:01:30"
+
+
+def test_vhs_gui_cutting_done_item_requeues_and_enables_start(tmp_path: Path) -> None:
+    source = tmp_path / "clip.mp4"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    gui_script = (ROOT / "scripts" / "optimize-vhs-mp4-gui.ps1").read_text(encoding="utf-8")
+    module_path = ps_quote(ROOT / "scripts" / "optimize-vhs-mp4-core.psm1")
+    gui_script = gui_script.replace(
+        '$modulePath = Join-Path $PSScriptRoot "optimize-vhs-mp4-core.psm1"',
+        f"$modulePath = '{module_path}'",
+    )
+
+    probe = f"""
+$inputTextBox.Text = '{ps_quote(tmp_path)}'
+$outputTextBox.Text = '{ps_quote(output_dir)}'
+$script:ResolvedFfmpegPath = 'ffmpeg.exe'
+$mediaInfo = [pscustomobject]@{{
+    Container = 'mov,mp4,m4a,3gp,3g2,mj2'
+    ContainerLongName = 'QuickTime / MOV'
+    DurationSeconds = 120.0
+    DurationText = '00:02:00'
+    SizeText = '1 MB'
+    OverallBitrateText = '1000 kbps'
+    VideoCodec = 'h264'
+    Resolution = '720x576'
+    DisplayAspectRatio = '4:3'
+    SampleAspectRatio = '16:15'
+    FrameRate = 25.0
+    FrameRateText = '25 fps'
+    FrameCount = 3000
+    VideoBitrateText = '900 kbps'
+    VideoSummary = 'h264 | 720x576 | 4:3 | 25 fps'
+    AudioCodec = 'aac'
+    AudioChannels = 2
+    AudioSampleRateHz = 48000
+    AudioBitrateText = '128 kbps'
+    AudioSummary = 'aac | 2 ch | 48000 Hz | 128 kbps'
+}}
+$item = [pscustomobject]@{{
+    SourceName = 'clip.mp4'
+    SourceFileName = 'clip.mp4'
+    RelativeSourcePath = 'clip.mp4'
+    SourcePath = '{ps_quote(source)}'
+    OutputPath = '{ps_quote(output_dir / "clip.mp4")}'
+    OutputPattern = '{ps_quote(output_dir / "clip.mp4")}'
+    DisplayOutputName = 'clip.mp4'
+    Status = 'done'
+    MediaInfo = $mediaInfo
+}}
+$plan = Add-PlanEstimates -Plan @($item)
+Set-GridRows -Plan $plan
+[void](Select-PlanGridRowBySourceName -SourceName 'clip.mp4')
+Update-ActionButtons
+$beforeStartEnabled = [bool]$startButton.Enabled
+$trimStartTextBox.Text = '00:00:10'
+$trimEndTextBox.Text = '00:00:20'
+Apply-SelectedTrim
+Update-ActionButtons
+Write-Output 'JSON_START'
+[pscustomobject]@{{
+    BeforeStartEnabled = $beforeStartEnabled
+    AfterStartEnabled = [bool]$startButton.Enabled
+    Status = [string]$script:PlanItems[0].Status
+    RowStatus = [string]$grid.Rows[0].Cells['Status'].Value
+    Summary = [string]$script:PlanItems[0].TrimSummary
+}} | ConvertTo-Json -Depth 5
+try {{ $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() }} catch {{}}
+""".strip()
+
+    gui_script = gui_script.replace("[void]$form.ShowDialog()", probe)
+    probe_script = tmp_path / "gui-cut-requeue-probe.ps1"
+    probe_script.write_text(gui_script, encoding="utf-8")
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe_script),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    payload = json.loads(run.stdout.split("JSON_START", 1)[1])
+    assert payload["BeforeStartEnabled"] is False
+    assert payload["AfterStartEnabled"] is True
+    assert payload["Status"] == "queued"
+    assert payload["RowStatus"] == "queued"
+    assert payload["Summary"] == "00:00:10 - 00:00:20"
 
 
 def test_vhs_gui_preview_timeline_sets_trim_points_without_rendering(tmp_path: Path) -> None:
