@@ -15,7 +15,7 @@ namespace VhsMp4Optimizer.App.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    private readonly SourceScanService _sourceScanService = new();
+    private readonly ISourceScanService _sourceScanService;
     private readonly FfmpegConversionService _conversionService = new();
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly QueueSnapshotService _queueSnapshotService = new();
@@ -27,9 +27,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _pauseRequested;
     private bool _isBatchPaused;
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(ISourceScanService? sourceScanService = null, string? ffmpegPath = null)
     {
-        _ffmpegPath = FfmpegLocator.Resolve();
+        _sourceScanService = sourceScanService ?? new SourceScanService();
+        _ffmpegPath = ffmpegPath ?? FfmpegLocator.Resolve();
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));
         WorkflowPresets = new ObservableCollection<string>(CoreServices.WorkflowPresetService.Names);
@@ -485,7 +486,7 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = $"Preset aktivan: {preset.Name}";
     }
 
-    public void UseSelectedFiles(IReadOnlyList<string> filePaths)
+    public async Task UseSelectedFilesAsync(IReadOnlyList<string> filePaths)
     {
         var normalized = filePaths
             .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -518,9 +519,11 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectionHint = normalized.Count == 1
             ? $"Izabran je 1 fajl: {Path.GetFileName(normalized[0])}"
             : $"Izabrano je {normalized.Count} fajlova. Scan ce raditi samo nad tom listom.";
+
+        await AutoScanAfterSelectionAsync();
     }
 
-    public void UseSelectedFolder(string folderPath)
+    public async Task UseSelectedFolderAsync(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath))
         {
@@ -544,6 +547,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         SelectionHint = "Izabran je ceo folder. Scan ide kroz podrzane video fajlove u folderu i podfolderima.";
+
+        await AutoScanAfterSelectionAsync();
     }
 
     public void SetOutputFolderPath(string folderPath)
@@ -551,6 +556,33 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(folderPath))
         {
             OutputFolder = Path.GetFullPath(folderPath);
+        }
+    }
+
+    public async Task UseDroppedPathsAsync(IReadOnlyList<string> droppedPaths)
+    {
+        var normalized = droppedPaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count == 0)
+        {
+            return;
+        }
+
+        var files = normalized.Where(File.Exists).ToList();
+        if (files.Count > 0)
+        {
+            await UseSelectedFilesAsync(files);
+            return;
+        }
+
+        var folder = normalized.FirstOrDefault(Directory.Exists);
+        if (!string.IsNullOrWhiteSpace(folder))
+        {
+            await UseSelectedFolderAsync(folder);
         }
     }
 
@@ -895,6 +927,17 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static string currentDisplayName(QueueItemSummary item) => item.SourceFile;
+
+    private async Task AutoScanAfterSelectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        {
+            StatusMessage = "Izbor je prihvacen, ali ffmpeg/ffprobe jos nisu dostupni za automatski scan.";
+            return;
+        }
+
+        await ScanFilesAsync();
+    }
 
     private double ResolveSampleStartSeconds(double sourceDurationSeconds)
     {

@@ -46,6 +46,13 @@
             <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
 
+        <Style Selector="TextBlock.group-title">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#243247" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
         <Style Selector="TextBlock.field-label">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -58,14 +65,39 @@
             <Setter Property="Foreground" Value="#66758C" />
         </Style>
 
-        <Style Selector="Button.quick-action">
+        <Style Selector="Button.action">
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="14,8" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,10,*,10,220" Margin="16">
-        <Grid Grid.Row="0" ColumnDefinitions="*,16,*" Margin="0,0,0,10">
+    <Grid RowDefinitions="Auto,Auto,Auto,8,Auto,10,*,10,220" Margin="16">
+        <Menu Grid.Row="0" Margin="0,0,0,10">
+            <MenuItem Header="_File">
+                <MenuItem Header="Scan Files" Command="{Binding ScanFilesCommand}" />
+                <MenuItem Header="Open Output" Command="{Binding OpenOutputCommand}" />
+                <Separator />
+                <MenuItem Header="Save Queue" Click="SaveQueueClick" />
+                <MenuItem Header="Load Queue" Click="LoadQueueClick" />
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="Open Player / Trim" Click="OpenPlayerTrimClick" />
+                <MenuItem Header="Test Sample" Command="{Binding TestSampleCommand}" />
+                <MenuItem Header="Open Sample" Command="{Binding OpenSampleCommand}" />
+                <Separator />
+                <MenuItem Header="Split Selected (Copy)" Command="{Binding SplitSelectedCopyCommand}" />
+                <MenuItem Header="Join Files (Copy)" Click="JoinFilesCopyClick" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="Check for Updates" Click="CheckForUpdatesClick" />
+                <MenuItem Header="Open User Guide" Click="OpenUserGuideClick" />
+                <Separator />
+                <MenuItem Header="About" Click="OpenAboutClick" />
+            </MenuItem>
+        </Menu>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,16,*" Margin="0,0,0,10">
             <Border Grid.Column="0" Classes="card">
                 <Grid ColumnDefinitions="90,*,90,90" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto">
                     <TextBlock Classes="section-title" Grid.Row="0" Grid.ColumnSpan="4" Text="Input folder" />
@@ -92,107 +124,112 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="1" Classes="card" Margin="0,0,0,10">
-            <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
-                <TextBlock Classes="section-title" Text="Quick Setup" />
-
-                <Grid Grid.Row="1" ColumnDefinitions="220,190,150,150,150,*" ColumnSpacing="12">
+        <Border Grid.Row="2" Classes="card">
+            <Grid ColumnDefinitions="*,24,430" ColumnSpacing="0">
+                <Grid Grid.Column="0" ColumnDefinitions="220,180,150,150,150" ColumnSpacing="12">
                     <StackPanel Grid.Column="0">
+                        <TextBlock Classes="section-title" Text="Quick Setup" />
                         <TextBlock Classes="field-label" Text="Workflow preset" />
                         <ComboBox ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1">
+                    <StackPanel Grid.Column="1" Margin="0,26,0,0">
                         <TextBlock Classes="field-label" Text="Quality mode" />
                         <ComboBox ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2">
+                    <StackPanel Grid.Column="2" Margin="0,26,0,0">
                         <TextBlock Classes="field-label" Text="Scale" />
                         <ComboBox ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="3">
+                    <StackPanel Grid.Column="3" Margin="0,26,0,0">
                         <TextBlock Classes="field-label" Text="Video bitrate" />
                         <TextBox Text="{Binding VideoBitrate}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="4">
+                    <StackPanel Grid.Column="4" Margin="0,26,0,0">
                         <TextBlock Classes="field-label" Text="Audio bitrate" />
                         <TextBox Text="{Binding AudioBitrate}" />
                     </StackPanel>
                 </Grid>
 
-                <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="8" RowDefinitions="Auto,Auto" RowSpacing="8">
-                    <Button Grid.Row="0" Grid.Column="0" Classes="quick-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                    <Button Grid.Row="0" Grid.Column="1" Classes="quick-action" Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
-                    <Button Grid.Row="0" Grid.Column="2" Classes="quick-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                    <Button Grid.Row="0" Grid.Column="3" Classes="quick-action accent" Content="Start Conversion" Command="{Binding StartConversionCommand}" />
-                    <Button Grid.Row="0" Grid.Column="4" Classes="quick-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
-                    <Button Grid.Row="0" Grid.Column="5" Classes="quick-action" Content="About" Click="OpenAboutClick" />
-
-                    <Button Grid.Row="1" Grid.Column="0" Classes="quick-action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
-                    <Button Grid.Row="1" Grid.Column="1" Classes="quick-action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
-                    <Button Grid.Row="1" Grid.Column="2" Classes="quick-action" Content="Save Queue" Click="SaveQueueClick" />
-                    <Button Grid.Row="1" Grid.Column="3" Classes="quick-action" Content="Load Queue" Click="LoadQueueClick" />
-                    <Button Grid.Row="1" Grid.Column="4" Classes="quick-action" Content="Open User Guide" Click="OpenUserGuideClick" />
-                </Grid>
+                <Border Grid.Column="2" Background="#F7F9FC" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                        <TextBlock Classes="group-title" Text="Batch actions" />
+                        <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0" Classes="action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
+                            <Button Grid.Column="1" Classes="action" Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
+                            <Button Grid.Column="2" Classes="action accent" Content="Start Conversion" Command="{Binding StartConversionCommand}" />
+                        </Grid>
+                        <Grid Grid.Row="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0" Classes="action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                            <Button Grid.Column="1" Classes="action" Content="Save Queue" Click="SaveQueueClick" />
+                            <Button Grid.Column="2" Classes="action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" Classes="card">
-            <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
-                <TextBlock Classes="section-title" Text="Advanced Settings" />
-                <Grid Grid.Row="1" ColumnDefinitions="150,150,180,170,180,170,170" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Classes="field-label" Text="Deinterlace" />
-                        <ComboBox SelectedIndex="0">
-                            <ComboBoxItem Content="Off" />
-                        </ComboBox>
-                    </StackPanel>
+        <Border Grid.Row="3" Height="1" Background="#D6DEEA" Margin="8,4" />
 
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Classes="field-label" Text="Denoise" />
-                        <ComboBox SelectedIndex="0">
-                            <ComboBoxItem Content="Off" />
-                        </ComboBox>
-                    </StackPanel>
+        <Border Grid.Row="4" Classes="card">
+            <Grid ColumnDefinitions="220,260,220,270" ColumnSpacing="16">
+                <StackPanel Grid.Column="0">
+                    <TextBlock Classes="section-title" Text="Advanced Settings" />
+                    <TextBlock Classes="field-label" Text="Deinterlace" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Off" />
+                    </ComboBox>
+                    <TextBlock Classes="field-label" Text="Denoise" Margin="0,10,0,4" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Off" />
+                    </ComboBox>
+                </StackPanel>
 
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Classes="field-label" Text="Aspect mode" />
-                        <ComboBox ItemsSource="{Binding AspectModes}" SelectedItem="{Binding AspectMode}" />
-                    </StackPanel>
+                <StackPanel Grid.Column="1" Margin="0,26,0,0">
+                    <TextBlock Classes="group-title" Text="Output transform" />
+                    <TextBlock Classes="field-label" Text="Aspect mode" />
+                    <ComboBox ItemsSource="{Binding AspectModes}" SelectedItem="{Binding AspectMode}" />
+                    <TextBlock Classes="field-label" Text="Encode engine" Margin="0,10,0,4" />
+                    <ComboBox SelectedIndex="0">
+                        <ComboBoxItem Content="Auto" />
+                    </ComboBox>
+                </StackPanel>
 
-                    <StackPanel Grid.Column="3">
-                        <TextBlock Classes="field-label" Text="Encode engine" />
-                        <ComboBox SelectedIndex="0">
-                            <ComboBoxItem Content="Auto" />
-                        </ComboBox>
-                    </StackPanel>
+                <StackPanel Grid.Column="2" Margin="0,26,0,0">
+                    <TextBlock Classes="group-title" Text="Split output" />
+                    <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
+                    <TextBlock Classes="field-label" Text="Max part GB" Margin="0,10,0,4" />
+                    <NumericUpDown Value="{Binding MaxPartGb}" Minimum="0.5" Maximum="25" Increment="0.1" FormatString="0.0" />
+                </StackPanel>
 
-                    <StackPanel Grid.Column="4" Spacing="6">
-                        <TextBlock Classes="field-label" Text="Split output" />
-                        <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
-                        <TextBlock Classes="field-label" Text="Max part GB" Margin="0,4,0,4" />
-                        <NumericUpDown Value="{Binding MaxPartGb}" Minimum="0.5" Maximum="25" Increment="0.1" FormatString="0.0" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="5">
-                        <TextBlock Classes="field-label" Text="Sample start" />
-                        <TextBox Text="{Binding SampleStartText}" PlaceholderText="00:00:30" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="6">
-                        <TextBlock Classes="field-label" Text="Sample duration" />
-                        <TextBox Text="{Binding SampleDurationText}" PlaceholderText="00:02:00" />
-                    </StackPanel>
-                </Grid>
+                <Border Grid.Column="3" Background="#F7F9FC" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,26,0,0">
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                        <TextBlock Classes="group-title" Text="Sample clip" />
+                        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <StackPanel>
+                                <TextBlock Classes="field-label" Text="Sample start" />
+                                <TextBox Text="{Binding SampleStartText}" PlaceholderText="00:00:30" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Classes="field-label" Text="Sample duration" />
+                                <TextBox Text="{Binding SampleDurationText}" PlaceholderText="00:02:00" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0" Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
+                            <Button Grid.Column="1" Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
 
-        <GridSplitter Grid.Row="3" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows" />
+        <GridSplitter Grid.Row="5" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows"/>
 
-        <Grid Grid.Row="4" ColumnDefinitions="1.4*,10,*">
+        <Grid Grid.Row="6" ColumnDefinitions="1.4*,10,*">
             <Border Grid.Column="0" Classes="card">
                 <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="8">
                     <TextBlock Classes="section-title" Text="Queue" />
@@ -248,7 +285,7 @@
                 </Grid>
             </Border>
 
-            <GridSplitter Grid.Column="1" Classes="v-splitter" VerticalAlignment="Stretch" ResizeDirection="Columns" />
+            <GridSplitter Grid.Column="1" Classes="v-splitter" VerticalAlignment="Stretch" ResizeDirection="Columns"/>
 
             <Border Grid.Column="2" Classes="card">
                 <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
@@ -286,9 +323,9 @@
             </Border>
         </Grid>
 
-        <GridSplitter Grid.Row="5" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows" />
+        <GridSplitter Grid.Row="7" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows"/>
 
-        <Border Grid.Row="6" Classes="card">
+        <Border Grid.Row="8" Classes="card">
             <TabControl>
                 <TabItem Header="Status">
                     <Border Padding="12">

@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\VhsMp4Optimizer.App\VhsMp4Optimizer.App.csproj" />
     <ProjectReference Include="..\..\src\VhsMp4Optimizer.Core\VhsMp4Optimizer.Core.csproj" />
     <ProjectReference Include="..\..\src\VhsMp4Optimizer.Infrastructure\VhsMp4Optimizer.Infrastructure.csproj" />
   </ItemGroup>

@@ -3,7 +3,7 @@ using VhsMp4Optimizer.Core.Services;
 
 namespace VhsMp4Optimizer.Infrastructure.Services;
 
-public sealed class SourceScanService
+public sealed class SourceScanService : ISourceScanService
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {

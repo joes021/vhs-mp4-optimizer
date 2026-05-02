@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using VhsMp4Optimizer.App.ViewModels;
 using VhsMp4Optimizer.Infrastructure.Services;
@@ -17,6 +18,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AddHandler(DragDrop.DragOverEvent, DragOverWindow);
+        AddHandler(DragDrop.DropEvent, DropWindow);
+        DragDrop.SetAllowDrop(this, true);
     }
 
     private void OpenPlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -69,7 +73,7 @@ public partial class MainWindow : Window
 
         if (localPaths.Count > 0)
         {
-            viewModel.UseSelectedFiles(localPaths);
+            await viewModel.UseSelectedFilesAsync(localPaths);
         }
     }
 
@@ -89,7 +93,7 @@ public partial class MainWindow : Window
         var folderPath = folders.FirstOrDefault()?.TryGetLocalPath();
         if (!string.IsNullOrWhiteSpace(folderPath))
         {
-            viewModel.UseSelectedFolder(folderPath);
+            await viewModel.UseSelectedFolderAsync(folderPath);
         }
     }
 
@@ -187,6 +191,20 @@ public partial class MainWindow : Window
         });
     }
 
+    private void CheckForUpdatesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.StatusMessage = "Otvaram GitHub release stranicu za VHS MP4 Optimizer Next.";
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "https://github.com/joes021/vhs-mp4-optimizer/releases",
+            UseShellExecute = true
+        });
+    }
+
     private async void SaveQueueClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel)
@@ -263,5 +281,39 @@ public partial class MainWindow : Window
         };
 
         window.ShowDialog(this);
+    }
+
+    private void DragOverWindow(object? sender, DragEventArgs e)
+    {
+        if (e.DataTransfer.TryGetFiles() is { Length: > 0 })
+        {
+            e.DragEffects = DragDropEffects.Copy;
+        }
+        else
+        {
+            e.DragEffects = DragDropEffects.None;
+        }
+    }
+
+    private async void DropWindow(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var droppedPaths = e.DataTransfer
+            .TryGetFiles()?
+            .Select(file => file.TryGetLocalPath())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Cast<string>()
+            .ToList();
+
+        if (droppedPaths is not { Count: > 0 })
+        {
+            return;
+        }
+
+        await viewModel.UseDroppedPathsAsync(droppedPaths);
     }
 }
