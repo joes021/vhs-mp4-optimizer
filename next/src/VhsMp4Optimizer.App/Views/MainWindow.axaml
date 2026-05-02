@@ -75,24 +75,33 @@
         </Style>
 
         <Style Selector="Button.action">
-            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="MinHeight" Value="40" />
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
 
+        <Style Selector="Button.batch-action">
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="MinWidth" Value="152" />
+            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
         <Style Selector="Button.primary-big">
-            <Setter Property="MinHeight" Value="70" />
-            <Setter Property="MinWidth" Value="230" />
+            <Setter Property="MinHeight" Value="72" />
+            <Setter Property="MinWidth" Value="290" />
             <Setter Property="Padding" Value="18,12" />
-            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="#138AA6" />
             <Setter Property="Foreground" Value="White" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
     </Window.Styles>
 
     <Grid x:Name="MainLayoutGrid"
-          RowDefinitions="Auto,112,10,164,10,176,10,*,10,220"
+          RowDefinitions="Auto,Auto,10,Auto,10,Auto,10,*,10,220"
           Margin="16"
           DragDrop.AllowDrop="True">
         <Menu Grid.Row="0" Margin="0,0,0,10">
@@ -130,10 +139,10 @@
         <Border Grid.Row="1" Classes="card">
             <Grid ColumnDefinitions="*,16,*">
                 <Border Grid.Column="0" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <Grid ColumnDefinitions="90,*,92,92" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="96,*,96,96" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
                         <TextBlock Classes="section-title" Grid.ColumnSpan="4" Text="Input folder" />
                         <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Source" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
+                        <TextBox Grid.Row="1" Grid.Column="1" MinHeight="42" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
                         <Button Grid.Row="1" Grid.Column="2" Classes="action" Content="Files..." Click="BrowseInputFilesClick" />
                         <Button Grid.Row="1" Grid.Column="3" Classes="action" Content="Folder..." Click="BrowseInputFolderClick" />
                         <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Classes="hint" Text="{Binding SelectionHint}" TextWrapping="Wrap" />
@@ -141,10 +150,10 @@
                 </Border>
 
                 <Border Grid.Column="2" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <Grid ColumnDefinitions="90,*,112" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="96,*,112" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="8">
                         <TextBlock Classes="section-title" Grid.ColumnSpan="3" Text="Output folder" />
                         <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Target" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
+                        <TextBox Grid.Row="1" Grid.Column="1" MinHeight="42" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
                         <Button Grid.Row="1" Grid.Column="2" Classes="action" Content="Browse..." Click="BrowseOutputFolderClick" />
                     </Grid>
                 </Border>
@@ -154,52 +163,55 @@
         <GridSplitter Grid.Row="2" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows" />
 
         <Border Grid.Row="3" Classes="card">
-            <Grid ColumnDefinitions="*,20,430" ColumnSpacing="0">
-                <Grid Grid.Column="0" ColumnDefinitions="210,180,150,150,150" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Classes="section-title" Text="Quick Setup" />
-                        <TextBlock Classes="field-label" Text="Workflow preset" />
-                        <ComboBox ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
-                    </StackPanel>
+            <Grid ColumnDefinitions="*,16,560" ColumnSpacing="0">
+                <StackPanel Grid.Column="0" Spacing="12">
+                    <TextBlock Classes="section-title" Text="Quick Setup" />
+                    <WrapPanel Orientation="Horizontal">
+                        <StackPanel Width="200" Spacing="4" Margin="0,0,12,8">
+                            <TextBlock Classes="field-label" Text="Workflow preset" />
+                            <ComboBox ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
+                            <TextBlock Classes="hint" Text="Brz izbor tipicnih izlaznih podesavanja." TextWrapping="Wrap" />
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="1" Margin="0,26,0,0" Spacing="4">
-                        <TextBlock Classes="field-label" Text="Quality mode" />
-                        <ComboBox ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
-                    </StackPanel>
+                        <StackPanel Width="180" Spacing="4" Margin="0,0,12,8">
+                            <TextBlock Classes="field-label" Text="Quality mode" />
+                            <ComboBox ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="2" Margin="0,26,0,0" Spacing="4">
-                        <TextBlock Classes="field-label" Text="Scale" />
-                        <ComboBox ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
-                    </StackPanel>
+                        <StackPanel Width="140" Spacing="4" Margin="0,0,12,8">
+                            <TextBlock Classes="field-label" Text="Scale" />
+                            <ComboBox ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="3" Margin="0,26,0,0" Spacing="4">
-                        <TextBlock Classes="field-label" Text="Video bitrate" />
-                        <TextBox Text="{Binding VideoBitrate}" />
-                    </StackPanel>
+                        <StackPanel Width="150" Spacing="4" Margin="0,0,12,8">
+                            <TextBlock Classes="field-label" Text="Video bitrate" />
+                            <TextBox MinHeight="40" Text="{Binding VideoBitrate}" />
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="4" Margin="0,26,0,0" Spacing="4">
-                        <TextBlock Classes="field-label" Text="Audio bitrate" />
-                        <TextBox Text="{Binding AudioBitrate}" />
-                    </StackPanel>
-                </Grid>
+                        <StackPanel Width="150" Spacing="4" Margin="0,0,0,8">
+                            <TextBlock Classes="field-label" Text="Audio bitrate" />
+                            <TextBox MinHeight="40" Text="{Binding AudioBitrate}" />
+                        </StackPanel>
+                    </WrapPanel>
+                </StackPanel>
 
                 <Border Grid.Column="2" Classes="subtle-group">
-                    <Grid ColumnDefinitions="1.2*,1.5*" RowDefinitions="Auto,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="1.2*,260" RowDefinitions="Auto,*" ColumnSpacing="16">
                         <TextBlock Classes="group-title" Text="Batch actions" />
                         <TextBlock Grid.Column="1" Classes="group-title" Text="Render" />
 
-                        <Grid Grid.Row="1" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
-                            <Button Grid.Column="0" Classes="action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                            <Button Grid.Column="1" Classes="action" Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
-                            <Button Grid.Row="1" Grid.Column="0" Classes="action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                            <Button Grid.Row="1" Grid.Column="1" Classes="action" Content="Save Queue" Click="SaveQueueClick" />
-                            <Button Grid.Row="2" Grid.Column="0" Classes="action" Content="Load Queue" Click="LoadQueueClick" />
-                            <Button Grid.Row="2" Grid.Column="1" Classes="action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
-                        </Grid>
+                        <WrapPanel Grid.Row="1" Orientation="Horizontal">
+                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
+                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
+                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Save Queue" Click="SaveQueueClick" />
+                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Load Queue" Click="LoadQueueClick" />
+                            <Button Classes="batch-action" Margin="0,0,10,10" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                        </WrapPanel>
 
                         <Border Grid.Row="1" Grid.Column="1" Background="#F4FAFC" BorderBrush="#B8DDE5" BorderThickness="1" CornerRadius="10" Padding="12">
                             <StackPanel VerticalAlignment="Center" Spacing="12">
-                                <Button Classes="primary-big" Content="POKRENI KONVERZIJU" Command="{Binding StartConversionCommand}" />
+                                <Button Classes="primary-big" Content="Pokreni konverziju" Command="{Binding StartConversionCommand}" />
                                 <TextBlock Classes="hint"
                                            Text="Batch konverzija, test sample i trim koriste ista izlazna podesavanja."
                                            TextWrapping="Wrap" />
@@ -215,36 +227,36 @@
         <Border Grid.Row="5" Classes="card">
             <StackPanel Spacing="10">
                 <TextBlock Classes="section-title" Text="Advanced Settings" />
-                <WrapPanel Orientation="Horizontal" ItemWidth="210" ItemHeight="124">
-                    <Border Classes="subtle-group" Margin="0,0,10,10">
+                <WrapPanel Orientation="Horizontal">
+                    <Border Classes="subtle-group" Width="160" Margin="0,0,10,10">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Deinterlace" />
                             <ComboBox ItemsSource="{Binding DeinterlaceModes}" SelectedItem="{Binding DeinterlaceMode}" />
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="160" Margin="0,0,10,10">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Denoise" />
                             <ComboBox ItemsSource="{Binding DenoiseModes}" SelectedItem="{Binding DenoiseMode}" />
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="180" Margin="0,0,10,10">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Aspect mode" />
                             <ComboBox ItemsSource="{Binding AspectModes}" SelectedItem="{Binding AspectMode}" />
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="180" Margin="0,0,10,10">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Encode engine" />
                             <ComboBox ItemsSource="{Binding EncodeEngines}" SelectedItem="{Binding EncodeEngine}" />
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="230" Margin="0,0,10,10">
                         <StackPanel Spacing="8">
                             <TextBlock Classes="field-label" Text="Split output" />
                             <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
@@ -253,7 +265,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="320" Margin="0,0,10,10">
                         <StackPanel Spacing="6">
                             <TextBlock Classes="field-label" Text="Sample clip" />
                             <TextBox Text="{Binding SampleStartText}" PlaceholderText="Sample start (00:00:30)" />

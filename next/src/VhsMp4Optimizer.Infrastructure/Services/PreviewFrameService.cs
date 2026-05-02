@@ -17,7 +17,7 @@ public sealed class PreviewFrameService : IPreviewFrameService
             Path.GetTempPath(),
             "VhsMp4OptimizerNext",
             "preview-cache",
-            Path.GetFileNameWithoutExtension(mediaInfo.SourceName));
+            SanitizePreviewCacheComponent(mediaInfo.SourceName));
         Directory.CreateDirectory(previewDirectory);
 
         var safeSeconds = Math.Max(0, Math.Min(mediaInfo.DurationSeconds, sourceSeconds));
@@ -79,5 +79,32 @@ public sealed class PreviewFrameService : IPreviewFrameService
         }
 
         return previewPath;
+    }
+
+    internal static string SanitizePreviewCacheComponent(string? sourceName)
+    {
+        var baseName = sourceName ?? string.Empty;
+        var extensionIndex = baseName.LastIndexOf('.');
+        if (extensionIndex > 0)
+        {
+            baseName = baseName[..extensionIndex];
+        }
+
+        var invalidFileNameChars = Path.GetInvalidFileNameChars();
+        var sanitizedChars = baseName
+            .Select(ch => invalidFileNameChars.Contains(ch) ? '_' : ch)
+            .ToArray();
+
+        var sanitized = new string(sanitizedChars)
+            .Trim()
+            .TrimEnd('.', ' ');
+
+        while (sanitized.Contains("__", StringComparison.Ordinal))
+        {
+            sanitized = sanitized.Replace("__", "_", StringComparison.Ordinal);
+        }
+
+        sanitized = sanitized.Trim('_', '.', ' ');
+        return string.IsNullOrWhiteSpace(sanitized) ? "preview-source" : sanitized;
     }
 }
