@@ -19,7 +19,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly FfmpegConversionService _conversionService = new();
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly QueueSnapshotService _queueSnapshotService = new();
-    private readonly string? _ffmpegPath;
     private IReadOnlyList<string>? _explicitSourcePaths;
     private bool _suppressSelectionReset;
     private bool _applyingPreset;
@@ -30,13 +29,16 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel(ISourceScanService? sourceScanService = null, string? ffmpegPath = null)
     {
         _sourceScanService = sourceScanService ?? new SourceScanService();
-        _ffmpegPath = ffmpegPath ?? FfmpegLocator.Resolve();
+        ResolvedFfmpegPath = ffmpegPath ?? FfmpegLocator.Resolve();
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));
         WorkflowPresets = new ObservableCollection<string>(CoreServices.WorkflowPresetService.Names);
         QualityModes = new ObservableCollection<string>(CoreServices.QualityModes.All);
         ScaleModes = new ObservableCollection<string>(CoreServices.ScaleModes.All);
         AspectModes = new ObservableCollection<string>(CoreServices.AspectModes.All);
+        DeinterlaceModes = new ObservableCollection<string>(CoreServices.DeinterlaceModes.All);
+        DenoiseModes = new ObservableCollection<string>(CoreServices.DenoiseModes.All);
+        EncodeEngines = new ObservableCollection<string>(CoreServices.EncodeEngines.All);
         ScanFilesCommand = new AsyncRelayCommand(ScanFilesAsync);
         StartConversionCommand = new AsyncRelayCommand(StartConversionAsync);
         TestSampleCommand = new AsyncRelayCommand(TestSampleAsync);
@@ -50,9 +52,9 @@ public partial class MainWindowViewModel : ViewModelBase
         SaveQueueCommand = new AsyncRelayCommand<string>(SaveQueueAsync);
         LoadQueueCommand = new AsyncRelayCommand<string>(LoadQueueAsync);
 
-        if (!string.IsNullOrWhiteSpace(_ffmpegPath))
+        if (!string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
-            StatusMessage = $"Faza 3: ffmpeg je pronadjen na {_ffmpegPath}. Sledeci korak je scan i planned output parity.";
+            StatusMessage = $"Faza 3: ffmpeg je pronadjen na {ResolvedFfmpegPath}. Sledeci korak je scan i planned output parity.";
         }
         else
         {
@@ -85,6 +87,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _aspectMode = CoreServices.AspectModes.Auto;
+
+    [ObservableProperty]
+    private string _deinterlaceMode = CoreServices.DeinterlaceModes.Off;
+
+    [ObservableProperty]
+    private string _denoiseMode = CoreServices.DenoiseModes.Off;
+
+    [ObservableProperty]
+    private string _encodeEngine = CoreServices.EncodeEngines.Auto;
 
     [ObservableProperty]
     private bool _splitOutput;
@@ -122,6 +133,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string? _lastSamplePath;
 
+    [ObservableProperty]
+    private string? _resolvedFfmpegPath;
+
     public ObservableCollection<QueueItemSummary> QueueItems { get; }
 
     public ObservableCollection<PropertyComparisonRow> ComparisonRows { get; }
@@ -134,7 +148,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<string> AspectModes { get; }
 
-    public string? ResolvedFfmpegPath => _ffmpegPath;
+    public ObservableCollection<string> DeinterlaceModes { get; }
+
+    public ObservableCollection<string> DenoiseModes { get; }
+
+    public ObservableCollection<string> EncodeEngines { get; }
 
     public IAsyncRelayCommand ScanFilesCommand { get; }
 
@@ -186,6 +204,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnAspectModeChanged(string value) => RefreshPlannedOutput();
 
+    partial void OnDeinterlaceModeChanged(string value) => RefreshPlannedOutput();
+
+    partial void OnDenoiseModeChanged(string value) => RefreshPlannedOutput();
+
+    partial void OnEncodeEngineChanged(string value) => RefreshPlannedOutput();
+
     partial void OnVideoBitrateChanged(string value) => RefreshPlannedOutput();
 
     partial void OnAudioBitrateChanged(string value) => RefreshPlannedOutput();
@@ -217,7 +241,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        if (string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
             StatusMessage = "ffmpeg/ffprobe nisu pronadjeni. Novi sistem za sada trazi lokalni ffmpeg da bi skenirao media info.";
             return Task.CompletedTask;
@@ -226,7 +250,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var settings = BuildSettings();
         var outputDirectory = _sourceScanService.ResolveOutputDirectory(InputFolder, OutputFolder);
         OutputFolder = outputDirectory;
-        var items = _sourceScanService.Scan(settings with { OutputDirectory = outputDirectory }, _ffmpegPath, _explicitSourcePaths);
+        var items = _sourceScanService.Scan(settings with { OutputDirectory = outputDirectory }, ResolvedFfmpegPath, _explicitSourcePaths);
 
         foreach (var item in items)
         {
@@ -240,7 +264,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ProgressMessage = explicitCount > 0
             ? $"Scan zavrsen. Pronadjeno: {QueueItems.Count} fajlova | eksplicitno izabrano: {explicitCount}"
             : $"Scan zavrsen. Pronadjeno: {QueueItems.Count} fajlova.";
-        LogMessage = $"ffmpeg: {_ffmpegPath}{Environment.NewLine}Output: {outputDirectory}";
+        LogMessage = $"ffmpeg: {ResolvedFfmpegPath}{Environment.NewLine}Output: {outputDirectory}";
         StatusMessage = QueueItems.Count == 0
             ? "Nema podrzanih video fajlova za scan u zadatom input putu."
             : $"Scan Files: pronadjeno {QueueItems.Count} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
@@ -255,7 +279,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        if (string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
             StatusMessage = "ffmpeg nije dostupan za Start Conversion.";
             return;
@@ -267,7 +291,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var ffmpegPath = _ffmpegPath!;
+        var ffmpegPath = ResolvedFfmpegPath!;
         var settings = BuildSettings();
         var items = QueueItems.ToList();
         var converted = 0;
@@ -345,7 +369,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task TestSampleAsync()
     {
-        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        if (string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
             StatusMessage = "ffmpeg nije dostupan za Test Sample.";
             return;
@@ -364,7 +388,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var duration = ResolveSampleDurationSeconds(SelectedQueueItem.MediaInfo.DurationSeconds, start);
         var settings = BuildSettings();
 
-        var ffmpegPath = _ffmpegPath!;
+        var ffmpegPath = ResolvedFfmpegPath!;
         try
         {
             await _conversionService.ConvertAsync(ffmpegPath, new ConversionRequest
@@ -458,6 +482,9 @@ public partial class MainWindowViewModel : ViewModelBase
         VideoBitrate = VideoBitrate,
         AudioBitrate = AudioBitrate
         ,
+        DeinterlaceMode = DeinterlaceMode,
+        DenoiseMode = DenoiseMode,
+        EncodeEngine = EncodeEngine,
         SplitOutput = SplitOutput,
         MaxPartGb = MaxPartGb
     };
@@ -478,6 +505,9 @@ public partial class MainWindowViewModel : ViewModelBase
             AspectMode = preset.AspectMode;
             VideoBitrate = preset.VideoBitrate;
             AudioBitrate = preset.AudioBitrate;
+            DeinterlaceMode = CoreServices.DeinterlaceModes.Off;
+            DenoiseMode = CoreServices.DenoiseModes.Off;
+            EncodeEngine = CoreServices.EncodeEngines.Auto;
             SplitOutput = preset.SplitOutput;
             MaxPartGb = preset.MaxPartGb;
             RefreshPlannedOutput();
@@ -657,7 +687,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public async Task JoinFilesCopyAsync(IReadOnlyList<string> inputPaths, string outputPath)
     {
-        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        if (string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
             StatusMessage = "ffmpeg nije dostupan za copy join.";
             return;
@@ -665,7 +695,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            await _copyOnlyMediaToolsService.JoinAsync(_ffmpegPath, inputPaths, outputPath);
+            await _copyOnlyMediaToolsService.JoinAsync(ResolvedFfmpegPath, inputPaths, outputPath);
             StatusMessage = $"Copy join zavrsen: {Path.GetFileName(outputPath)}";
             ProgressMessage = $"Join fajlova: {inputPaths.Count} -> {outputPath}";
             LogMessage = outputPath;
@@ -693,6 +723,9 @@ public partial class MainWindowViewModel : ViewModelBase
             QualityMode = QualityMode,
             ScaleMode = ScaleMode,
             AspectMode = AspectMode,
+            DeinterlaceMode = DeinterlaceMode,
+            DenoiseMode = DenoiseMode,
+            EncodeEngine = EncodeEngine,
             VideoBitrate = VideoBitrate,
             AudioBitrate = AudioBitrate,
             SplitOutput = SplitOutput,
@@ -726,6 +759,9 @@ public partial class MainWindowViewModel : ViewModelBase
             QualityMode = snapshot.QualityMode;
             ScaleMode = snapshot.ScaleMode;
             AspectMode = snapshot.AspectMode;
+            DeinterlaceMode = snapshot.DeinterlaceMode;
+            DenoiseMode = snapshot.DenoiseMode;
+            EncodeEngine = snapshot.EncodeEngine;
             VideoBitrate = snapshot.VideoBitrate;
             AudioBitrate = snapshot.AudioBitrate;
             SplitOutput = snapshot.SplitOutput;
@@ -810,13 +846,13 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private bool CanSplitSelectedCopy()
-        => !string.IsNullOrWhiteSpace(_ffmpegPath) && SelectedQueueItem?.MediaInfo is not null;
+        => !string.IsNullOrWhiteSpace(ResolvedFfmpegPath) && SelectedQueueItem?.MediaInfo is not null;
 
     private bool CanPauseOrResume() => _isConverting || _isBatchPaused;
 
     private async Task SplitSelectedCopyAsync()
     {
-        if (string.IsNullOrWhiteSpace(_ffmpegPath) || SelectedQueueItem?.MediaInfo is null)
+        if (string.IsNullOrWhiteSpace(ResolvedFfmpegPath) || SelectedQueueItem?.MediaInfo is null)
         {
             return;
         }
@@ -824,7 +860,7 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             var createdFiles = await _copyOnlyMediaToolsService.SplitAsync(
-                _ffmpegPath,
+                ResolvedFfmpegPath,
                 SelectedQueueItem.MediaInfo,
                 OutputFolder,
                 MaxPartGb);
@@ -952,7 +988,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task AutoScanAfterSelectionAsync()
     {
-        if (string.IsNullOrWhiteSpace(_ffmpegPath))
+        if (string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
             StatusMessage = "Izbor je prihvacen, ali ffmpeg/ffprobe jos nisu dostupni za automatski scan.";
             return;
@@ -1004,5 +1040,30 @@ public partial class MainWindowViewModel : ViewModelBase
 
         seconds = 0;
         return false;
+    }
+
+    public void SetFfmpegPath(string? ffmpegPath)
+    {
+        if (string.IsNullOrWhiteSpace(ffmpegPath))
+        {
+            return;
+        }
+
+        ResolvedFfmpegPath = Path.GetFullPath(ffmpegPath);
+        StatusMessage = $"ffmpeg putanja je postavljena: {ResolvedFfmpegPath}";
+        LogMessage = $"FFmpeg: {ResolvedFfmpegPath}";
+        SplitSelectedCopyCommand.NotifyCanExecuteChanged();
+    }
+
+    public void AutoDetectFfmpeg()
+    {
+        var detected = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(detected))
+        {
+            StatusMessage = "ffmpeg nije automatski pronadjen. Izaberi ga rucno ili ga instaliraj iz Tools menija.";
+            return;
+        }
+
+        SetFfmpegPath(detected);
     }
 }

@@ -8,6 +8,9 @@ public sealed class QueueSessionSnapshot
     public required string QualityMode { get; init; }
     public required string ScaleMode { get; init; }
     public required string AspectMode { get; init; }
+    public required string DeinterlaceMode { get; init; }
+    public required string DenoiseMode { get; init; }
+    public required string EncodeEngine { get; init; }
     public required string VideoBitrate { get; init; }
     public required string AudioBitrate { get; init; }
     public required bool SplitOutput { get; init; }

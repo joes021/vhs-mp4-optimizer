@@ -50,7 +50,7 @@ public static class OutputPlanner
             AudioCodecText = "AAC",
             AudioBitrateText = FormatKbps(audioBitrateKbps),
             BitrateText = $"{FormatKbps(totalBitrateKbps)} est.",
-            EncodeEngineText = "CPU / libx264",
+            EncodeEngineText = ResolveEncodeEngineLabel(settings.EncodeEngine, profile.CodecLabel),
             EstimatedSizeText = $"Estimate: {estimatedGb:F2} GB",
             UsbNoteText = $"USB note: {usbNote}",
             SplitModeText = splitMode,
@@ -163,6 +163,26 @@ public static class OutputPlanner
             QualityModes.TvSmart => new QualityProfile("H.264", 21, "slow", "160k", 6500),
             _ => new QualityProfile("H.264", 22, "slow", "160k", 5000)
         };
+    }
+
+    private static string ResolveEncodeEngineLabel(string encodeEngine, string codecLabel)
+    {
+        if (string.Equals(encodeEngine, EncodeEngines.NvidiaNvenc, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"NVIDIA NVENC / {codecLabel}";
+        }
+
+        if (string.Equals(encodeEngine, EncodeEngines.IntelQsv, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Intel QSV / {codecLabel}";
+        }
+
+        if (string.Equals(encodeEngine, EncodeEngines.AmdAmf, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"AMD AMF / {codecLabel}";
+        }
+
+        return $"CPU / {codecLabel}";
     }
 
     private static int ResolveVideoKbps(QualityProfile profile, string overrideBitrate)

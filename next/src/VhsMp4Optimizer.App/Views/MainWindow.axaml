@@ -70,6 +70,24 @@
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
+
+        <Style Selector="Button.primary-big">
+            <Setter Property="MinHeight" Value="58" />
+            <Setter Property="MinWidth" Value="210" />
+            <Setter Property="Padding" Value="18,12" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="#138AA6" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style Selector="Border.subtle-group">
+            <Setter Property="Background" Value="#F7F9FC" />
+            <Setter Property="BorderBrush" Value="#E1E7F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
     </Window.Styles>
 
     <Grid RowDefinitions="Auto,Auto,Auto,8,Auto,10,*,10,220" Margin="16">
@@ -82,6 +100,10 @@
                 <MenuItem Header="Load Queue" Click="LoadQueueClick" />
             </MenuItem>
             <MenuItem Header="_Tools">
+                <MenuItem Header="Browse FFmpeg..." Click="BrowseFfmpegClick" />
+                <MenuItem Header="Auto detect FFmpeg" Click="AutoDetectFfmpegClick" />
+                <MenuItem Header="Install FFmpeg" Click="InstallFfmpegClick" />
+                <Separator />
                 <MenuItem Header="Open Player / Trim" Click="OpenPlayerTrimClick" />
                 <MenuItem Header="Test Sample" Command="{Binding TestSampleCommand}" />
                 <MenuItem Header="Open Sample" Command="{Binding OpenSampleCommand}" />
@@ -127,104 +149,103 @@
         <Border Grid.Row="2" Classes="card">
             <Grid ColumnDefinitions="*,24,430" ColumnSpacing="0">
                 <Grid Grid.Column="0" ColumnDefinitions="220,180,150,150,150" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0">
+                    <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Classes="section-title" Text="Quick Setup" />
                         <TextBlock Classes="field-label" Text="Workflow preset" />
                         <ComboBox ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" Margin="0,26,0,0">
+                    <StackPanel Grid.Column="1" Margin="0,26,0,0" Spacing="4">
                         <TextBlock Classes="field-label" Text="Quality mode" />
                         <ComboBox ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Margin="0,26,0,0">
+                    <StackPanel Grid.Column="2" Margin="0,26,0,0" Spacing="4">
                         <TextBlock Classes="field-label" Text="Scale" />
                         <ComboBox ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="3" Margin="0,26,0,0">
+                    <StackPanel Grid.Column="3" Margin="0,26,0,0" Spacing="4">
                         <TextBlock Classes="field-label" Text="Video bitrate" />
                         <TextBox Text="{Binding VideoBitrate}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="4" Margin="0,26,0,0">
+                    <StackPanel Grid.Column="4" Margin="0,26,0,0" Spacing="4">
                         <TextBlock Classes="field-label" Text="Audio bitrate" />
                         <TextBox Text="{Binding AudioBitrate}" />
                     </StackPanel>
                 </Grid>
 
-                <Border Grid.Column="2" Background="#F7F9FC" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                <Border Grid.Column="2" Classes="subtle-group">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="10">
                         <TextBlock Classes="group-title" Text="Batch actions" />
-                        <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Grid Grid.Row="1" ColumnDefinitions="1.1*,1.1*,1.25*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
                             <Button Grid.Column="0" Classes="action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
                             <Button Grid.Column="1" Classes="action" Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
-                            <Button Grid.Column="2" Classes="action accent" Content="Start Conversion" Command="{Binding StartConversionCommand}" />
-                        </Grid>
-                        <Grid Grid.Row="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                            <Button Grid.Column="0" Classes="action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                            <Button Grid.Column="1" Classes="action" Content="Save Queue" Click="SaveQueueClick" />
-                            <Button Grid.Column="2" Classes="action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                            <Button Grid.Column="0" Grid.Row="1" Classes="action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                            <Button Grid.Column="1" Grid.Row="1" Classes="action" Content="Save Queue" Click="SaveQueueClick" />
+                            <Button Grid.Column="0" Grid.Row="2" Classes="action" Content="Load Queue" Click="LoadQueueClick" />
+                            <Button Grid.Column="1" Grid.Row="2" Classes="action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                            <Button Grid.Column="2" Grid.Row="0" Grid.RowSpan="3" Classes="primary-big" Content="START CONVERSION" Command="{Binding StartConversionCommand}" VerticalAlignment="Stretch" />
                         </Grid>
                     </Grid>
                 </Border>
             </Grid>
         </Border>
 
-        <Border Grid.Row="3" Height="1" Background="#D6DEEA" Margin="8,4" />
+        <Border Grid.Row="3" Height="8" Background="#D6DEEA" Margin="0,6" CornerRadius="4" />
 
         <Border Grid.Row="4" Classes="card">
-            <Grid ColumnDefinitions="220,260,220,270" ColumnSpacing="16">
-                <StackPanel Grid.Column="0">
-                    <TextBlock Classes="section-title" Text="Advanced Settings" />
-                    <TextBlock Classes="field-label" Text="Deinterlace" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="Off" />
-                    </ComboBox>
-                    <TextBlock Classes="field-label" Text="Denoise" Margin="0,10,0,4" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="Off" />
-                    </ComboBox>
-                </StackPanel>
+            <StackPanel Spacing="12">
+                <TextBlock Classes="section-title" Text="Advanced Settings" />
+                <WrapPanel Orientation="Horizontal" ItemWidth="210" ItemHeight="92">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Deinterlace" />
+                        <ComboBox ItemsSource="{Binding DeinterlaceModes}" SelectedItem="{Binding DeinterlaceMode}" />
+                    </StackPanel>
 
-                <StackPanel Grid.Column="1" Margin="0,26,0,0">
-                    <TextBlock Classes="group-title" Text="Output transform" />
-                    <TextBlock Classes="field-label" Text="Aspect mode" />
-                    <ComboBox ItemsSource="{Binding AspectModes}" SelectedItem="{Binding AspectMode}" />
-                    <TextBlock Classes="field-label" Text="Encode engine" Margin="0,10,0,4" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="Auto" />
-                    </ComboBox>
-                </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Denoise" />
+                        <ComboBox ItemsSource="{Binding DenoiseModes}" SelectedItem="{Binding DenoiseMode}" />
+                    </StackPanel>
 
-                <StackPanel Grid.Column="2" Margin="0,26,0,0">
-                    <TextBlock Classes="group-title" Text="Split output" />
-                    <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
-                    <TextBlock Classes="field-label" Text="Max part GB" Margin="0,10,0,4" />
-                    <NumericUpDown Value="{Binding MaxPartGb}" Minimum="0.5" Maximum="25" Increment="0.1" FormatString="0.0" />
-                </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Aspect mode" />
+                        <ComboBox ItemsSource="{Binding AspectModes}" SelectedItem="{Binding AspectMode}" />
+                    </StackPanel>
 
-                <Border Grid.Column="3" Background="#F7F9FC" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,26,0,0">
-                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
-                        <TextBlock Classes="group-title" Text="Sample clip" />
-                        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="10">
-                            <StackPanel>
-                                <TextBlock Classes="field-label" Text="Sample start" />
-                                <TextBox Text="{Binding SampleStartText}" PlaceholderText="00:00:30" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Classes="field-label" Text="Sample duration" />
-                                <TextBox Text="{Binding SampleDurationText}" PlaceholderText="00:02:00" />
-                            </StackPanel>
-                        </Grid>
-                        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <Button Grid.Column="0" Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
-                            <Button Grid.Column="1" Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
-                        </Grid>
-                    </Grid>
-                </Border>
-            </Grid>
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Encode engine" />
+                        <ComboBox ItemsSource="{Binding EncodeEngines}" SelectedItem="{Binding EncodeEngine}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Split output" />
+                        <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Max part GB" />
+                        <NumericUpDown Value="{Binding MaxPartGb}" Minimum="0.5" Maximum="25" Increment="0.1" FormatString="0.0" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Sample start" />
+                        <TextBox Text="{Binding SampleStartText}" PlaceholderText="00:00:30" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="field-label" Text="Sample duration" />
+                        <TextBox Text="{Binding SampleDurationText}" PlaceholderText="00:02:00" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="field-label" Text="Sample clip" />
+                        <Button Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
+                        <Button Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
+                    </StackPanel>
+                </WrapPanel>
+            </StackPanel>
         </Border>
 
         <GridSplitter Grid.Row="5" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows"/>

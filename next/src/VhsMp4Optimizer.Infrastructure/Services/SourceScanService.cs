@@ -10,7 +10,13 @@ public sealed class SourceScanService : ISourceScanService
         ".mp4", ".avi", ".mpg", ".mpeg", ".mov", ".mkv", ".m4v", ".wmv", ".ts", ".m2ts", ".vob"
     };
 
-    private readonly FfprobeMediaProbeService _mediaProbeService = new();
+    private readonly Func<string, string, MediaInfo> _probeMediaInfo;
+
+    public SourceScanService(Func<string, string, MediaInfo>? probeMediaInfo = null)
+    {
+        var probeService = new FfprobeMediaProbeService();
+        _probeMediaInfo = probeMediaInfo ?? ((sourcePath, ffmpegPath) => probeService.Probe(sourcePath, ffmpegPath));
+    }
 
     public IReadOnlyList<QueueItemSummary> Scan(BatchSettings settings, string ffmpegPath, IReadOnlyList<string>? explicitSourcePaths = null)
     {
@@ -52,9 +58,7 @@ public sealed class SourceScanService : ISourceScanService
         var outputPattern = settings.SplitOutput
             ? Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(sourceName) + "-part%03d.mp4")
             : outputPath;
-        var status = File.Exists(outputPath) ? "skipped" : "queued";
-
-        var mediaInfo = _mediaProbeService.Probe(sourcePath, ffmpegPath);
+        var mediaInfo = _probeMediaInfo(sourcePath, ffmpegPath);
         var plannedOutput = OutputPlanner.Build(mediaInfo, settings);
 
         return new QueueItemSummary
@@ -69,7 +73,7 @@ public sealed class SourceScanService : ISourceScanService
             Duration = mediaInfo.DurationText,
             Video = mediaInfo.VideoSummary,
             Audio = mediaInfo.AudioSummary,
-            Status = status,
+            Status = "queued",
             MediaInfo = mediaInfo,
             PlannedOutput = plannedOutput,
             TransformSettings = null

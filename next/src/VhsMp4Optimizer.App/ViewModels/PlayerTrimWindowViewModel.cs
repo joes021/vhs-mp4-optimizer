@@ -224,7 +224,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.CutSegment(Timeline, inSeconds, outSeconds);
-        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
+        await RefreshStateAndPreviewAsync();
     }
 
     private async Task DeleteSegmentAsync()
@@ -235,7 +235,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.DeleteSegment(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
+        await RefreshStateAndPreviewAsync();
     }
 
     private async Task RippleDeleteSegmentAsync()
@@ -246,7 +246,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.RippleDeleteSegment(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
+        await RefreshStateAndPreviewAsync();
     }
 
     private async Task MoveLeftAsync()
@@ -257,7 +257,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.MoveSegmentLeft(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
+        await RefreshStateAndPreviewAsync();
     }
 
     private async Task MoveRightAsync()
@@ -268,7 +268,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         Timeline = TimelineEditorService.MoveSegmentRight(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync().ConfigureAwait(false);
+        await RefreshStateAndPreviewAsync();
     }
 
     private void SaveToQueue() => _saveAction(Timeline, BuildTransformSettings());
@@ -278,13 +278,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     private async Task GoToStartAsync()
     {
         PreviewVirtualSeconds = 0;
-        await LoadPreviewAsync().ConfigureAwait(false);
+        await LoadPreviewAsync();
     }
 
     private async Task GoToEndAsync()
     {
         PreviewVirtualSeconds = PreviewVirtualMaximum;
-        await LoadPreviewAsync().ConfigureAwait(false);
+        await LoadPreviewAsync();
     }
 
     private async Task StepFramesAsync(int frameDelta)
@@ -292,7 +292,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         var frameRate = Math.Max(1d, Item.MediaInfo?.FrameRate ?? 25d);
         var stepSeconds = frameDelta / frameRate;
         PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum);
-        await LoadPreviewAsync().ConfigureAwait(false);
+        await LoadPreviewAsync();
     }
 
     private bool CanStartPlayback() => !IsPlaying && PreviewVirtualMaximum > 0;
@@ -331,7 +331,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     {
         RefreshState();
         PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum);
-        await LoadPreviewAsync().ConfigureAwait(false);
+        await LoadPreviewAsync();
     }
 
     private void RefreshState()
@@ -413,18 +413,27 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         {
             _previewBusy = true;
             EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
-            var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token).ConfigureAwait(false);
-            if (token.IsCancellationRequested || string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
+            var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token);
+            if (token.IsCancellationRequested)
             {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
+            {
+                EditorHint = "Preview frame nije renderovan. Proveri ffmpeg putanju i da li je ulazni fajl citljiv.";
                 return;
             }
 
             await using var stream = File.OpenRead(previewPath);
             var bitmap = new Bitmap(stream);
-            var previous = PreviewBitmap;
-            PreviewBitmap = bitmap;
-            previous?.Dispose();
-            EditorHint = $"Preview spreman | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var previous = PreviewBitmap;
+                PreviewBitmap = bitmap;
+                previous?.Dispose();
+                EditorHint = $"Preview spreman | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+            });
         }
         catch (OperationCanceledException)
         {
@@ -450,7 +459,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         try
         {
             EditorHint = "Crop detect radi...";
-            var detected = await _cropDetectService.DetectAsync(_ffmpegPath, Item.MediaInfo).ConfigureAwait(false);
+            var detected = await _cropDetectService.DetectAsync(_ffmpegPath, Item.MediaInfo);
             if (detected is null)
             {
                 EditorHint = "Crop detect nije nasao pouzdan crop za ovaj fajl.";
@@ -462,7 +471,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
             CropRight = detected.Right;
             CropBottom = detected.Bottom;
             EditorHint = $"Crop detect: L{CropLeft} T{CropTop} R{CropRight} B{CropBottom}";
-            await LoadPreviewAsync().ConfigureAwait(false);
+            await LoadPreviewAsync();
         }
         catch (Exception ex)
         {
@@ -477,7 +486,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         CropRight = 0;
         CropBottom = 0;
         EditorHint = "Crop je ociscen.";
-        await LoadPreviewAsync().ConfigureAwait(false);
+        await LoadPreviewAsync();
     }
 
     private void UpdatePreviewTimeTexts()
@@ -547,6 +556,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         PreviewVirtualSeconds = Math.Min(PreviewVirtualMaximum, PreviewVirtualSeconds + step);
-        await LoadPreviewAsync().ConfigureAwait(false);
+        await LoadPreviewAsync();
     }
 }

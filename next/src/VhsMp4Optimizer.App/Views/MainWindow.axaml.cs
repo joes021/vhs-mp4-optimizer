@@ -45,6 +45,56 @@ public partial class MainWindow : Window
         _playerTrimWindow.Activate();
     }
 
+    private async void BrowseFfmpegClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Izaberi ffmpeg.exe",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("FFmpeg executable")
+                {
+                    Patterns = ["ffmpeg.exe", "*.exe"]
+                }
+            ]
+        });
+
+        var selectedPath = files.FirstOrDefault()?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(selectedPath))
+        {
+            viewModel.SetFfmpegPath(selectedPath);
+        }
+    }
+
+    private void AutoDetectFfmpegClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.AutoDetectFfmpeg();
+        }
+    }
+
+    private void InstallFfmpegClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.StatusMessage = "Pokrecem winget instalaciju za FFmpeg. Posle toga uradi Auto detect FFmpeg ili Browse FFmpeg.";
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "winget",
+            Arguments = "install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements",
+            UseShellExecute = true
+        });
+    }
+
     private async void BrowseInputFilesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel)
