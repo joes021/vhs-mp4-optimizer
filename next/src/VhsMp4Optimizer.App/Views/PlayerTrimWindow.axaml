@@ -43,13 +43,15 @@
                     <Button Content="&lt; 250 Frames" Command="{Binding Back250FramesCommand}" />
                     <Button Content="&lt; 25 Frames" Command="{Binding Back25FramesCommand}" />
                     <Button Content="&lt; Frame" Command="{Binding BackFrameCommand}" />
-                    <Button Content="Preview Frame" Command="{Binding RefreshPreviewCommand}" />
+                    <Button Content="Play" Command="{Binding PlayCommand}" />
+                    <Button Content="Pause" Command="{Binding PauseCommand}" />
                     <Button Content="Frame &gt;" Command="{Binding ForwardFrameCommand}" />
                     <Button Content="25 Frames &gt;" Command="{Binding Forward25FramesCommand}" />
                     <Button Content="250 Frames &gt;" Command="{Binding Forward250FramesCommand}" />
                     <Button Content="In Point" Command="{Binding SetInPointCommand}" />
                     <Button Content="Out Point" Command="{Binding SetOutPointCommand}" />
                     <Button Content="END" Command="{Binding GoToEndCommand}" />
+                    <Button Content="Preview Frame" Command="{Binding RefreshPreviewCommand}" />
                 </WrapPanel>
 
                 <Grid Grid.Row="4" ColumnDefinitions="150,*,150,*" ColumnSpacing="10">

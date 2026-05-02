@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VhsMp4Optimizer.Core.Models;
@@ -22,6 +23,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     private readonly CropDetectService _cropDetectService = new();
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
+    private readonly DispatcherTimer _playbackTimer;
+    private bool _previewBusy;
 
     public PlayerTrimWindowViewModel(QueueItemSummary item, string? ffmpegPath, Action<TimelineProject, ItemTransformSettings?> saveAction)
     {
@@ -67,6 +70,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         ClearCropCommand = new AsyncRelayCommand(ClearCropAsync);
         SetInPointCommand = new RelayCommand(SetInPointFromCurrent);
         SetOutPointCommand = new RelayCommand(SetOutPointFromCurrent);
+        PlayCommand = new RelayCommand(StartPlayback, CanStartPlayback);
+        PauseCommand = new RelayCommand(PausePlayback, CanPausePlayback);
+
+        _playbackTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
+        _playbackTimer.Tick += PlaybackTimerOnTick;
 
         RefreshState();
         _ = LoadPreviewAsync();
@@ -117,6 +128,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     public IRelayCommand SetInPointCommand { get; }
 
     public IRelayCommand SetOutPointCommand { get; }
+
+    public IRelayCommand PlayCommand { get; }
+
+    public IRelayCommand PauseCommand { get; }
 
     [ObservableProperty]
     private string _windowTitle = string.Empty;
@@ -172,6 +187,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     [ObservableProperty]
     private Bitmap? _previewBitmap;
 
+    [ObservableProperty]
+    private bool _isPlaying;
+
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
     {
         DeleteSegmentCommand.NotifyCanExecuteChanged();
@@ -181,6 +199,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     }
 
     partial void OnPreviewVirtualSecondsChanged(double value) => UpdatePreviewTimeTexts();
+
+    partial void OnIsPlayingChanged(bool value)
+    {
+        PlayCommand.NotifyCanExecuteChanged();
+        PauseCommand.NotifyCanExecuteChanged();
+    }
 
     public Task CommitPreviewSliderAsync() => LoadPreviewAsync();
 
@@ -264,6 +288,34 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         await LoadPreviewAsync().ConfigureAwait(false);
     }
 
+    private bool CanStartPlayback() => !IsPlaying && PreviewVirtualMaximum > 0;
+
+    private bool CanPausePlayback() => IsPlaying;
+
+    private void StartPlayback()
+    {
+        if (IsPlaying)
+        {
+            return;
+        }
+
+        IsPlaying = true;
+        _playbackTimer.Start();
+        EditorHint = "Playback aktivan preko preview timeline-a.";
+    }
+
+    private void PausePlayback()
+    {
+        if (!IsPlaying)
+        {
+            return;
+        }
+
+        _playbackTimer.Stop();
+        IsPlaying = false;
+        EditorHint = $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+    }
+
     private void SetInPointFromCurrent() => InPointText = PreviewSourceTimeText;
 
     private void SetOutPointFromCurrent() => OutPointText = PreviewSourceTimeText;
@@ -305,6 +357,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
             return;
         }
 
+        if (_previewBusy)
+        {
+            return;
+        }
+
         _previewCts?.Cancel();
         _previewCts = new CancellationTokenSource();
         var token = _previewCts.Token;
@@ -312,6 +369,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
         try
         {
+            _previewBusy = true;
             EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
             var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token).ConfigureAwait(false);
             if (token.IsCancellationRequested || string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
@@ -332,6 +390,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             EditorHint = $"Preview nije uspeo: {ex.Message}";
+        }
+        finally
+        {
+            _previewBusy = false;
         }
     }
 
@@ -418,4 +480,22 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     }
 
     private static IReadOnlyList<string> AspectModesService() => CoreServices.AspectModes.All;
+
+    private async void PlaybackTimerOnTick(object? sender, EventArgs e)
+    {
+        if (!IsPlaying)
+        {
+            return;
+        }
+
+        var step = 0.25;
+        if (PreviewVirtualSeconds >= PreviewVirtualMaximum)
+        {
+            PausePlayback();
+            return;
+        }
+
+        PreviewVirtualSeconds = Math.Min(PreviewVirtualMaximum, PreviewVirtualSeconds + step);
+        await LoadPreviewAsync().ConfigureAwait(false);
+    }
 }
