@@ -233,6 +233,8 @@ public partial class MainWindowViewModel : ViewModelBase
             QueueItems.Add(item);
         }
 
+        ApplyQueueZebra();
+
         SelectedQueueItem = QueueItems.FirstOrDefault();
         var explicitCount = _explicitSourcePaths?.Count ?? 0;
         ProgressMessage = explicitCount > 0
@@ -429,6 +431,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 TransformSettings = item.TransformSettings
             });
         }
+
+        ApplyQueueZebra();
 
         var selected = QueueItems.FirstOrDefault(i => i.SourcePath == SelectedQueueItem?.SourcePath) ?? QueueItems.FirstOrDefault();
         SelectedQueueItem = selected;
@@ -645,6 +649,8 @@ public partial class MainWindowViewModel : ViewModelBase
             });
         }
 
+        ApplyQueueZebra();
+
         SelectedQueueItem = QueueItems.FirstOrDefault(item => string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase));
         StatusMessage = "Timeline izmene su vracene u batch queue.";
     }
@@ -754,6 +760,8 @@ public partial class MainWindowViewModel : ViewModelBase
             });
         }
 
+        ApplyQueueZebra();
+
         SelectedQueueItem = QueueItems.FirstOrDefault();
         SelectionHint = _explicitSourcePaths?.Count > 0
             ? $"Ucitan queue sa eksplicitnih fajlova: {_explicitSourcePaths.Count}"
@@ -781,6 +789,8 @@ public partial class MainWindowViewModel : ViewModelBase
             QueueItems[index] = CoreServices.QueueWorkflowService.RetryFailed(QueueItems[index]);
         }
 
+        ApplyQueueZebra();
+
         StatusMessage = $"Failed stavke su vracene u queue | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
     }
 
@@ -792,6 +802,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             QueueItems.Add(survivor);
         }
+
+        ApplyQueueZebra();
 
         SelectedQueueItem = QueueItems.FirstOrDefault();
         StatusMessage = $"Done stavke su uklonjene iz queue liste | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
@@ -866,7 +878,17 @@ public partial class MainWindowViewModel : ViewModelBase
                 SelectedQueueItem = updated;
             }
 
+            ApplyQueueZebra();
+
             return;
+        }
+    }
+
+    private void ApplyQueueZebra()
+    {
+        for (var index = 0; index < QueueItems.Count; index++)
+        {
+            QueueItems[index].IsAlternate = index % 2 == 1;
         }
     }
 

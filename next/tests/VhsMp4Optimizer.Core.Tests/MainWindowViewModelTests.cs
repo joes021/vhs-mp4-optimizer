@@ -18,17 +18,19 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task UseSelectedFilesAsync_should_auto_scan_and_fill_queue_and_planned_output()
     {
         var filePath = CreateFile("sample.avi");
-        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath), BuildQueueItem(CreateFile("sample-2.avi")));
         var viewModel = new MainWindowViewModel(scanner, ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
 
         await viewModel.UseSelectedFilesAsync([filePath]);
 
-        Assert.Single(viewModel.QueueItems);
+        Assert.Equal(2, viewModel.QueueItems.Count);
         Assert.NotNull(viewModel.SelectedQueueItem);
         Assert.Equal(Path.GetFileName(filePath), viewModel.SelectedQueueItem!.SourceFile);
-        Assert.Contains("pronadjeno 1", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("pronadjeno 2", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("sample.avi", viewModel.SelectionHint, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(viewModel.ComparisonRows, row => row.Label == "File" && row.InputValue == "sample.avi");
+        Assert.False(viewModel.QueueItems[0].IsAlternate);
+        Assert.True(viewModel.QueueItems[1].IsAlternate);
         Assert.Single(scanner.ScanCalls);
         Assert.Equal(filePath, scanner.ScanCalls[0].ExplicitPaths!.Single());
     }

@@ -14,7 +14,8 @@ public static class PropertyComparisonBuilder
                 {
                     Label = "Info",
                     InputValue = "Izaberi fajl iz queue liste",
-                    OutputValue = "Ovde poredimo ulaz i planirani izlaz"
+                    OutputValue = "Ovde poredimo ulaz i planirani izlaz",
+                    IsAlternate = false
                 }
             };
         }
@@ -42,6 +43,14 @@ public static class PropertyComparisonBuilder
             new PropertyComparisonRow { Label = "Split output", InputValue = "--", OutputValue = output.SplitModeText },
             new PropertyComparisonRow { Label = "Crop", InputValue = "--", OutputValue = output.CropText },
             new PropertyComparisonRow { Label = "USB note", InputValue = "--", OutputValue = output.UsbNoteText }
-        };
+        }
+        .Select((row, index) => new PropertyComparisonRow
+        {
+            Label = row.Label,
+            InputValue = row.InputValue,
+            OutputValue = row.OutputValue,
+            IsAlternate = index % 2 == 1
+        })
+        .ToArray();
     }
 }

@@ -2,6 +2,9 @@ namespace VhsMp4Optimizer.Core.Models;
 
 public sealed class QueueItemSummary
 {
+    public const string PrimaryRowBackground = "#FBFCFE";
+    public const string AlternateRowBackground = "#F3F7FD";
+
     public required string SourceFile { get; init; }
     public required string SourcePath { get; init; }
     public required string OutputFile { get; init; }
@@ -17,4 +20,6 @@ public sealed class QueueItemSummary
     public required OutputPlanSummary? PlannedOutput { get; init; }
     public TimelineProject? TimelineProject { get; init; }
     public ItemTransformSettings? TransformSettings { get; init; }
+    public bool IsAlternate { get; set; }
+    public string RowBackground => IsAlternate ? AlternateRowBackground : PrimaryRowBackground;
 }
