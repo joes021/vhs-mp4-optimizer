@@ -71,7 +71,8 @@ public sealed class SourceScanService
             Audio = mediaInfo.AudioSummary,
             Status = status,
             MediaInfo = mediaInfo,
-            PlannedOutput = plannedOutput
+            PlannedOutput = plannedOutput,
+            TransformSettings = null
         };
     }
 

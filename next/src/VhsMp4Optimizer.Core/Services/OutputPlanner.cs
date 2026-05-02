@@ -5,11 +5,15 @@ namespace VhsMp4Optimizer.Core.Services;
 
 public static class OutputPlanner
 {
-    public static OutputPlanSummary Build(MediaInfo mediaInfo, BatchSettings settings)
+    public static OutputPlanSummary Build(MediaInfo mediaInfo, BatchSettings settings, ItemTransformSettings? transformSettings = null)
     {
         var profile = ResolveProfile(settings);
-        var aspectLabel = ResolveAspectLabel(mediaInfo, settings.AspectMode);
-        var (displayWidth, displayHeight) = GetDisplayGeometry(mediaInfo.Width, mediaInfo.Height, aspectLabel);
+        var crop = NormalizeCrop(transformSettings?.Crop, mediaInfo.Width, mediaInfo.Height);
+        var croppedWidth = Math.Max(2, mediaInfo.Width - crop.Left - crop.Right);
+        var croppedHeight = Math.Max(2, mediaInfo.Height - crop.Top - crop.Bottom);
+        var aspectMode = transformSettings?.AspectMode ?? settings.AspectMode;
+        var aspectLabel = ResolveAspectLabel(mediaInfo, aspectMode);
+        var (displayWidth, displayHeight) = GetDisplayGeometry(croppedWidth, croppedHeight, aspectLabel);
         var (outputWidth, outputHeight) = ApplyScale(displayWidth, displayHeight, settings.ScaleMode);
         var videoBitrateKbps = ResolveVideoKbps(profile, settings.VideoBitrate);
         var audioBitrateKbps = ParseKbps(profile.AudioBitrate);
@@ -27,6 +31,9 @@ public static class OutputPlanner
         var splitMode = settings.SplitOutput
             ? $"Split ON | max {settings.MaxPartGb:0.0} GB | delova: {partCount}"
             : "Split OFF";
+        var cropText = crop.HasCrop
+            ? $"L{crop.Left} T{crop.Top} R{crop.Right} B{crop.Bottom}"
+            : "--";
 
         var rateControlText = string.IsNullOrWhiteSpace(settings.VideoBitrate)
             ? $"CRF {profile.Crf} | preset {profile.Preset}"
@@ -47,6 +54,7 @@ public static class OutputPlanner
             EstimatedSizeText = $"Estimate: {estimatedGb:F2} GB",
             UsbNoteText = $"USB note: {usbNote}",
             SplitModeText = splitMode,
+            CropText = cropText,
             AspectText = aspectLabel,
             OutputWidth = outputWidth,
             OutputHeight = outputHeight
@@ -182,6 +190,26 @@ public static class OutputPlanner
     {
         var rounded = Math.Max(2, (int)Math.Round(value));
         return rounded % 2 == 0 ? rounded : rounded + 1;
+    }
+
+    private static CropSettings NormalizeCrop(CropSettings? crop, int width, int height)
+    {
+        if (crop is null)
+        {
+            return new CropSettings();
+        }
+
+        var left = Math.Clamp(crop.Left, 0, Math.Max(0, width - 2));
+        var top = Math.Clamp(crop.Top, 0, Math.Max(0, height - 2));
+        var right = Math.Clamp(crop.Right, 0, Math.Max(0, width - left - 2));
+        var bottom = Math.Clamp(crop.Bottom, 0, Math.Max(0, height - top - 2));
+        return new CropSettings
+        {
+            Left = left,
+            Top = top,
+            Right = right,
+            Bottom = bottom
+        };
     }
 
     private sealed record QualityProfile(string CodecLabel, int Crf, string Preset, string AudioBitrate, int VideoKbps);

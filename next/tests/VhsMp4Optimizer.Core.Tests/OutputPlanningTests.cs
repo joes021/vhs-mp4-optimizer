@@ -102,4 +102,59 @@ public sealed class OutputPlanningTests
         Assert.Contains("delova", plan.SplitModeText);
         Assert.Contains("USB note", plan.UsbNoteText);
     }
+
+    [Fact]
+    public void Should_apply_manual_crop_before_scaled_output_resolution()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "crop-test.mp4",
+            SourcePath = @"F:\crop-test.mp4",
+            Container = "mov",
+            DurationSeconds = 120,
+            DurationText = "00:02:00",
+            SizeBytes = 2_000_000_000,
+            SizeText = "1.86 GB",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "h264",
+            Width = 1920,
+            Height = 1080,
+            Resolution = "1920x1080",
+            DisplayAspectRatio = "16:9",
+            SampleAspectRatio = "1:1",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 3000,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "aac",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 160,
+            AudioBitrateText = "160 kbps",
+            VideoSummary = "h264 | 1920x1080 | 16:9 | 25 fps",
+            AudioSummary = "aac | 2 ch | 48000 Hz | 160 kbps"
+        };
+
+        var settings = new BatchSettings
+        {
+            QualityMode = QualityModes.TvSmart,
+            ScaleMode = ScaleModes.P720,
+            AspectMode = AspectModes.Auto,
+            AudioBitrate = "160k"
+        };
+
+        var transform = new ItemTransformSettings
+        {
+            AspectMode = AspectModes.Force4x3,
+            Crop = new CropSettings { Left = 100, Right = 100, Top = 10, Bottom = 10 }
+        };
+
+        var plan = OutputPlanner.Build(mediaInfo, settings, transform);
+
+        Assert.Equal("960x720", plan.Resolution);
+        Assert.Equal("4:3", plan.AspectText);
+        Assert.Contains("L100", plan.CropText);
+    }
 }

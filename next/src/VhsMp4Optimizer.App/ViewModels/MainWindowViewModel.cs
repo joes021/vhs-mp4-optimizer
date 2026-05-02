@@ -233,7 +233,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     MediaInfo = item.MediaInfo,
                     Settings = settings,
                     OutputPath = item.OutputPath,
-                    TimelineProject = item.TimelineProject
+                    TimelineProject = item.TimelineProject,
+                    TransformSettings = item.TransformSettings
                 };
 
                 await _conversionService.ConvertAsync(_ffmpegPath, request);
@@ -283,6 +284,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Settings = settings,
                 OutputPath = samplePath,
                 TimelineProject = SelectedQueueItem.TimelineProject,
+                TransformSettings = SelectedQueueItem.TransformSettings,
                 IsSample = true,
                 SampleStartSeconds = start,
                 SampleDurationSeconds = duration
@@ -313,7 +315,7 @@ public partial class MainWindowViewModel : ViewModelBase
         QueueItems.Clear();
         foreach (var item in existingItems)
         {
-            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, settings);
+            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, settings, item.TransformSettings);
             QueueItems.Add(new QueueItemSummary
             {
                 SourceFile = item.SourceFile,
@@ -329,7 +331,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 Status = item.Status,
                 MediaInfo = item.MediaInfo,
                 PlannedOutput = planned,
-                TimelineProject = item.TimelineProject
+                TimelineProject = item.TimelineProject,
+                TransformSettings = item.TransformSettings
             });
         }
 
@@ -430,7 +433,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public void ApplyTimelineProject(string sourcePath, TimelineProject timeline)
+    public void ApplyEditorState(string sourcePath, TimelineProject timeline, ItemTransformSettings? transformSettings)
     {
         var existingItems = QueueItems.ToList();
         QueueItems.Clear();
@@ -443,7 +446,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            OutputPlanSummary? planned = item.PlannedOutput;
+            var effectiveTransform = transformSettings ?? item.TransformSettings;
+            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, BuildSettings(), effectiveTransform);
             if (planned is not null)
             {
                 planned = new OutputPlanSummary
@@ -461,6 +465,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     EstimatedSizeText = planned.EstimatedSizeText,
                     UsbNoteText = planned.UsbNoteText,
                     SplitModeText = planned.SplitModeText,
+                    CropText = planned.CropText,
                     AspectText = planned.AspectText,
                     OutputWidth = planned.OutputWidth,
                     OutputHeight = planned.OutputHeight
@@ -482,7 +487,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 Status = "timeline edited",
                 MediaInfo = item.MediaInfo,
                 PlannedOutput = planned,
-                TimelineProject = timeline
+                TimelineProject = timeline,
+                TransformSettings = effectiveTransform
             });
         }
 
@@ -528,7 +534,8 @@ public partial class MainWindowViewModel : ViewModelBase
             Status = status,
             MediaInfo = mediaInfo,
             PlannedOutput = plannedOutput,
-            TimelineProject = source.TimelineProject
+            TimelineProject = source.TimelineProject,
+            TransformSettings = source.TransformSettings
         };
     }
 

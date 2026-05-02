@@ -21,9 +21,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        var editorViewModel = new PlayerTrimWindowViewModel(viewModel.SelectedQueueItem, viewModel.ResolvedFfmpegPath, timeline =>
+        var editorViewModel = new PlayerTrimWindowViewModel(viewModel.SelectedQueueItem, viewModel.ResolvedFfmpegPath, (timeline, transformSettings) =>
         {
-            viewModel.ApplyTimelineProject(viewModel.SelectedQueueItem.SourcePath, timeline);
+            viewModel.ApplyEditorState(viewModel.SelectedQueueItem.SourcePath, timeline, transformSettings);
         });
 
         if (_playerTrimWindow is null || !_playerTrimWindow.IsVisible)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -10,17 +11,18 @@ using CommunityToolkit.Mvvm.Input;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Core.Services;
 using VhsMp4Optimizer.Infrastructure.Services;
+using CoreServices = VhsMp4Optimizer.Core.Services;
 
 namespace VhsMp4Optimizer.App.ViewModels;
 
 public partial class PlayerTrimWindowViewModel : ViewModelBase
 {
-    private readonly Action<TimelineProject> _saveAction;
+    private readonly Action<TimelineProject, ItemTransformSettings?> _saveAction;
     private readonly PreviewFrameService _previewFrameService = new();
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
 
-    public PlayerTrimWindowViewModel(QueueItemSummary item, string? ffmpegPath, Action<TimelineProject> saveAction)
+    public PlayerTrimWindowViewModel(QueueItemSummary item, string? ffmpegPath, Action<TimelineProject, ItemTransformSettings?> saveAction)
     {
         ArgumentNullException.ThrowIfNull(item.MediaInfo);
 
@@ -29,6 +31,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         Item = item;
         Timeline = item.TimelineProject ?? TimelineEditorService.CreateInitial(item.MediaInfo);
         Segments = new ObservableCollection<TimelineSegment>(Timeline.Segments);
+        AspectModes = new ObservableCollection<string>(AspectModesService());
+
+        var transformSettings = item.TransformSettings ?? new ItemTransformSettings();
+        SelectedAspectMode = transformSettings.AspectMode;
+        CropLeft = transformSettings.Crop.Left;
+        CropTop = transformSettings.Crop.Top;
+        CropRight = transformSettings.Crop.Right;
+        CropBottom = transformSettings.Crop.Bottom;
 
         WindowTitle = $"Player / Trim - {item.SourceFile}";
         FileSummary = $"{item.SourceFile} | {item.Container} | {item.Resolution} | {item.Duration}";
@@ -61,6 +71,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     public QueueItemSummary Item { get; }
 
     public ObservableCollection<TimelineSegment> Segments { get; }
+
+    public ObservableCollection<string> AspectModes { get; }
 
     public IAsyncRelayCommand CutSegmentCommand { get; }
 
@@ -113,6 +125,21 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _outPointText = string.Empty;
+
+    [ObservableProperty]
+    private string _selectedAspectMode = CoreServices.AspectModes.Auto;
+
+    [ObservableProperty]
+    private int _cropLeft;
+
+    [ObservableProperty]
+    private int _cropTop;
+
+    [ObservableProperty]
+    private int _cropRight;
+
+    [ObservableProperty]
+    private int _cropBottom;
 
     [ObservableProperty]
     private string _timelineSummary = string.Empty;
@@ -203,7 +230,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         await RefreshStateAndPreviewAsync().ConfigureAwait(false);
     }
 
-    private void SaveToQueue() => _saveAction(Timeline);
+    private void SaveToQueue() => _saveAction(Timeline, BuildTransformSettings());
 
     private bool CanModifySelectedSegment() => SelectedSegment is not null;
 
@@ -312,6 +339,21 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         PreviewSourceTimeText = TimelineEditorService.FormatSeconds(sourceSeconds);
     }
 
+    private ItemTransformSettings BuildTransformSettings()
+    {
+        return new ItemTransformSettings
+        {
+            AspectMode = SelectedAspectMode,
+            Crop = new CropSettings
+            {
+                Left = Math.Max(0, CropLeft),
+                Top = Math.Max(0, CropTop),
+                Right = Math.Max(0, CropRight),
+                Bottom = Math.Max(0, CropBottom)
+            }
+        };
+    }
+
     private static bool TryParseTime(string text, out double seconds)
     {
         if (TimeSpan.TryParse(text, out var value))
@@ -323,4 +365,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         seconds = 0;
         return false;
     }
+
+    private static IReadOnlyList<string> AspectModesService() => CoreServices.AspectModes.All;
 }

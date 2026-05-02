@@ -38,12 +38,15 @@ public static class TimelineNavigationService
         var clampedVirtual = Clamp(virtualSeconds, 0, GetVirtualDuration(project, sourceDurationSeconds));
         double cursor = 0;
 
-        foreach (var segment in keepSegments)
+        for (var index = 0; index < keepSegments.Count; index++)
         {
+            var segment = keepSegments[index];
             var duration = segment.DurationSeconds;
-            if (clampedVirtual <= cursor + duration)
+            var isLast = index == keepSegments.Count - 1;
+            if (clampedVirtual < cursor + duration || isLast)
             {
-                return Clamp(segment.SourceStartSeconds + (clampedVirtual - cursor), 0, sourceDurationSeconds);
+                var offset = Math.Min(duration, Math.Max(0, clampedVirtual - cursor));
+                return Clamp(segment.SourceStartSeconds + offset, 0, sourceDurationSeconds);
             }
 
             cursor += duration;

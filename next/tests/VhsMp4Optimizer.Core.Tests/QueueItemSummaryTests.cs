@@ -21,7 +21,8 @@ public sealed class QueueItemSummaryTests
             Audio = "pcm / stereo",
             Status = "Queued",
             MediaInfo = null,
-            PlannedOutput = null
+            PlannedOutput = null,
+            TransformSettings = null
         };
 
         Assert.Equal("source.avi", item.SourceFile);

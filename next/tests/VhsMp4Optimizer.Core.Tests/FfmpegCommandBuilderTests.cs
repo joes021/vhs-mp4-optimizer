@@ -138,4 +138,62 @@ public sealed class FfmpegCommandBuilderTests
         Assert.Contains("trim=start=30", joined);
         Assert.Contains("end=42", joined);
     }
+
+    [Fact]
+    public void Should_include_crop_filter_when_item_transform_has_crop()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "crop.avi",
+            SourcePath = @"F:\crop.avi",
+            Container = "avi",
+            DurationSeconds = 60,
+            DurationText = "00:01:00",
+            SizeBytes = 1000,
+            SizeText = "1000 B",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 1500,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "pcm",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo",
+            AudioSummary = "pcm"
+        };
+
+        var request = new ConversionRequest
+        {
+            MediaInfo = mediaInfo,
+            Settings = new BatchSettings
+            {
+                InputPath = mediaInfo.SourcePath,
+                OutputDirectory = @"F:\out",
+                QualityMode = QualityModes.StandardVhs,
+                ScaleMode = ScaleModes.Pal576p,
+                AspectMode = AspectModes.Auto,
+                AudioBitrate = "160k"
+            },
+            OutputPath = @"F:\out\crop.mp4",
+            TransformSettings = new ItemTransformSettings
+            {
+                Crop = new CropSettings { Left = 8, Right = 8, Top = 4, Bottom = 4 }
+            }
+        };
+
+        var joined = string.Join(" ", FfmpegCommandBuilder.BuildArguments(request));
+
+        Assert.Contains("crop=in_w-16:in_h-8:8:4", joined);
+    }
 }

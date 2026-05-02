@@ -9,12 +9,15 @@ public static class FfmpegCommandBuilder
     public static IReadOnlyList<string> BuildArguments(ConversionRequest request)
     {
         var args = new List<string> { "-y", "-i", request.MediaInfo.SourcePath };
-        var plan = OutputPlanner.Build(request.MediaInfo, request.Settings);
+        var plan = OutputPlanner.Build(request.MediaInfo, request.Settings, request.TransformSettings);
         var keepRanges = BuildEffectiveRanges(request);
         var hasAudio = !string.IsNullOrWhiteSpace(request.MediaInfo.AudioCodec) && request.MediaInfo.AudioCodec != "--";
+        var crop = request.TransformSettings?.Crop;
+        var hasCrop = crop is { HasCrop: true };
         var useFilterComplex = keepRanges.Count != 1
             || keepRanges[0].StartSeconds > 0
             || keepRanges[0].EndSeconds < request.MediaInfo.DurationSeconds
+            || hasCrop
             || plan.OutputWidth != request.MediaInfo.Width
             || plan.OutputHeight != request.MediaInfo.Height;
 
@@ -23,7 +26,7 @@ public static class FfmpegCommandBuilder
         if (useFilterComplex)
         {
             args.Add("-filter_complex");
-            args.Add(BuildFilterComplex(keepRanges, hasAudio, plan.OutputWidth, plan.OutputHeight));
+            args.Add(BuildFilterComplex(keepRanges, hasAudio, plan.OutputWidth, plan.OutputHeight, crop));
             args.Add("-map");
             args.Add("[vout]");
             if (hasAudio)
@@ -84,7 +87,7 @@ public static class FfmpegCommandBuilder
         return trimmed.Count > 0 ? trimmed : keepRanges.Take(1).ToList();
     }
 
-    private static string BuildFilterComplex(IReadOnlyList<TimeRange> keepRanges, bool hasAudio, int outputWidth, int outputHeight)
+    private static string BuildFilterComplex(IReadOnlyList<TimeRange> keepRanges, bool hasAudio, int outputWidth, int outputHeight, CropSettings? crop)
     {
         var parts = new List<string>();
         var videoLabels = new List<string>();
@@ -113,7 +116,14 @@ public static class FfmpegCommandBuilder
             parts.Add($"{string.Concat(videoLabels)}concat=n={keepRanges.Count}:v=1:a=0[vcat]");
         }
 
-        parts.Add($"[vcat]scale={outputWidth}:{outputHeight}[vout]");
+        var filters = new List<string>();
+        if (crop is { HasCrop: true })
+        {
+            filters.Add($"crop=in_w-{crop.Left + crop.Right}:in_h-{crop.Top + crop.Bottom}:{crop.Left}:{crop.Top}");
+        }
+
+        filters.Add($"scale={outputWidth}:{outputHeight}");
+        parts.Add($"[vcat]{string.Join(",", filters)}[vout]");
         return string.Join(";", parts);
     }
 

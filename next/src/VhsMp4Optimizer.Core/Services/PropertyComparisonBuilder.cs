@@ -40,6 +40,7 @@ public static class PropertyComparisonBuilder
             new PropertyComparisonRow { Label = "Encode engine", InputValue = "--", OutputValue = output.EncodeEngineText },
             new PropertyComparisonRow { Label = "Input size / estimate", InputValue = input.SizeText, OutputValue = output.EstimatedSizeText },
             new PropertyComparisonRow { Label = "Split output", InputValue = "--", OutputValue = output.SplitModeText },
+            new PropertyComparisonRow { Label = "Crop", InputValue = "--", OutputValue = output.CropText },
             new PropertyComparisonRow { Label = "USB note", InputValue = "--", OutputValue = output.UsbNoteText }
         };
     }
