@@ -1261,7 +1261,7 @@ function New-VhsMp4MultiTrimFilterComplex {
         [bool]$SourceHasAudio = $true
     )
 
-    if (@($TrimSegments).Count -lt 2) {
+    if (@($TrimSegments).Count -lt 1) {
         return ""
     }
 
@@ -1293,7 +1293,15 @@ function New-VhsMp4MultiTrimFilterComplex {
         }
     }
 
-    if ($SourceHasAudio) {
+    if ($TrimSegments.Count -eq 1) {
+        if ($SourceHasAudio) {
+            $filterParts.Add(($concatInputs -join "") + "concat=n=1:v=1:a=1[vout][aout]")
+        }
+        else {
+            $filterParts.Add(($concatInputs -join "") + "concat=n=1:v=1:a=0[vout]")
+        }
+    }
+    elseif ($SourceHasAudio) {
         $filterParts.Add(($concatInputs -join "") + "concat=n=$($TrimSegments.Count):v=1:a=1[vout][aout]")
     }
     else {
@@ -3587,28 +3595,29 @@ function Get-VhsMp4FfmpegArguments {
     $trimPlan = Get-VhsMp4EffectiveTrimPlan -TrimStart $TrimStart -TrimEnd $TrimEnd -TrimSegments $TrimSegments -SourceDurationSeconds $sourceDurationSeconds
     $videoFilterChain = Get-VhsMp4VideoFilterChain -InputObject $VideoInfo -CropState $CropState -AspectMode $AspectMode -Deinterlace $Deinterlace -Denoise $Denoise -RotateFlip $RotateFlip -ScaleMode $ScaleMode
     $audioFilterChain = Get-VhsMp4AudioFilterChain -AudioNormalize:$AudioNormalize
+    $useFilterTrim = ($trimPlan.Mode -eq "multi") -or ($trimPlan.Count -gt 1)
 
     $ffmpegArgs = @(
         "-hide_banner",
         "-y"
     )
 
-    if ($trimPlan.Mode -ne "multi" -and -not [string]::IsNullOrWhiteSpace($trimPlan.StartText)) {
+    if ((-not $useFilterTrim) -and -not [string]::IsNullOrWhiteSpace($trimPlan.StartText)) {
         $ffmpegArgs += @("-ss", $trimPlan.StartText)
     }
 
-    if ($trimPlan.Mode -ne "multi" -and
+    if ((-not $useFilterTrim) -and
         (-not [string]::IsNullOrWhiteSpace($trimPlan.StartText)) -and
         (-not [string]::IsNullOrWhiteSpace($trimPlan.DurationText))) {
         $ffmpegArgs += @("-t", $trimPlan.DurationText)
     }
-    elseif ($trimPlan.Mode -ne "multi" -and -not [string]::IsNullOrWhiteSpace($trimPlan.EndText)) {
+    elseif ((-not $useFilterTrim) -and -not [string]::IsNullOrWhiteSpace($trimPlan.EndText)) {
         $ffmpegArgs += @("-to", $trimPlan.EndText)
     }
 
     $ffmpegArgs += @("-i", $SourcePath)
 
-    if ($trimPlan.Mode -eq "multi") {
+    if ($useFilterTrim) {
         $filterComplex = New-VhsMp4MultiTrimFilterComplex -TrimSegments $trimPlan.EffectiveSegments -VideoFilterChain $videoFilterChain -AudioFilterChain $audioFilterChain -SourceHasAudio $SourceHasAudio
         $ffmpegArgs += @(
             "-filter_complex", $filterComplex,

@@ -1967,6 +1967,55 @@ $split = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_d
     assert split_args[-1].endswith("range-part%03d.mp4")
 
 
+def test_core_uses_filter_complex_for_two_cut_segments_even_when_one_keep_range_remains(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    output_dir.mkdir()
+
+    source = input_dir / "family_tape.avi"
+    source.write_text("source", encoding="utf-8")
+
+    command = f"""
+$ErrorActionPreference = 'Stop'
+Import-Module '{MODULE}' -Force
+$videoInfo = [pscustomobject]@{{ DurationSeconds = 2602.2 }}
+$segments = @(
+  [pscustomobject]@{{ StartText = '00:00:00'; EndText = '00:00:45.95' }},
+  [pscustomobject]@{{ StartText = '00:43:15.89'; EndText = '00:43:22.2' }}
+)
+$args = Get-VhsMp4FfmpegArguments -SourcePath '{source}' -OutputPath '{output_dir / "kept-middle.mp4"}' -QualityMode 'Universal MP4 H.264' -TrimSegments $segments -VideoInfo $videoInfo -SourceHasAudio $true
+$args | ConvertTo-Json -Depth 6
+""".strip()
+
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert run.returncode == 0, run.stderr
+    args = json.loads(run.stdout)
+
+    assert "-filter_complex" in args
+    filter_complex = args[args.index("-filter_complex") + 1]
+    assert "trim=start=45.95:end=2595.89" in filter_complex
+    assert "-ss" not in args
+    assert "-to" not in args
+    assert "-t" not in args
+
+
 def test_core_builds_filter_complex_concat_for_multi_trim_segments(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
