@@ -92,7 +92,7 @@
                 <StackPanel Grid.Column="8" Spacing="8" VerticalAlignment="Bottom">
                     <Button Content="Open Sample" Command="{Binding OpenSampleCommand}" />
                     <Button Content="Start Conversion" Classes="accent" Command="{Binding StartConversionCommand}" />
-                    <Button Content="Pause / Resume" />
+                    <Button Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
                 </StackPanel>
             </Grid>
         </Border>

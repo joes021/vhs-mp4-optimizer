@@ -21,6 +21,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly string? _ffmpegPath;
     private IReadOnlyList<string>? _explicitSourcePaths;
     private bool _suppressSelectionReset;
+    private bool _isConverting;
+    private bool _pauseRequested;
+    private bool _isBatchPaused;
 
     public MainWindowViewModel()
     {
@@ -39,6 +42,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RetryFailedCommand = new RelayCommand(RetryFailedItems);
         ClearCompletedCommand = new RelayCommand(ClearCompletedItems);
         SplitSelectedCopyCommand = new AsyncRelayCommand(SplitSelectedCopyAsync, CanSplitSelectedCopy);
+        PauseResumeCommand = new AsyncRelayCommand(PauseResumeAsync, CanPauseOrResume);
 
         if (!string.IsNullOrWhiteSpace(_ffmpegPath))
         {
@@ -93,6 +97,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _sampleDurationText = string.Empty;
 
     [ObservableProperty]
+    private string _pauseResumeLabel = "Pause";
+
+    [ObservableProperty]
     private string _statusMessage;
 
     [ObservableProperty]
@@ -136,6 +143,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public IRelayCommand ClearCompletedCommand { get; }
 
     public IAsyncRelayCommand SplitSelectedCopyCommand { get; }
+
+    public IAsyncRelayCommand PauseResumeCommand { get; }
 
     partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
     {
@@ -214,6 +223,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task StartConversionAsync()
     {
+        if (_isConverting)
+        {
+            StatusMessage = "Batch je vec u toku.";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_ffmpegPath))
         {
             StatusMessage = "ffmpeg nije dostupan za Start Conversion.";
@@ -230,45 +245,76 @@ public partial class MainWindowViewModel : ViewModelBase
         var settings = BuildSettings();
         var items = QueueItems.ToList();
         var converted = 0;
+        var failed = false;
+        _isConverting = true;
+        _isBatchPaused = false;
+        _pauseRequested = false;
+        PauseResumeLabel = "Pause";
+        PauseResumeCommand.NotifyCanExecuteChanged();
 
-        foreach (var item in items)
+        try
         {
-            if (!CoreServices.QueueWorkflowService.ShouldConvert(item))
+            foreach (var item in items)
             {
-                continue;
-            }
-
-            ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "processing"));
-            ProgressMessage = $"Obrada: {currentDisplayName(item)}";
-
-            try
-            {
-                var mediaInfo = item.MediaInfo!;
-                var request = new ConversionRequest
+                if (!CoreServices.QueueWorkflowService.ShouldConvert(item))
                 {
-                    MediaInfo = mediaInfo,
-                    Settings = settings,
-                    OutputPath = item.OutputPath,
-                    TimelineProject = item.TimelineProject,
-                    TransformSettings = item.TransformSettings
-                };
+                    continue;
+                }
 
-                await _conversionService.ConvertAsync(ffmpegPath, request);
-                converted++;
-                ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done"));
-            }
-            catch (Exception ex)
-            {
-                ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "failed"));
-                StatusMessage = $"Greska pri obradi {item.SourceFile}: {ex.Message}";
-                LogMessage = ex.ToString();
+                ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "processing"));
+                ProgressMessage = $"Obrada: {currentDisplayName(item)}";
+
+                try
+                {
+                    var mediaInfo = item.MediaInfo!;
+                    var request = new ConversionRequest
+                    {
+                        MediaInfo = mediaInfo,
+                        Settings = settings,
+                        OutputPath = item.OutputPath,
+                        TimelineProject = item.TimelineProject,
+                        TransformSettings = item.TransformSettings
+                    };
+
+                    await _conversionService.ConvertAsync(ffmpegPath, request);
+                    converted++;
+                    ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done"));
+                }
+                catch (Exception ex)
+                {
+                    failed = true;
+                    ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "failed"));
+                    StatusMessage = $"Greska pri obradi {item.SourceFile}: {ex.Message}";
+                    LogMessage = ex.ToString();
+                    return;
+                }
+
+                if (!_pauseRequested)
+                {
+                    continue;
+                }
+
+                _pauseRequested = false;
+                _isBatchPaused = true;
+                PauseResumeLabel = "Resume";
+                StatusMessage = $"Batch je pauziran posle trenutnog fajla | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+                ProgressMessage = $"Pauza aktivna | do sada gotovo: {converted}";
                 return;
             }
         }
+        finally
+        {
+            if (!_isBatchPaused && !failed)
+            {
+                ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted}";
+                StatusMessage = $"Start Conversion zavrsen. Done: {converted} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+                LogMessage = $"Output folder: {OutputFolder}";
+                PauseResumeLabel = "Pause";
+            }
 
-        ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted}";
-        StatusMessage = $"Start Conversion zavrsen. Done: {converted} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
-        LogMessage = $"Output folder: {OutputFolder}";
+            _isConverting = false;
+            PauseResumeCommand.NotifyCanExecuteChanged();
+        }
     }
 
     private async Task TestSampleAsync()
@@ -572,6 +618,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool CanSplitSelectedCopy()
         => !string.IsNullOrWhiteSpace(_ffmpegPath) && SelectedQueueItem?.MediaInfo is not null;
 
+    private bool CanPauseOrResume() => _isConverting || _isBatchPaused;
+
     private async Task SplitSelectedCopyAsync()
     {
         if (string.IsNullOrWhiteSpace(_ffmpegPath) || SelectedQueueItem?.MediaInfo is null)
@@ -596,6 +644,27 @@ public partial class MainWindowViewModel : ViewModelBase
             StatusMessage = $"Copy split nije uspeo: {ex.Message}";
             LogMessage = ex.ToString();
         }
+    }
+
+    private async Task PauseResumeAsync()
+    {
+        if (_isBatchPaused)
+        {
+            StatusMessage = "Batch nastavlja od sledece queued stavke.";
+            await StartConversionAsync();
+            return;
+        }
+
+        if (!_isConverting)
+        {
+            StatusMessage = "Nema aktivne obrade za pauzu.";
+            return;
+        }
+
+        _pauseRequested = true;
+        PauseResumeLabel = "Resume";
+        StatusMessage = "Pause je zakazan posle trenutnog fajla.";
+        PauseResumeCommand.NotifyCanExecuteChanged();
     }
 
     private void ReplaceItem(string sourcePath, Func<QueueItemSummary, QueueItemSummary> updater)
