@@ -116,6 +116,33 @@ public static class TimelineEditorService
     public static TimelineProject MoveSegmentRight(TimelineProject project, Guid segmentId)
         => SwapWithNeighbor(project, segmentId, 1);
 
+    public static TimelineProject MoveSegmentBefore(TimelineProject project, Guid movingSegmentId, Guid targetSegmentId)
+    {
+        if (movingSegmentId == targetSegmentId)
+        {
+            return project;
+        }
+
+        var ordered = project.Segments.OrderBy(segment => segment.TimelineStartSeconds).ToList();
+        var movingIndex = ordered.FindIndex(segment => segment.Id == movingSegmentId);
+        var targetIndex = ordered.FindIndex(segment => segment.Id == targetSegmentId);
+        if (movingIndex < 0 || targetIndex < 0)
+        {
+            return project;
+        }
+
+        var moving = ordered[movingIndex];
+        ordered.RemoveAt(movingIndex);
+
+        if (movingIndex < targetIndex)
+        {
+            targetIndex--;
+        }
+
+        ordered.Insert(targetIndex, moving);
+        return Normalize(project, ordered, preserveSequence: true);
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 
@@ -138,7 +165,7 @@ public static class TimelineEditorService
         }
 
         (ordered[index], ordered[target]) = (ordered[target], ordered[index]);
-        return Normalize(project, ordered, preserveGaps: true);
+        return Normalize(project, ordered, preserveSequence: true);
     }
 
     private static TimelineSegment CloneSegment(TimelineSegment source, double timelineStart, double sourceStart, double sourceEnd, TimelineSegmentKind kind)
@@ -153,12 +180,21 @@ public static class TimelineEditorService
         };
     }
 
-    private static TimelineProject Normalize(TimelineProject project, IEnumerable<TimelineSegment> segments, bool preserveGaps = false)
+    private static TimelineProject Normalize(
+        TimelineProject project,
+        IEnumerable<TimelineSegment> segments,
+        bool preserveGaps = false,
+        bool preserveSequence = false)
     {
         var normalized = new List<TimelineSegment>();
         double cursor = 0;
 
-        foreach (var segment in segments.Where(segment => segment.DurationSeconds > 0).OrderBy(segment => segment.TimelineStartSeconds))
+        var filteredSegments = segments.Where(segment => segment.DurationSeconds > 0);
+        var sequence = preserveSequence
+            ? filteredSegments
+            : filteredSegments.OrderBy(segment => segment.TimelineStartSeconds);
+
+        foreach (var segment in sequence)
         {
             var timelineStart = preserveGaps ? Math.Max(cursor, segment.TimelineStartSeconds) : cursor;
             normalized.Add(new TimelineSegment

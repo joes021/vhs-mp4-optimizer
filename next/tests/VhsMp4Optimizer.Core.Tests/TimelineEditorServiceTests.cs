@@ -92,4 +92,65 @@ public sealed class TimelineEditorServiceTests
         Assert.Equal(10, rippled.Segments[1].TimelineStartSeconds);
         Assert.Equal(90, TimelineEditorService.GetKeptDurationSeconds(rippled));
     }
+
+    [Fact]
+    public void Move_segment_before_should_reorder_segments_and_normalize_timeline_positions()
+    {
+        var project = new TimelineProject
+        {
+            SourcePath = @"F:\test.avi",
+            SourceName = "test.avi",
+            SourceDurationSeconds = 30,
+            Segments =
+            [
+                new TimelineSegment
+                {
+                    Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                    Kind = TimelineSegmentKind.Keep,
+                    TimelineStartSeconds = 0,
+                    SourceStartSeconds = 0,
+                    SourceEndSeconds = 10
+                },
+                new TimelineSegment
+                {
+                    Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                    Kind = TimelineSegmentKind.Cut,
+                    TimelineStartSeconds = 10,
+                    SourceStartSeconds = 10,
+                    SourceEndSeconds = 20
+                },
+                new TimelineSegment
+                {
+                    Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                    Kind = TimelineSegmentKind.Keep,
+                    TimelineStartSeconds = 20,
+                    SourceStartSeconds = 20,
+                    SourceEndSeconds = 30
+                }
+            ]
+        };
+
+        var reordered = TimelineEditorService.MoveSegmentBefore(
+            project,
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            Guid.Parse("22222222-2222-2222-2222-222222222222"));
+
+        Assert.Collection(
+            reordered.Segments,
+            first =>
+            {
+                Assert.Equal(Guid.Parse("11111111-1111-1111-1111-111111111111"), first.Id);
+                Assert.Equal(0, first.TimelineStartSeconds);
+            },
+            second =>
+            {
+                Assert.Equal(Guid.Parse("33333333-3333-3333-3333-333333333333"), second.Id);
+                Assert.Equal(10, second.TimelineStartSeconds);
+            },
+            third =>
+            {
+                Assert.Equal(Guid.Parse("22222222-2222-2222-2222-222222222222"), third.Id);
+                Assert.Equal(20, third.TimelineStartSeconds);
+            });
+    }
 }
