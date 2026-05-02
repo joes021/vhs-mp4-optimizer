@@ -52,6 +52,25 @@ function Get-ProjectVersion {
     return $version
 }
 
+function Get-NumericVersionInfo {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    if ($Version -match '^(\d+)\.(\d+)\.(\d+)') {
+        return @{
+            AssemblyVersion = ("{0}.{1}.{2}.0" -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
+            FileVersion = ("{0}.{1}.{2}.0" -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
+        }
+    }
+
+    return @{
+        AssemblyVersion = "0.0.0.0"
+        FileVersion = "0.0.0.0"
+    }
+}
+
 function Get-DotNetPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -96,8 +115,9 @@ $guideMediaDir = Join-Path $guideDir "media"
 $null = New-Item -ItemType Directory -Path $publishDir -Force
 $null = New-Item -ItemType Directory -Path $guideMediaDir -Force
 
-$assemblyVersion = "$Version.0"
-$fileVersion = "$Version.0"
+$numericVersion = Get-NumericVersionInfo -Version $Version
+$assemblyVersion = $numericVersion.AssemblyVersion
+$fileVersion = $numericVersion.FileVersion
 $selfContainedText = if ($SelfContained.IsPresent) { "true" } else { "false" }
 $publishArgs = @(
     "publish",
@@ -115,6 +135,11 @@ $publishArgs = @(
 & $dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish nije uspeo za Avalonia release."
+}
+
+$iconSource = Join-Path $nextRoot "src\VhsMp4Optimizer.App\Assets\avalonia-logo.ico"
+if (Test-Path -LiteralPath $iconSource) {
+    Copy-Item -LiteralPath $iconSource -Destination (Join-Path $publishDir "avalonia-logo.ico") -Force
 }
 
 Copy-Item -LiteralPath (Join-Path $projectRoot "docs\VHS_MP4_OPTIMIZER_UPUTSTVO.html") -Destination (Join-Path $guideDir "VHS_MP4_OPTIMIZER_UPUTSTVO.html") -Force
