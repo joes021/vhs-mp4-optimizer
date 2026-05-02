@@ -34,6 +34,9 @@ public partial class MainWindowViewModel : ViewModelBase
         TestSampleCommand = new AsyncRelayCommand(TestSampleAsync);
         OpenSampleCommand = new RelayCommand(OpenSample, CanOpenSample);
         OpenOutputCommand = new RelayCommand(OpenOutputFolder, CanOpenOutputFolder);
+        SkipSelectedCommand = new RelayCommand(SkipSelected);
+        RetryFailedCommand = new RelayCommand(RetryFailedItems);
+        ClearCompletedCommand = new RelayCommand(ClearCompletedItems);
 
         if (!string.IsNullOrWhiteSpace(_ffmpegPath))
         {
@@ -124,6 +127,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public IRelayCommand OpenOutputCommand { get; }
 
+    public IRelayCommand SkipSelectedCommand { get; }
+
+    public IRelayCommand RetryFailedCommand { get; }
+
+    public IRelayCommand ClearCompletedCommand { get; }
+
     partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
     {
         RefreshComparisonRows(value);
@@ -194,7 +203,7 @@ public partial class MainWindowViewModel : ViewModelBase
         LogMessage = $"ffmpeg: {_ffmpegPath}{Environment.NewLine}Output: {outputDirectory}";
         StatusMessage = QueueItems.Count == 0
             ? "Nema podrzanih video fajlova za scan u zadatom input putu."
-            : $"Scan Files: pronadjeno {QueueItems.Count} | queued: {QueueItems.Count(i => i.Status == "queued")} | skipped: {QueueItems.Count(i => i.Status == "skipped")}";
+            : $"Scan Files: pronadjeno {QueueItems.Count} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
         return Task.CompletedTask;
     }
 
@@ -212,13 +221,14 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var ffmpegPath = _ffmpegPath!;
         var settings = BuildSettings();
         var items = QueueItems.ToList();
         var converted = 0;
 
         foreach (var item in items)
         {
-            if (item.MediaInfo is null)
+            if (!CoreServices.QueueWorkflowService.ShouldConvert(item))
             {
                 continue;
             }
@@ -228,16 +238,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
             try
             {
+                var mediaInfo = item.MediaInfo!;
                 var request = new ConversionRequest
                 {
-                    MediaInfo = item.MediaInfo,
+                    MediaInfo = mediaInfo,
                     Settings = settings,
                     OutputPath = item.OutputPath,
                     TimelineProject = item.TimelineProject,
                     TransformSettings = item.TransformSettings
                 };
 
-                await _conversionService.ConvertAsync(_ffmpegPath, request);
+                await _conversionService.ConvertAsync(ffmpegPath, request);
                 converted++;
                 ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done"));
             }
@@ -251,7 +262,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted}";
-        StatusMessage = $"Start Conversion zavrsen. Done: {converted}";
+        StatusMessage = $"Start Conversion zavrsen. Done: {converted} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
         LogMessage = $"Output folder: {OutputFolder}";
     }
 
@@ -276,9 +287,10 @@ public partial class MainWindowViewModel : ViewModelBase
         var duration = ResolveSampleDurationSeconds(SelectedQueueItem.MediaInfo.DurationSeconds, start);
         var settings = BuildSettings();
 
+        var ffmpegPath = _ffmpegPath!;
         try
         {
-            await _conversionService.ConvertAsync(_ffmpegPath, new ConversionRequest
+            await _conversionService.ConvertAsync(ffmpegPath, new ConversionRequest
             {
                 MediaInfo = SelectedQueueItem.MediaInfo,
                 Settings = settings,
@@ -494,6 +506,40 @@ public partial class MainWindowViewModel : ViewModelBase
 
         SelectedQueueItem = QueueItems.FirstOrDefault(item => string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase));
         StatusMessage = "Timeline izmene su vracene u batch queue.";
+    }
+
+    private void SkipSelected()
+    {
+        if (SelectedQueueItem is null)
+        {
+            return;
+        }
+
+        ReplaceItem(SelectedQueueItem.SourcePath, current => CoreServices.QueueWorkflowService.MarkSkipped(current));
+        StatusMessage = $"Selected item je oznacen kao skipped | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+    }
+
+    private void RetryFailedItems()
+    {
+        for (var index = 0; index < QueueItems.Count; index++)
+        {
+            QueueItems[index] = CoreServices.QueueWorkflowService.RetryFailed(QueueItems[index]);
+        }
+
+        StatusMessage = $"Failed stavke su vracene u queue | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+    }
+
+    private void ClearCompletedItems()
+    {
+        var survivors = QueueItems.Where(item => item.Status != "done").ToList();
+        QueueItems.Clear();
+        foreach (var survivor in survivors)
+        {
+            QueueItems.Add(survivor);
+        }
+
+        SelectedQueueItem = QueueItems.FirstOrDefault();
+        StatusMessage = $"Done stavke su uklonjene iz queue liste | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
     }
 
     private void ReplaceItem(string sourcePath, Func<QueueItemSummary, QueueItemSummary> updater)
