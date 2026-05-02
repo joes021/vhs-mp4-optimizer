@@ -59,16 +59,12 @@
 
                 <StackPanel Grid.Column="1" Spacing="4">
                     <TextBlock Classes="section-title" Text="Quality mode" Margin="0,0,0,4" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="{Binding QualityMode}" />
-                    </ComboBox>
+                    <ComboBox ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Spacing="4">
                     <TextBlock Classes="section-title" Text="Scale" Margin="0,0,0,4" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="{Binding ScaleMode}" />
-                    </ComboBox>
+                    <ComboBox ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Spacing="4">
@@ -82,7 +78,7 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="6" Spacing="8" VerticalAlignment="Bottom">
-                    <Button Content="Scan Files" />
+                    <Button Content="Scan Files" Command="{Binding ScanFilesCommand}" />
                     <Button Content="Open Output" />
                 </StackPanel>
 
@@ -117,9 +113,7 @@
                 <StackPanel Grid.Column="2" Spacing="4">
                     <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
                     <TextBlock Text="Aspect mode" Opacity="0.75" />
-                    <ComboBox SelectedIndex="0">
-                        <ComboBoxItem Content="Auto" />
-                    </ComboBox>
+                    <ComboBox ItemsSource="{Binding AspectModes}" SelectedItem="{Binding AspectMode}" />
                 </StackPanel>
                 <StackPanel Grid.Column="3" Spacing="4">
                     <TextBlock Classes="section-title" Text=" " Margin="0,0,0,4" />
@@ -158,7 +152,7 @@
                         <TextBlock Grid.Column="7" Text="Status" FontWeight="SemiBold" />
                     </Grid>
 
-                    <ListBox Grid.Row="2" ItemsSource="{Binding QueueItems}">
+                    <ListBox Grid.Row="2" ItemsSource="{Binding QueueItems}" SelectedItem="{Binding SelectedQueueItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="core:QueueItemSummary">
                                 <Border Padding="6" BorderBrush="#202838" BorderThickness="0,0,0,1">
