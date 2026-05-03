@@ -185,30 +185,30 @@
                 <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
                     <TextBlock Classes="section-title" Text="Quick Setup" />
 
-                    <Grid Grid.Row="1" ColumnDefinitions="180,180,180,180,180" ColumnSpacing="20" HorizontalAlignment="Left">
-                        <StackPanel Grid.Column="0" Spacing="4">
+                    <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="20" HorizontalAlignment="Stretch">
+                        <StackPanel Grid.Column="0" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Workflow preset" />
-                            <ComboBox MinHeight="42" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
+                            <ComboBox MinHeight="42" HorizontalAlignment="Stretch" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Spacing="4">
+                        <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Quality mode" />
-                            <ComboBox MinHeight="42" ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
+                            <ComboBox MinHeight="42" HorizontalAlignment="Stretch" ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="2" Spacing="4">
+                        <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Scale" />
-                            <ComboBox MinHeight="42" ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
+                            <ComboBox MinHeight="42" HorizontalAlignment="Stretch" ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="3" Spacing="4">
+                        <StackPanel Grid.Column="3" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Video bitrate" />
-                            <TextBox MinHeight="42" Text="{Binding VideoBitrate}" />
+                            <TextBox MinHeight="42" HorizontalAlignment="Stretch" Text="{Binding VideoBitrate}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="4" Spacing="4">
+                        <StackPanel Grid.Column="4" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Audio bitrate" />
-                            <TextBox MinHeight="42" Text="{Binding AudioBitrate}" />
+                            <TextBox MinHeight="42" HorizontalAlignment="Stretch" Text="{Binding AudioBitrate}" />
                         </StackPanel>
                     </Grid>
 
@@ -278,13 +278,28 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Width="280" Margin="0,0,10,10">
-                        <StackPanel Spacing="8">
+                    <Border Classes="subtle-group" Width="340" Margin="0,0,10,10">
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
                             <TextBlock Classes="field-label" Text="Split output" />
-                            <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
-                            <TextBlock Classes="field-label" Text="Max part GB" />
-                            <NumericUpDown Value="{Binding MaxPartGb}" Minimum="0.5" Maximum="25" Increment="0.1" FormatString="0.0" />
-                        </StackPanel>
+                            <Grid Grid.Row="1" ColumnDefinitions="Auto,18,Auto,110" ColumnSpacing="0" VerticalAlignment="Center">
+                                <CheckBox Grid.Column="0"
+                                          VerticalAlignment="Center"
+                                          Content="Enable split"
+                                          IsChecked="{Binding SplitOutput}" />
+                                <TextBlock Grid.Column="2"
+                                           VerticalAlignment="Center"
+                                           Classes="field-label"
+                                           Margin="0"
+                                           Text="Max part GB" />
+                                <NumericUpDown Grid.Column="3"
+                                               VerticalAlignment="Center"
+                                               Value="{Binding MaxPartGb}"
+                                               Minimum="0.5"
+                                               Maximum="25"
+                                               Increment="0.1"
+                                               FormatString="0.0" />
+                            </Grid>
+                        </Grid>
                     </Border>
 
                     <Border Classes="subtle-group" Width="440" Margin="0,0,10,10">

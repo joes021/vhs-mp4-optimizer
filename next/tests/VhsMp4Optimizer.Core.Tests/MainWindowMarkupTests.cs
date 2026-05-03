@@ -16,7 +16,8 @@ public sealed class MainWindowMarkupTests
 
         var markup = File.ReadAllText(markupPath);
 
-        Assert.Contains("ColumnDefinitions=\"180,180,180,180,180\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"*,*,*,*,*\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnSpacing=\"20\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Converted File\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Report\"", markup, StringComparison.Ordinal);
@@ -59,7 +60,27 @@ public sealed class MainWindowMarkupTests
 
         Assert.Contains("Text=\"Batch actions\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("RowDefinitions=\"Auto,Auto\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"5\" Classes=\"batch-action\" Content=\"{Binding PauseResumeLabel}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_should_keep_split_output_controls_inside_the_same_card_row()
+    {
+        var projectRoot = FindProjectRoot();
+        var markupPath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "Views",
+            "MainWindow.axaml");
+
+        var markup = File.ReadAllText(markupPath);
+
+        Assert.Contains("Text=\"Split output\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"Auto,18,Auto,110\"", markup, StringComparison.Ordinal);
+        Assert.Contains("VerticalAlignment=\"Center\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Max part GB\" />\r\n                            <NumericUpDown", markup, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()
