@@ -110,6 +110,8 @@
             <MenuItem Header="_File">
                 <MenuItem Header="Scan Files" Command="{Binding ScanFilesCommand}" />
                 <MenuItem Header="Open Output" Command="{Binding OpenOutputCommand}" />
+                <MenuItem Header="Open Converted File" Command="{Binding OpenConvertedFileCommand}" />
+                <MenuItem Header="Open Report" Command="{Binding OpenReportCommand}" />
                 <Separator />
                 <MenuItem Header="Save Queue" Click="SaveQueueClick" />
                 <MenuItem Header="Load Queue" Click="LoadQueueClick" />
@@ -409,6 +411,11 @@
                 <TabItem Header="Progress">
                     <Border Padding="12">
                         <StackPanel Spacing="10">
+                            <WrapPanel ItemHeight="38" Margin="0,0,0,4">
+                                <Button Margin="0,0,8,8" Classes="action" Content="Open Converted File" Command="{Binding OpenConvertedFileCommand}" />
+                                <Button Margin="0,0,8,8" Classes="action" Content="Open Report" Command="{Binding OpenReportCommand}" />
+                                <Button Margin="0,0,8,8" Classes="action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                            </WrapPanel>
                             <ProgressBar Minimum="0"
                                          Maximum="100"
                                          Height="18"

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VhsMp4Optimizer.Core.Models;
+using VhsMp4Optimizer.App.Services;
 using CoreServices = VhsMp4Optimizer.Core.Services;
 using VhsMp4Optimizer.Infrastructure.Services;
 using VhsMp4Optimizer.App.Models;
@@ -18,6 +19,8 @@ public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ISourceScanService _sourceScanService;
     private readonly IConversionService _conversionService;
+    private readonly IConversionReportService _conversionReportService;
+    private readonly IExternalLauncher _externalLauncher;
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly QueueSnapshotService _queueSnapshotService = new();
     private IReadOnlyList<string>? _explicitSourcePaths;
@@ -27,14 +30,20 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _pauseRequested;
     private bool _isBatchPaused;
     private bool _isInitializing = true;
+    private string? _lastConvertedOutputPath;
+    private string? _lastBatchReportPath;
 
     public MainWindowViewModel(
         ISourceScanService? sourceScanService = null,
         IConversionService? conversionService = null,
-        string? ffmpegPath = null)
+        string? ffmpegPath = null,
+        IExternalLauncher? launcher = null,
+        IConversionReportService? reportService = null)
     {
         _sourceScanService = sourceScanService ?? new SourceScanService();
         _conversionService = conversionService ?? new FfmpegConversionService();
+        _conversionReportService = reportService ?? new ConversionReportService();
+        _externalLauncher = launcher ?? new ExternalLauncher();
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));
         WorkflowPresets = new ObservableCollection<string>(CoreServices.WorkflowPresetService.Names);
@@ -49,6 +58,8 @@ public partial class MainWindowViewModel : ViewModelBase
         TestSampleCommand = new AsyncRelayCommand(TestSampleAsync, CanTestSample);
         OpenSampleCommand = new RelayCommand(OpenSample, CanOpenSample);
         OpenOutputCommand = new RelayCommand(OpenOutputFolder, CanOpenOutputFolder);
+        OpenConvertedFileCommand = new RelayCommand(OpenConvertedFile, CanOpenConvertedFile);
+        OpenReportCommand = new RelayCommand(OpenReport, CanOpenReport);
         SkipSelectedCommand = new RelayCommand(SkipSelected);
         RetryFailedCommand = new RelayCommand(RetryFailedItems);
         ClearCompletedCommand = new RelayCommand(ClearCompletedItems);
@@ -187,6 +198,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public IRelayCommand OpenOutputCommand { get; }
 
+    public IRelayCommand OpenConvertedFileCommand { get; }
+
+    public IRelayCommand OpenReportCommand { get; }
+
     public IRelayCommand SkipSelectedCommand { get; }
 
     public IRelayCommand RetryFailedCommand { get; }
@@ -213,6 +228,8 @@ public partial class MainWindowViewModel : ViewModelBase
         SplitSelectedCopyCommand.NotifyCanExecuteChanged();
         TestSampleCommand.NotifyCanExecuteChanged();
         StartConversionCommand.NotifyCanExecuteChanged();
+        OpenConvertedFileCommand.NotifyCanExecuteChanged();
+        OpenReportCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnInputFolderChanged(string value)
@@ -452,6 +469,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var converted = 0;
         var failed = false;
+        var failedCount = 0;
+        var processedItems = new List<QueueItemSummary>();
         _isConverting = true;
         _isBatchPaused = false;
         _pauseRequested = false;
@@ -482,6 +501,8 @@ public partial class MainWindowViewModel : ViewModelBase
                         TimelineProject = item.TimelineProject,
                         TransformSettings = item.TransformSettings
                     };
+                    var ffmpegArguments = FfmpegCommandBuilder.BuildArguments(request).ToArray();
+                    var itemStopwatch = Stopwatch.StartNew();
 
                     var completedBeforeCurrentItem = converted;
                     var progress = new Progress<ConversionProgressInfo>(update =>
@@ -497,13 +518,31 @@ public partial class MainWindowViewModel : ViewModelBase
                     });
 
                     await _conversionService.ConvertAsync(ffmpegPath, request, progress);
+                    itemStopwatch.Stop();
+                    var reportPath = await _conversionReportService.WriteItemReportAsync(
+                        OutputFolder,
+                        SelectedPreset,
+                        request,
+                        item,
+                        ffmpegArguments,
+                        itemStopwatch.Elapsed);
                     converted++;
                     ConversionProgressPercent = Math.Clamp((double)converted / queuedItems.Count, 0, 1) * 100d;
-                    ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done"));
+                    ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done", reportPath));
+                    var processedItem = QueueItems.First(queueItem => string.Equals(queueItem.SourcePath, item.SourcePath, StringComparison.OrdinalIgnoreCase));
+                    processedItems.Add(processedItem);
+                    _lastConvertedOutputPath = processedItem.OutputPath;
+                    _lastBatchReportPath = reportPath;
+                    AppendLog(
+                        $"DONE | {processedItem.SourceFile} -> {processedItem.OutputFile}{Environment.NewLine}" +
+                        $"Output: {processedItem.OutputPath}{Environment.NewLine}" +
+                        $"Report: {reportPath}{Environment.NewLine}" +
+                        $"Deinterlace: {request.Settings.DeinterlaceMode} | Denoise: {request.Settings.DenoiseMode} | Scale: {request.Settings.ScaleMode}");
                 }
                 catch (Exception ex)
                 {
                     failed = true;
+                    failedCount++;
                     ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "failed"));
                     StatusMessage = $"Greska pri obradi {item.SourceFile}: {ex.Message}";
                     LogMessage = ex.ToString();
@@ -527,6 +566,19 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (!_isBatchPaused && !failed)
             {
+                if (processedItems.Count > 0)
+                {
+                    var batchReportPath = await _conversionReportService.WriteBatchReportAsync(
+                        OutputFolder,
+                        SelectedPreset,
+                        settings,
+                        processedItems,
+                        converted,
+                        failedCount);
+                    _lastBatchReportPath = batchReportPath;
+                    AppendLog($"Batch report: {batchReportPath}");
+                }
+
                 IsConversionProgressIndeterminate = false;
                 ConversionProgressPercent = 100d;
                 CurrentConversionItemText = converted == 0
@@ -534,8 +586,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     : $"{queuedItems.Last().SourceFile} | batch zavrsen ({converted} stavki)";
                 ConversionEtaText = "ETA: 00:00:00";
                 ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted} | {ConversionEtaText}";
-                StatusMessage = $"Start Conversion zavrsen. Done: {converted} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
-                LogMessage = $"Output folder: {OutputFolder}";
+                StatusMessage = $"Start Conversion zavrsen. Done: {converted} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}"
+                    + (_lastBatchReportPath is null ? string.Empty : $" | Report: {Path.GetFileName(_lastBatchReportPath)}");
+                AppendLog($"Output folder: {OutputFolder}");
                 PauseResumeLabel = "Pause";
             }
 
@@ -629,6 +682,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Status = item.Status,
                 MediaInfo = item.MediaInfo,
                 PlannedOutput = planned,
+                ReportPath = item.ReportPath,
                 TimelineProject = item.TimelineProject,
                 TransformSettings = item.TransformSettings
             });
@@ -1005,6 +1059,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Status = item.Status,
                 MediaInfo = item.MediaInfo,
                 PlannedOutput = planned,
+                ReportPath = item.ReportPath,
                 TimelineProject = item.TimelineProject,
                 TransformSettings = item.TransformSettings
             });
@@ -1161,6 +1216,8 @@ public partial class MainWindowViewModel : ViewModelBase
         PauseResumeCommand?.NotifyCanExecuteChanged();
         OpenSampleCommand?.NotifyCanExecuteChanged();
         OpenOutputCommand?.NotifyCanExecuteChanged();
+        OpenConvertedFileCommand?.NotifyCanExecuteChanged();
+        OpenReportCommand?.NotifyCanExecuteChanged();
     }
 
     private void ApplyQueueZebra()
@@ -1171,7 +1228,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private static QueueItemSummary CloneItem(QueueItemSummary source, MediaInfo? mediaInfo, OutputPlanSummary? plannedOutput, string status)
+    private static QueueItemSummary CloneItem(QueueItemSummary source, MediaInfo? mediaInfo, OutputPlanSummary? plannedOutput, string status, string? reportPath = null)
     {
         return new QueueItemSummary
         {
@@ -1188,6 +1245,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Status = status,
             MediaInfo = mediaInfo,
             PlannedOutput = plannedOutput,
+            ReportPath = reportPath ?? source.ReportPath,
             TimelineProject = source.TimelineProject,
             TransformSettings = source.TransformSettings
         };
@@ -1203,11 +1261,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = LastSamplePath!,
-            UseShellExecute = true
-        });
+        _externalLauncher.OpenPath(LastSamplePath!);
     }
 
     private bool CanOpenOutputFolder() => !string.IsNullOrWhiteSpace(OutputFolder);
@@ -1220,14 +1274,66 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         Directory.CreateDirectory(OutputFolder);
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = OutputFolder,
-            UseShellExecute = true
-        });
+        _externalLauncher.OpenPath(OutputFolder);
     }
 
     private static string currentDisplayName(QueueItemSummary item) => item.SourceFile;
+
+    private bool CanOpenConvertedFile()
+    {
+        var path = ResolveOpenConvertedFilePath();
+        return !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+    }
+
+    private void OpenConvertedFile()
+    {
+        var path = ResolveOpenConvertedFilePath();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        _externalLauncher.OpenPath(path);
+    }
+
+    private bool CanOpenReport()
+    {
+        var path = ResolveOpenReportPath();
+        return !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+    }
+
+    private void OpenReport()
+    {
+        var path = ResolveOpenReportPath();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        _externalLauncher.OpenPath(path);
+    }
+
+    private string? ResolveOpenConvertedFilePath()
+        => SelectedQueueItem is { OutputPath: not null } selected && File.Exists(selected.OutputPath)
+            ? selected.OutputPath
+            : _lastConvertedOutputPath;
+
+    private string? ResolveOpenReportPath()
+        => SelectedQueueItem is { ReportPath: not null } selected && File.Exists(selected.ReportPath)
+            ? selected.ReportPath
+            : _lastBatchReportPath;
+
+    private void AppendLog(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        LogMessage = string.IsNullOrWhiteSpace(LogMessage)
+            ? message
+            : LogMessage + Environment.NewLine + message;
+    }
 
     private async Task AutoScanAfterSelectionAsync()
     {

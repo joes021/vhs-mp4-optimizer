@@ -18,6 +18,8 @@ public sealed class MainWindowMarkupTests
 
         Assert.Contains("ColumnDefinitions=\"180,180,180,180,180\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"168,168,168\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Open Converted File\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Open Report\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Migracioni branch je aktivan", markup, StringComparison.OrdinalIgnoreCase);
     }
 

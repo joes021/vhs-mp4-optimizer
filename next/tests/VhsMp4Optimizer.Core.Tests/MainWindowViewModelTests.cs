@@ -1,4 +1,5 @@
 using VhsMp4Optimizer.App.ViewModels;
+using VhsMp4Optimizer.App.Services;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Infrastructure.Services;
 
@@ -58,7 +59,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var filePath = CreateFile("convert-me.avi");
         var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
-        var conversionService = new FakeConversionService();
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
         var viewModel = new MainWindowViewModel(
             scanner,
             conversionService,
@@ -71,6 +72,32 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(filePath, conversionService.Requests[0].MediaInfo.SourcePath);
         Assert.Equal("done", viewModel.QueueItems.Single().Status);
         Assert.Contains("Done: 1", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task StartConversionCommand_should_write_report_and_surface_output_and_report_paths_in_log()
+    {
+        var filePath = CreateFile("convert-report.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
+        var reportService = new FakeConversionReportService(_rootPath);
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            launcher: null,
+            reportService: reportService);
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        var converted = viewModel.QueueItems.Single();
+        Assert.NotNull(converted.ReportPath);
+        Assert.True(File.Exists(converted.ReportPath!));
+        Assert.Contains(converted.OutputPath, viewModel.LogMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(converted.ReportPath!, viewModel.LogMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(reportService.ItemReportCalls);
+        Assert.Single(reportService.BatchReportCalls);
     }
 
     [Fact]
@@ -142,6 +169,54 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         Assert.True(viewModel.TestSampleCommand.CanExecute(null));
         Assert.True(viewModel.StartConversionCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task OpenConvertedFileCommand_should_open_selected_done_output_file()
+    {
+        var filePath = CreateFile("open-output.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
+        var launcher = new FakeExternalLauncher();
+        var reportService = new FakeConversionReportService(_rootPath);
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            launcher: launcher,
+            reportService: reportService);
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        viewModel.OpenConvertedFileCommand.Execute(null);
+
+        Assert.Single(launcher.OpenedPaths);
+        Assert.Equal(viewModel.QueueItems.Single().OutputPath, launcher.OpenedPaths[0]);
+    }
+
+    [Fact]
+    public async Task OpenReportCommand_should_open_selected_report_file()
+    {
+        var filePath = CreateFile("open-report.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
+        var launcher = new FakeExternalLauncher();
+        var reportService = new FakeConversionReportService(_rootPath);
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            launcher: launcher,
+            reportService: reportService);
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        viewModel.OpenReportCommand.Execute(null);
+
+        Assert.Single(launcher.OpenedPaths);
+        Assert.Equal(viewModel.QueueItems.Single().ReportPath, launcher.OpenedPaths[0]);
     }
 
     public void Dispose()
@@ -304,6 +379,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         public List<ConversionRequest> Requests { get; } = [];
         public IReadOnlyList<ConversionProgressInfo> ProgressToReport { get; init; } = [];
+        public bool CreateOutputFile { get; init; }
 
         public Task ConvertAsync(string ffmpegPath, ConversionRequest request, IProgress<ConversionProgressInfo>? progress = null, CancellationToken cancellationToken = default)
         {
@@ -312,7 +388,54 @@ public sealed class MainWindowViewModelTests : IDisposable
             {
                 progress?.Report(update);
             }
+
+            if (CreateOutputFile)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(request.OutputPath)!);
+                File.WriteAllText(request.OutputPath, "converted");
+            }
+
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeExternalLauncher : IExternalLauncher
+    {
+        public List<string> OpenedPaths { get; } = [];
+
+        public void OpenPath(string path)
+        {
+            OpenedPaths.Add(path);
+        }
+    }
+
+    private sealed class FakeConversionReportService : IConversionReportService
+    {
+        private readonly string _rootPath;
+
+        public FakeConversionReportService(string rootPath)
+        {
+            _rootPath = rootPath;
+        }
+
+        public List<string> ItemReportCalls { get; } = [];
+
+        public List<string> BatchReportCalls { get; } = [];
+
+        public Task<string> WriteItemReportAsync(string outputDirectory, string presetName, ConversionRequest request, QueueItemSummary item, IReadOnlyList<string> ffmpegArguments, TimeSpan elapsed, CancellationToken cancellationToken = default)
+        {
+            var path = Path.Combine(_rootPath, $"{Path.GetFileNameWithoutExtension(item.SourceFile)}-report.txt");
+            File.WriteAllText(path, string.Join(Environment.NewLine, ffmpegArguments));
+            ItemReportCalls.Add(path);
+            return Task.FromResult(path);
+        }
+
+        public Task<string> WriteBatchReportAsync(string outputDirectory, string presetName, BatchSettings settings, IReadOnlyList<QueueItemSummary> processedItems, int convertedCount, int failedCount, CancellationToken cancellationToken = default)
+        {
+            var path = Path.Combine(_rootPath, "batch-report.txt");
+            File.WriteAllText(path, $"converted={convertedCount};failed={failedCount}");
+            BatchReportCalls.Add(path);
+            return Task.FromResult(path);
         }
     }
 }

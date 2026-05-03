@@ -18,6 +18,7 @@ public sealed class QueueItemSummary
     public required string Status { get; init; }
     public required MediaInfo? MediaInfo { get; init; }
     public required OutputPlanSummary? PlannedOutput { get; init; }
+    public string? ReportPath { get; init; }
     public TimelineProject? TimelineProject { get; init; }
     public ItemTransformSettings? TransformSettings { get; init; }
     public bool IsAlternate { get; set; }
