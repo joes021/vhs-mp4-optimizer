@@ -22,8 +22,12 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.DoesNotContain("Content=\"Preview Frame\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"In\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Out\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Content=\"250 &gt;&gt;&gt;\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Content=\"&lt;&lt;&lt; 250\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&gt;&gt;&gt;\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&lt;&lt;&lt;\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&gt;&gt;\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&lt;&lt;\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&gt;\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&lt;\"", markup, StringComparison.Ordinal);
         Assert.Equal(1, CountOccurrences(markup, "Text=\"{Binding EditorHint}\""));
     }
 
