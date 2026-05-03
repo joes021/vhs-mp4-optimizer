@@ -11,6 +11,7 @@ public partial class PlayerTrimWindow : Window
     {
         InitializeComponent();
         Closing += OnClosing;
+        KeyDown += OnKeyDown;
     }
 
     private async void PreviewSliderPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -28,6 +29,15 @@ public partial class PlayerTrimWindow : Window
         if (DataContext is IDisposable disposable)
         {
             disposable.Dispose();
+        }
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            Close();
+            e.Handled = true;
         }
     }
 }

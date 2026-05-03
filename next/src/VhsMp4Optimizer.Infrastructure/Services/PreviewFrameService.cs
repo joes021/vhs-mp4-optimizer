@@ -21,7 +21,9 @@ public sealed class PreviewFrameService : IPreviewFrameService
         Directory.CreateDirectory(previewDirectory);
 
         var safeSeconds = Math.Max(0, Math.Min(mediaInfo.DurationSeconds, sourceSeconds));
-        var previewPath = Path.Combine(previewDirectory, $"frame-{safeSeconds.ToString("0000000.000", CultureInfo.InvariantCulture).Replace('.', '_')}.png");
+        var previewPath = Path.Combine(
+            previewDirectory,
+            $"frame-{safeSeconds.ToString("0000000.000", CultureInfo.InvariantCulture).Replace('.', '_')}-{BuildTransformCacheSuffix(transformSettings)}.png");
         if (File.Exists(previewPath))
         {
             return previewPath;
@@ -106,5 +108,22 @@ public sealed class PreviewFrameService : IPreviewFrameService
 
         sanitized = sanitized.Trim('_', '.', ' ');
         return string.IsNullOrWhiteSpace(sanitized) ? "preview-source" : sanitized;
+    }
+
+    internal static string BuildTransformCacheSuffix(ItemTransformSettings? transformSettings)
+    {
+        if (transformSettings is null)
+        {
+            return "base";
+        }
+
+        var crop = transformSettings.Crop;
+        var cropSuffix = crop.HasCrop
+            ? $"crop-{crop.Left}-{crop.Top}-{crop.Right}-{crop.Bottom}"
+            : "nocrop";
+        var aspectSuffix = string.IsNullOrWhiteSpace(transformSettings.AspectMode)
+            ? "aspect-auto"
+            : "aspect-" + SanitizePreviewCacheComponent(transformSettings.AspectMode);
+        return $"{cropSuffix}-{aspectSuffix}";
     }
 }

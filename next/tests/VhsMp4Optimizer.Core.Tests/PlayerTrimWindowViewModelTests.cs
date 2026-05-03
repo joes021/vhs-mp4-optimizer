@@ -71,6 +71,29 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task PrepareForDisplayAsync_should_render_initial_preview_before_window_shows()
+    {
+        var queueItem = BuildQueueItem();
+        var previewPath = CreateTinyPng("initial-preview.png");
+        var previewRequests = 0;
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            (_, _) => { },
+            new FakePreviewFrameService((_, _, _, _, _) =>
+            {
+                previewRequests++;
+                return previewPath;
+            }),
+            autoLoadPreview: false);
+
+        await viewModel.PrepareForDisplayAsync();
+
+        Assert.Equal(1, previewRequests);
+        Assert.DoesNotContain("nije dostupan", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();

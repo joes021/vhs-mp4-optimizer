@@ -104,7 +104,7 @@
                                 CornerRadius="10">
                             <TextBlock Foreground="White"
                                        FontWeight="SemiBold"
-                                       Text="Učitavam preview frame..." />
+                                       Text="Ucitavam preview frame..." />
                         </Border>
                         <Border VerticalAlignment="Bottom" Margin="12" Padding="10,8" CornerRadius="8" Background="#B30F172A">
                             <StackPanel Spacing="2">

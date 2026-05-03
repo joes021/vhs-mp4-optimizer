@@ -33,7 +33,7 @@ public partial class MainWindow : Window
         Closing += OnClosing;
     }
 
-    private void OpenPlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OpenPlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel || viewModel.SelectedQueueItem is null)
         {
@@ -49,7 +49,12 @@ public partial class MainWindow : Window
 
         if (_playerTrimWindow is { IsVisible: true })
         {
+            if (!ReferenceEquals(_playerTrimWindow.DataContext, editorViewModel) && _playerTrimWindow.DataContext is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
             _playerTrimWindow.DataContext = editorViewModel;
+            await editorViewModel.PrepareForDisplayAsync();
             _playerTrimWindow.Activate();
             return;
         }
@@ -57,6 +62,7 @@ public partial class MainWindow : Window
         _playerTrimWindow = new PlayerTrimWindow();
         _playerTrimWindow.Closed += (_, _) => _playerTrimWindow = null;
         _playerTrimWindow.DataContext = editorViewModel;
+        await editorViewModel.PrepareForDisplayAsync();
         _playerTrimWindow.Show();
         _playerTrimWindow.Activate();
     }

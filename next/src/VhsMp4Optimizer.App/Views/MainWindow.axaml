@@ -76,14 +76,14 @@
 
         <Style Selector="Button.action">
             <Setter Property="MinHeight" Value="40" />
-            <Setter Property="MinWidth" Value="108" />
+            <Setter Property="MinWidth" Value="120" />
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
 
         <Style Selector="Button.batch-action">
             <Setter Property="MinHeight" Value="42" />
-            <Setter Property="MinWidth" Value="136" />
+            <Setter Property="MinWidth" Value="152" />
             <Setter Property="Padding" Value="16,10" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -141,27 +141,37 @@
         <Border Grid.Row="1" Classes="card">
             <Grid ColumnDefinitions="*,16,*">
                 <Border Grid.Column="0" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <StackPanel Spacing="10">
-                        <TextBlock Classes="section-title" Text="Input folder" />
-                        <Grid ColumnDefinitions="96,*,112,112" ColumnSpacing="12">
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                        <TextBlock Grid.Row="0" Classes="section-title" Text="Input folder" />
+                        <Grid Grid.Row="1" ColumnDefinitions="96,*,136,136" ColumnSpacing="16">
                             <TextBlock VerticalAlignment="Center" Text="Source" />
                             <TextBox Grid.Column="1" MinHeight="42" VerticalAlignment="Center" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
                             <Button Grid.Column="2" Classes="action" Content="Files..." Click="BrowseInputFilesClick" />
                             <Button Grid.Column="3" Classes="action" Content="Folder..." Click="BrowseInputFolderClick" />
                         </Grid>
-                        <TextBlock Margin="106,0,0,0" Classes="hint" Text="{Binding SelectionHint}" TextWrapping="Wrap" />
-                    </StackPanel>
+                        <Grid Grid.Row="2" ColumnDefinitions="96,*" ColumnSpacing="16">
+                            <Border />
+                            <TextBlock Grid.Column="1" Classes="hint" Text="{Binding SelectionHint}" TextWrapping="Wrap" />
+                        </Grid>
+                    </Grid>
                 </Border>
 
                 <Border Grid.Column="2" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <StackPanel Spacing="10">
-                        <TextBlock Classes="section-title" Text="Output folder" />
-                        <Grid ColumnDefinitions="96,*,118" ColumnSpacing="12">
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                        <TextBlock Grid.Row="0" Classes="section-title" Text="Output folder" />
+                        <Grid Grid.Row="1" ColumnDefinitions="96,*,136" ColumnSpacing="16">
                             <TextBlock VerticalAlignment="Center" Text="Target" />
                             <TextBox Grid.Column="1" MinHeight="42" VerticalAlignment="Center" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
                             <Button Grid.Column="2" Classes="action" Content="Browse..." Click="BrowseOutputFolderClick" />
                         </Grid>
-                    </StackPanel>
+                        <Grid Grid.Row="2" ColumnDefinitions="96,*" ColumnSpacing="16">
+                            <Border />
+                            <TextBlock Grid.Column="1"
+                                       Classes="hint"
+                                       Text="Ovde ide izlaz za batch konverziju, trim export i sample klipove."
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                    </Grid>
                 </Border>
             </Grid>
         </Border>
@@ -169,11 +179,11 @@
         <GridSplitter Grid.Row="2" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows" />
 
         <Border Grid.Row="3" Classes="card">
-            <Grid ColumnDefinitions="*,20,340">
+            <Grid ColumnDefinitions="*,20,360">
                 <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
                     <TextBlock Classes="section-title" Text="Quick Setup" />
 
-                    <Grid Grid.Row="1" ColumnDefinitions="170,190,120,130,130" ColumnSpacing="20" HorizontalAlignment="Left">
+                    <Grid Grid.Row="1" ColumnDefinitions="180,180,180,180,180" ColumnSpacing="20" HorizontalAlignment="Left">
                         <StackPanel Grid.Column="0" Spacing="4">
                             <TextBlock Classes="field-label" Text="Workflow preset" />
                             <ComboBox MinHeight="42" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
@@ -208,13 +218,13 @@
                     <Border Grid.Row="3" Classes="subtle-group">
                         <StackPanel Spacing="10">
                             <TextBlock Classes="group-title" Text="Batch actions" />
-                            <Grid ColumnDefinitions="136,136,136,136,136,136" ColumnSpacing="10" HorizontalAlignment="Left">
-                                <Button Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                                <Button Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
-                                <Button Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                                <Button Grid.Column="3" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
-                                <Button Grid.Column="4" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
-                                <Button Grid.Column="5" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                            <Grid ColumnDefinitions="168,168,168" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12" HorizontalAlignment="Left">
+                                <Button Grid.Row="0" Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
+                                <Button Grid.Row="0" Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
+                                <Button Grid.Row="0" Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                                <Button Grid.Row="1" Grid.Column="0" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
+                                <Button Grid.Row="1" Grid.Column="1" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
+                                <Button Grid.Row="1" Grid.Column="2" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -223,7 +233,7 @@
                 <Border Grid.Column="2" Classes="subtle-group">
                     <StackPanel VerticalAlignment="Stretch" Spacing="12">
                         <TextBlock Classes="group-title" Text="Render" />
-                        <Button Classes="primary-big" Content="POKRENI KONVERZIJU" Command="{Binding StartConversionCommand}" />
+                        <Button Classes="primary-big" Content="Pokreni konverziju" Command="{Binding StartConversionCommand}" />
                         <TextBlock Classes="hint"
                                    Text="Batch konverzija, test sample i trim koriste ista izlazna podesavanja."
                                    TextWrapping="Wrap" />
@@ -266,7 +276,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Width="250" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="280" Margin="0,0,10,10">
                         <StackPanel Spacing="8">
                             <TextBlock Classes="field-label" Text="Split output" />
                             <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
@@ -275,12 +285,12 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Width="360" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="440" Margin="0,0,10,10">
                         <StackPanel Spacing="6">
                             <TextBlock Classes="field-label" Text="Sample clip" />
                             <TextBox Text="{Binding SampleStartText}" PlaceholderText="Sample start (00:00:30)" />
                             <TextBox Text="{Binding SampleDurationText}" PlaceholderText="Sample duration (00:02:00)" />
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="1.1*,1.1*" ColumnSpacing="10">
                                 <Button Grid.Column="0" Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
                                 <Button Grid.Column="1" Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
                             </Grid>

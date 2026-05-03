@@ -121,6 +121,29 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.True(File.Exists(converted.OutputPath));
     }
 
+    [Fact]
+    public void StartConversionCommand_should_be_disabled_without_queued_items()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        Assert.False(viewModel.StartConversionCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task TestSampleCommand_should_be_enabled_after_scan_selects_queue_item()
+    {
+        var filePath = CreateFile("sample-enabled.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var viewModel = new MainWindowViewModel(scanner, ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        Assert.False(viewModel.TestSampleCommand.CanExecute(null));
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+
+        Assert.True(viewModel.TestSampleCommand.CanExecute(null));
+        Assert.True(viewModel.StartConversionCommand.CanExecute(null));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))

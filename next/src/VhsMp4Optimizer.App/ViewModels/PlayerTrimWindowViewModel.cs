@@ -35,6 +35,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private bool _suppressPreviewAutoRefresh;
     private bool _awaitingPlaybackFrame;
     private bool _disposed;
+    private bool _previewRefreshQueued;
+    private bool _unmuteWhenPlaybackFrameArrives;
     private double _lastRequestedSourceSeconds;
 
     public PlayerTrimWindowViewModel(
@@ -363,7 +365,15 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         _lastRequestedSourceSeconds = sourceSeconds;
         _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
         _awaitingPlaybackFrame = true;
+        _unmuteWhenPlaybackFrameArrives = true;
+        _playbackMediaPlayer.Mute = true;
         _playbackMediaPlayer.Play();
+        if (_pendingPlaybackSeekMilliseconds is { } playbackStartMs)
+        {
+            _playbackMediaPlayer.Time = playbackStartMs;
+            _pendingPlaybackSeekMilliseconds = null;
+        }
+
         IsPlaying = true;
         IsVideoPlaybackVisible = false;
         IsPreviewImageVisible = PreviewBitmap is not null;
@@ -384,6 +394,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         IsVideoPlaybackVisible = false;
         IsPreviewImageVisible = true;
         _awaitingPlaybackFrame = false;
+        _unmuteWhenPlaybackFrameArrives = false;
+        if (_playbackMediaPlayer is not null)
+        {
+            _playbackMediaPlayer.Mute = false;
+        }
+
         _ = LoadPreviewAsync();
         EditorHint = $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
     }
@@ -401,6 +417,16 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         RefreshState();
         SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum));
+        await LoadPreviewAsync();
+    }
+
+    public async Task PrepareForDisplayAsync()
+    {
+        if (_disposed || IsPlaying || PreviewBitmap is not null)
+        {
+            return;
+        }
+
         await LoadPreviewAsync();
     }
 
@@ -471,6 +497,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         if (_previewBusy)
         {
+            _previewRefreshQueued = true;
             return;
         }
 
@@ -533,6 +560,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             _previewBusy = false;
             IsPreviewLoading = false;
             PlayCommand.NotifyCanExecuteChanged();
+            var rerunPreview = _previewRefreshQueued && !_disposed && !IsPlaying;
+            _previewRefreshQueued = false;
+            if (rerunPreview)
+            {
+                _ = LoadPreviewAsync();
+            }
         }
     }
 
@@ -633,6 +666,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             _awaitingPlaybackFrame = false;
             IsVideoPlaybackVisible = true;
             IsPreviewImageVisible = false;
+            if (_unmuteWhenPlaybackFrameArrives)
+            {
+                _playbackMediaPlayer.Mute = false;
+                _unmuteWhenPlaybackFrameArrives = false;
+            }
         }
 
         if (!TimelineNavigationService.TryMapSourceToVirtual(Timeline, sourceSeconds, Item.MediaInfo.DurationSeconds, out var virtualSeconds))

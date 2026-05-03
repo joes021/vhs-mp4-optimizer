@@ -26,6 +26,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isConverting;
     private bool _pauseRequested;
     private bool _isBatchPaused;
+    private bool _isInitializing = true;
 
     public MainWindowViewModel(
         ISourceScanService? sourceScanService = null,
@@ -34,7 +35,6 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _sourceScanService = sourceScanService ?? new SourceScanService();
         _conversionService = conversionService ?? new FfmpegConversionService();
-        ResolvedFfmpegPath = ffmpegPath ?? FfmpegLocator.Resolve();
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));
         WorkflowPresets = new ObservableCollection<string>(CoreServices.WorkflowPresetService.Names);
@@ -44,9 +44,9 @@ public partial class MainWindowViewModel : ViewModelBase
         DeinterlaceModes = new ObservableCollection<string>(CoreServices.DeinterlaceModes.All);
         DenoiseModes = new ObservableCollection<string>(CoreServices.DenoiseModes.All);
         EncodeEngines = new ObservableCollection<string>(CoreServices.EncodeEngines.All);
-        ScanFilesCommand = new AsyncRelayCommand(ScanFilesAsync);
-        StartConversionCommand = new AsyncRelayCommand(StartConversionAsync);
-        TestSampleCommand = new AsyncRelayCommand(TestSampleAsync);
+        ScanFilesCommand = new AsyncRelayCommand(ScanFilesAsync, CanScanFiles);
+        StartConversionCommand = new AsyncRelayCommand(StartConversionAsync, CanStartConversion);
+        TestSampleCommand = new AsyncRelayCommand(TestSampleAsync, CanTestSample);
         OpenSampleCommand = new RelayCommand(OpenSample, CanOpenSample);
         OpenOutputCommand = new RelayCommand(OpenOutputFolder, CanOpenOutputFolder);
         SkipSelectedCommand = new RelayCommand(SkipSelected);
@@ -56,27 +56,30 @@ public partial class MainWindowViewModel : ViewModelBase
         PauseResumeCommand = new AsyncRelayCommand(PauseResumeAsync, CanPauseOrResume);
         SaveQueueCommand = new AsyncRelayCommand<string>(SaveQueueAsync);
         LoadQueueCommand = new AsyncRelayCommand<string>(LoadQueueAsync);
+        ResolvedFfmpegPath = ffmpegPath ?? FfmpegLocator.Resolve();
 
         if (!string.IsNullOrWhiteSpace(ResolvedFfmpegPath))
         {
-            StatusMessage = $"Faza 3: ffmpeg je pronadjen na {ResolvedFfmpegPath}. Sledeci korak je scan i planned output parity.";
+            StatusMessage = $"FFmpeg je spreman: {ResolvedFfmpegPath}";
         }
         else
         {
-            StatusMessage = "Faza 3: ffmpeg jos nije pronadjen. Scan i media info cekaju lokalni ffmpeg/fprobe.";
+            StatusMessage = "FFmpeg jos nije pronadjen. Izaberi ga iz Tools menija ili ga instaliraj.";
         }
 
         ApplyPreset(SelectedPreset);
+        _isInitializing = false;
+        RefreshCommandStates();
     }
 
     [ObservableProperty]
     private string _windowTitle = "VHS MP4 Optimizer Next";
 
     [ObservableProperty]
-    private string _inputFolder = @"F:\Veliki avi";
+    private string _inputFolder = string.Empty;
 
     [ObservableProperty]
-    private string _outputFolder = @"F:\Veliki avi\vhs-mp4-output";
+    private string _outputFolder = string.Empty;
 
     [ObservableProperty]
     private string _selectionHint = "Unesi putanju ili izaberi jedan fajl, vise fajlova ili ceo folder.";
@@ -127,10 +130,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _statusMessage;
 
     [ObservableProperty]
-    private string _progressMessage = "Nema aktivne obrade. Ovaj ekran sada prelazi iz shell-a u stvarni batch workspace.";
+    private string _progressMessage = "Nema aktivne obrade.";
 
     [ObservableProperty]
-    private string _logMessage = "Migracioni branch je aktivan. Avalonia verzija sada dobija pravo scan/planned output ponasanje.";
+    private string _logMessage = "Spreman za scan, trim, sample i batch konverziju.";
 
     [ObservableProperty]
     private double _conversionProgressPercent;
@@ -200,13 +203,25 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedQueueItemChanged(QueueItemSummary? value)
     {
+        if (_isInitializing)
+        {
+            return;
+        }
+
         RefreshComparisonRows(value);
         OpenSampleCommand.NotifyCanExecuteChanged();
         SplitSelectedCopyCommand.NotifyCanExecuteChanged();
+        TestSampleCommand.NotifyCanExecuteChanged();
+        StartConversionCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnInputFolderChanged(string value)
     {
+        if (_isInitializing)
+        {
+            return;
+        }
+
         if (_suppressSelectionReset)
         {
             return;
@@ -214,34 +229,147 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _explicitSourcePaths = null;
         SelectionHint = "Rucno uneta putanja: scan ide nad ovim input putem.";
+        RefreshCommandStates();
     }
 
-    partial void OnOutputFolderChanged(string value) => OpenOutputCommand.NotifyCanExecuteChanged();
+    partial void OnOutputFolderChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
 
-    partial void OnQualityModeChanged(string value) => RefreshPlannedOutput();
+        OpenOutputCommand.NotifyCanExecuteChanged();
+        RefreshCommandStates();
+    }
 
-    partial void OnScaleModeChanged(string value) => RefreshPlannedOutput();
+    partial void OnQualityModeChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
 
-    partial void OnAspectModeChanged(string value) => RefreshPlannedOutput();
+        RefreshPlannedOutput();
+    }
 
-    partial void OnDeinterlaceModeChanged(string value) => RefreshPlannedOutput();
+    partial void OnScaleModeChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
 
-    partial void OnDenoiseModeChanged(string value) => RefreshPlannedOutput();
+        RefreshPlannedOutput();
+    }
 
-    partial void OnEncodeEngineChanged(string value) => RefreshPlannedOutput();
+    partial void OnAspectModeChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
 
-    partial void OnVideoBitrateChanged(string value) => RefreshPlannedOutput();
+        RefreshPlannedOutput();
+    }
 
-    partial void OnAudioBitrateChanged(string value) => RefreshPlannedOutput();
+    partial void OnDeinterlaceModeChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
 
-    partial void OnSplitOutputChanged(bool value) => RefreshPlannedOutput();
+        RefreshPlannedOutput();
+    }
 
-    partial void OnMaxPartGbChanged(double value) => RefreshPlannedOutput();
+    partial void OnDenoiseModeChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
 
-    partial void OnLastSamplePathChanged(string? value) => OpenSampleCommand.NotifyCanExecuteChanged();
+        RefreshPlannedOutput();
+    }
+
+    partial void OnEncodeEngineChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        RefreshPlannedOutput();
+    }
+
+    partial void OnVideoBitrateChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        RefreshPlannedOutput();
+    }
+
+    partial void OnAudioBitrateChanged(string value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        RefreshPlannedOutput();
+    }
+
+    partial void OnSplitOutputChanged(bool value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        RefreshPlannedOutput();
+    }
+
+    partial void OnMaxPartGbChanged(double value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        RefreshPlannedOutput();
+    }
+
+    partial void OnLastSamplePathChanged(string? value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        OpenSampleCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnResolvedFfmpegPathChanged(string? value)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        RefreshCommandStates();
+    }
 
     partial void OnSelectedPresetChanged(string value)
     {
+        if (_isInitializing)
+        {
+            return;
+        }
+
         if (_applyingPreset)
         {
             return;
@@ -288,6 +416,7 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = QueueItems.Count == 0
             ? "Nema podrzanih video fajlova za scan u zadatom input putu."
             : $"Scan Files: pronadjeno {QueueItems.Count} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+        RefreshCommandStates();
         return Task.CompletedTask;
     }
 
@@ -412,6 +541,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
             _isConverting = false;
             PauseResumeCommand.NotifyCanExecuteChanged();
+            RefreshCommandStates();
         }
     }
 
@@ -453,8 +583,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             LastSamplePath = samplePath;
             StatusMessage = $"Test Sample napravljen: {Path.GetFileName(samplePath)}";
-        ProgressMessage = $"Sample start: {start:0}s | duration: {duration:0}s";
-        LogMessage = samplePath;
+            ProgressMessage = $"Sample start: {start:0}s | duration: {duration:0}s";
+            LogMessage = samplePath;
         }
         catch (Exception ex)
         {
@@ -566,6 +696,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         StatusMessage = $"Preset aktivan: {preset.Name}";
+        RefreshCommandStates();
     }
 
     public async Task UseSelectedFilesAsync(IReadOnlyList<string> filePaths)
@@ -639,6 +770,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             OutputFolder = Path.GetFullPath(folderPath);
         }
+
+        RefreshCommandStates();
     }
 
     public AppSessionState CaptureSessionState() => new()
@@ -763,6 +896,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         SelectedQueueItem = QueueItems.FirstOrDefault(item => string.Equals(item.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase));
         StatusMessage = "Timeline izmene su vracene u batch queue.";
+        RefreshCommandStates();
     }
 
     public async Task JoinFilesCopyAsync(IReadOnlyList<string> inputPaths, string outputPath)
@@ -885,6 +1019,7 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = $"Queue ucitan: {Path.GetFileName(inputPath)} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
         LogMessage = inputPath;
         RefreshComparisonRows(SelectedQueueItem);
+        RefreshCommandStates();
     }
 
     private void SkipSelected()
@@ -896,6 +1031,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         ReplaceItem(SelectedQueueItem.SourcePath, current => CoreServices.QueueWorkflowService.MarkSkipped(current));
         StatusMessage = $"Selected item je oznacen kao skipped | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+        RefreshCommandStates();
     }
 
     private void RetryFailedItems()
@@ -908,6 +1044,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ApplyQueueZebra();
 
         StatusMessage = $"Failed stavke su vracene u queue | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+        RefreshCommandStates();
     }
 
     private void ClearCompletedItems()
@@ -923,6 +1060,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         SelectedQueueItem = QueueItems.FirstOrDefault();
         StatusMessage = $"Done stavke su uklonjene iz queue liste | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
+        RefreshCommandStates();
     }
 
     private bool CanSplitSelectedCopy()
@@ -995,9 +1133,34 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             ApplyQueueZebra();
+            RefreshCommandStates();
 
             return;
         }
+    }
+
+    private bool CanScanFiles()
+        => !_isConverting && !string.IsNullOrWhiteSpace(InputFolder) && !string.IsNullOrWhiteSpace(ResolvedFfmpegPath);
+
+    private bool CanStartConversion()
+        => !_isConverting
+           && !string.IsNullOrWhiteSpace(ResolvedFfmpegPath)
+           && QueueItems.Any(CoreServices.QueueWorkflowService.ShouldConvert);
+
+    private bool CanTestSample()
+        => !_isConverting
+           && !string.IsNullOrWhiteSpace(ResolvedFfmpegPath)
+           && SelectedQueueItem?.MediaInfo is not null;
+
+    private void RefreshCommandStates()
+    {
+        ScanFilesCommand?.NotifyCanExecuteChanged();
+        StartConversionCommand?.NotifyCanExecuteChanged();
+        TestSampleCommand?.NotifyCanExecuteChanged();
+        SplitSelectedCopyCommand?.NotifyCanExecuteChanged();
+        PauseResumeCommand?.NotifyCanExecuteChanged();
+        OpenSampleCommand?.NotifyCanExecuteChanged();
+        OpenOutputCommand?.NotifyCanExecuteChanged();
     }
 
     private void ApplyQueueZebra()
