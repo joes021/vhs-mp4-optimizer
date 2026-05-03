@@ -9,6 +9,8 @@
         Width="640"
         Height="340"
         CanResize="False"
+        Background="#141A24"
+        Foreground="#EAF1FB"
         Title="About VHS MP4 Optimizer Next">
 
     <Border Background="#141A24" Padding="18">
