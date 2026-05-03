@@ -50,8 +50,8 @@ public sealed class AppSessionStateService
     private static AppSessionState Normalize(AppSessionState? state)
     {
         state ??= new AppSessionState();
-        state.InputFolder = string.IsNullOrWhiteSpace(state.InputFolder) ? @"F:\Veliki avi" : state.InputFolder.Trim();
-        state.OutputFolder = string.IsNullOrWhiteSpace(state.OutputFolder) ? @"F:\Veliki avi\vhs-mp4-output" : state.OutputFolder.Trim();
+        state.InputFolder = string.IsNullOrWhiteSpace(state.InputFolder) ? string.Empty : state.InputFolder.Trim();
+        state.OutputFolder = string.IsNullOrWhiteSpace(state.OutputFolder) ? string.Empty : state.OutputFolder.Trim();
         state.FfmpegPath = string.IsNullOrWhiteSpace(state.FfmpegPath) ? null : state.FfmpegPath.Trim();
         return state;
     }

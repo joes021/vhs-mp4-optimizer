@@ -33,6 +33,19 @@ public sealed class AppSessionStateServiceTests : IDisposable
         Assert.Equal(@"C:\ffmpeg\bin\ffmpeg.exe", loaded.FfmpegPath);
     }
 
+    [Fact]
+    public void LoadOrDefault_without_file_should_start_with_empty_input_and_output()
+    {
+        var statePath = Path.Combine(_rootPath, "missing-session.json");
+        var service = new AppSessionStateService(statePath);
+
+        var loaded = service.LoadOrDefault();
+
+        Assert.Equal(string.Empty, loaded.InputFolder);
+        Assert.Equal(string.Empty, loaded.OutputFolder);
+        Assert.Null(loaded.FfmpegPath);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))

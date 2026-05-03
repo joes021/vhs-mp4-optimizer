@@ -737,9 +737,6 @@ public partial class MainWindowViewModel : ViewModelBase
             AspectMode = preset.AspectMode;
             VideoBitrate = preset.VideoBitrate;
             AudioBitrate = preset.AudioBitrate;
-            DeinterlaceMode = CoreServices.DeinterlaceModes.Off;
-            DenoiseMode = CoreServices.DenoiseModes.Off;
-            EncodeEngine = CoreServices.EncodeEngines.Auto;
             SplitOutput = preset.SplitOutput;
             MaxPartGb = preset.MaxPartGb;
             RefreshPlannedOutput();
@@ -841,18 +838,6 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             return;
         }
-
-        _suppressSelectionReset = true;
-        try
-        {
-            InputFolder = state.InputFolder;
-        }
-        finally
-        {
-            _suppressSelectionReset = false;
-        }
-
-        OutputFolder = state.OutputFolder;
         if (!string.IsNullOrWhiteSpace(state.FfmpegPath))
         {
             ResolvedFfmpegPath = state.FfmpegPath;

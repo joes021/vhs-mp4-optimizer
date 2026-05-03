@@ -1,6 +1,8 @@
 using VhsMp4Optimizer.App.ViewModels;
 using VhsMp4Optimizer.App.Services;
+using VhsMp4Optimizer.App.Models;
 using VhsMp4Optimizer.Core.Models;
+using VhsMp4Optimizer.Core.Services;
 using VhsMp4Optimizer.Infrastructure.Services;
 
 namespace VhsMp4Optimizer.Core.Tests;
@@ -72,6 +74,34 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(filePath, conversionService.Requests[0].MediaInfo.SourcePath);
         Assert.Equal("done", viewModel.QueueItems.Single().Status);
         Assert.Contains("Done: 1", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplySessionState_should_not_restore_input_and_output_paths_on_startup()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        viewModel.ApplySessionState(new AppSessionState
+        {
+            InputFolder = @"F:\Ulaz",
+            OutputFolder = @"F:\Izlaz",
+            FfmpegPath = @"C:\tools\ffmpeg\bin\ffmpeg.exe"
+        });
+
+        Assert.Equal(string.Empty, viewModel.InputFolder);
+        Assert.Equal(string.Empty, viewModel.OutputFolder);
+        Assert.Equal(@"C:\tools\ffmpeg\bin\ffmpeg.exe", viewModel.ResolvedFfmpegPath);
+    }
+
+    [Fact]
+    public void Selecting_workflow_preset_should_not_reset_deinterlace_mode()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        viewModel.DeinterlaceMode = DeinterlaceModes.Yadif;
+        viewModel.SelectedPreset = WorkflowPresetService.Archive;
+
+        Assert.Equal(DeinterlaceModes.Yadif, viewModel.DeinterlaceMode);
     }
 
     [Fact]

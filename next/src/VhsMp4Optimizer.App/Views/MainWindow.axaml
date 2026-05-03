@@ -220,13 +220,13 @@
                     <Border Grid.Row="3" Classes="subtle-group">
                         <StackPanel Spacing="10">
                             <TextBlock Classes="group-title" Text="Batch actions" />
-                            <Grid ColumnDefinitions="168,168,168" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12" HorizontalAlignment="Left">
-                                <Button Grid.Row="0" Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                                <Button Grid.Row="0" Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
-                                <Button Grid.Row="0" Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                                <Button Grid.Row="1" Grid.Column="0" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
-                                <Button Grid.Row="1" Grid.Column="1" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
-                                <Button Grid.Row="1" Grid.Column="2" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                            <Grid ColumnDefinitions="168,168,168,168,168,168" ColumnSpacing="12" HorizontalAlignment="Left">
+                                <Button Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
+                                <Button Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
+                                <Button Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                                <Button Grid.Column="3" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
+                                <Button Grid.Column="4" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
+                                <Button Grid.Column="5" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
                             </Grid>
                         </StackPanel>
                     </Border>

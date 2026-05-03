@@ -17,7 +17,7 @@ public sealed class MainWindowMarkupTests
         var markup = File.ReadAllText(markupPath);
 
         Assert.Contains("ColumnDefinitions=\"180,180,180,180,180\"", markup, StringComparison.Ordinal);
-        Assert.Contains("ColumnDefinitions=\"168,168,168\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Converted File\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Report\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Migracioni branch je aktivan", markup, StringComparison.OrdinalIgnoreCase);
@@ -41,6 +41,25 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("ColumnDefinitions=\"96,*,136,136\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"96,*,136\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Margin=\"106,0,0,0\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_should_keep_batch_actions_in_single_horizontal_row()
+    {
+        var projectRoot = FindProjectRoot();
+        var markupPath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "Views",
+            "MainWindow.axaml");
+
+        var markup = File.ReadAllText(markupPath);
+
+        Assert.Contains("Text=\"Batch actions\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("RowDefinitions=\"Auto,Auto\"", markup, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()
