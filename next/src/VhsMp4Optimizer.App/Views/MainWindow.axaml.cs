@@ -41,6 +41,7 @@ public partial class MainWindow : Window
         }
 
         var selectedItem = viewModel.SelectedQueueItem;
+        viewModel.StatusMessage = $"Pripremam Player / Trim za {selectedItem.SourceFile}...";
 
         var editorViewModel = new PlayerTrimWindowViewModel(selectedItem, viewModel.ResolvedFfmpegPath, (timeline, transformSettings) =>
         {
@@ -54,17 +55,19 @@ public partial class MainWindow : Window
                 disposable.Dispose();
             }
             _playerTrimWindow.DataContext = editorViewModel;
-            _playerTrimWindow.Activate();
             await editorViewModel.PrepareForDisplayAsync();
+            _playerTrimWindow.Activate();
+            viewModel.StatusMessage = $"Player / Trim je spreman za {selectedItem.SourceFile}.";
             return;
         }
 
         _playerTrimWindow = new PlayerTrimWindow();
         _playerTrimWindow.Closed += (_, _) => _playerTrimWindow = null;
         _playerTrimWindow.DataContext = editorViewModel;
+        await editorViewModel.PrepareForDisplayAsync();
         _playerTrimWindow.Show(this);
         _playerTrimWindow.Activate();
-        await editorViewModel.PrepareForDisplayAsync();
+        viewModel.StatusMessage = $"Player / Trim je spreman za {selectedItem.SourceFile}.";
     }
 
     private void QueueListDoubleTapped(object? sender, TappedEventArgs e)

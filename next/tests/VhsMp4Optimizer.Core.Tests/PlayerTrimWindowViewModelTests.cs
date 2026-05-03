@@ -148,6 +148,29 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void PlayCommand_should_keep_preview_image_visible_until_first_video_frame_arrives()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-source-first-frame.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PlayCommand.Execute(null);
+
+        Assert.True(viewModel.IsPlaying);
+        Assert.True(viewModel.IsPreviewImageVisible);
+    }
+
+    [Fact]
     public void BeginManualPreviewNavigation_should_leave_playback_mode_and_return_to_trim_preview()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
@@ -170,6 +193,37 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.False(viewModel.IsPlaying);
         Assert.False(viewModel.IsVideoPlaybackVisible);
         Assert.True(viewModel.IsPreviewImageVisible);
+    }
+
+    [Fact]
+    public async Task BeginManualPreviewNavigation_should_request_fresh_preview_for_precise_trim()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-source-manual-refresh.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var requestedSeconds = new List<double>();
+        var previewPath = CreateTinyPng("manual-refresh-preview.png");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            new FakePreviewFrameService((_, _, sourceSeconds, _, _) =>
+            {
+                requestedSeconds.Add(sourceSeconds);
+                return previewPath;
+            }),
+            autoLoadPreview: false);
+
+        viewModel.PlayCommand.Execute(null);
+        viewModel.BeginManualPreviewNavigation();
+        await Task.Delay(250);
+
+        Assert.Contains(requestedSeconds, value => value >= 0d);
     }
 
     [Fact]

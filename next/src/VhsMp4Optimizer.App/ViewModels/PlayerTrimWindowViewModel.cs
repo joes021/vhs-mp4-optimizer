@@ -375,10 +375,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         IsPlaying = true;
-        IsVideoPlaybackVisible = true;
-        IsPreviewImageVisible = false;
+        IsVideoPlaybackVisible = false;
+        IsPreviewImageVisible = true;
         _playbackTimer.Start();
-        EditorHint = "Playback se pokrece iz trenutno izabranog mesta.";
+        EditorHint = "Pokrecem reprodukciju iz trenutno izabranog mesta...";
     }
 
     private void PausePlayback()
@@ -388,7 +388,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public void BeginManualPreviewNavigation()
     {
-        PausePlaybackCore(loadPreviewAfterPause: false, "Pomeraj timeline za precizan trim frame.");
+        PausePlaybackCore(loadPreviewAfterPause: true, "Pomeraj timeline za precizan trim frame.");
     }
 
     private void SetInPointFromCurrent() => InPointText = PreviewSourceTimeText;
@@ -748,7 +748,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            await Task.Delay(120, cancellationToken);
+            await Task.Delay(60, cancellationToken);
             if (cancellationToken.IsCancellationRequested || IsPlaying || _disposed)
             {
                 return;

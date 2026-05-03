@@ -49,8 +49,8 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("_playerTrimWindow.Closed +=", source, StringComparison.Ordinal);
         Assert.Contains("_playerTrimWindow = null;", source, StringComparison.Ordinal);
         Assert.Contains("_playerTrimWindow.Show(this);", source, StringComparison.Ordinal);
-        Assert.True(source.IndexOf("_playerTrimWindow.Show(this);", StringComparison.Ordinal) <
-                    source.LastIndexOf("await editorViewModel.PrepareForDisplayAsync();", StringComparison.Ordinal));
+        Assert.True(source.IndexOf("await editorViewModel.PrepareForDisplayAsync();", StringComparison.Ordinal) <
+                    source.LastIndexOf("_playerTrimWindow.Show(this);", StringComparison.Ordinal));
     }
 
     [Fact]
