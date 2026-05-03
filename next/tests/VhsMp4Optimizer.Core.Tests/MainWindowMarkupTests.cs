@@ -21,6 +21,8 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Converted File\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Report\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Check Encode Support\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Install / Repair Encode Support\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Migracioni branch je aktivan", markup, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -105,6 +107,27 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("Width=\"120\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Test Sample\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Sample\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_should_show_system_monitor_strip_for_cpu_gpu_ram_and_storage()
+    {
+        var projectRoot = FindProjectRoot();
+        var markupPath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "Views",
+            "MainWindow.axaml");
+
+        var markup = File.ReadAllText(markupPath);
+
+        Assert.Contains("Text=\"System monitor\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding CpuUsageText}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding GpuUsageText}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding RamUsageText}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding StorageUsageText}\"", markup, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()

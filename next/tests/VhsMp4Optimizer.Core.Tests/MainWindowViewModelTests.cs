@@ -279,6 +279,57 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(viewModel.QueueItems.Single().ReportPath, launcher.OpenedPaths[0]);
     }
 
+    [Fact]
+    public void ApplySystemResourceSnapshot_should_update_usage_labels()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        viewModel.ApplySystemResourceSnapshot(new SystemResourceSnapshot
+        {
+            CpuPercent = 37.4,
+            GpuPercent = 18.2,
+            RamPercent = 62.8,
+            StoragePercent = 54.5,
+            StorageLabel = "F:"
+        });
+
+        Assert.Equal("CPU 37%", viewModel.CpuUsageText);
+        Assert.Equal("GPU 18%", viewModel.GpuUsageText);
+        Assert.Equal("RAM 63%", viewModel.RamUsageText);
+        Assert.Equal("Storage F: 55%", viewModel.StorageUsageText);
+    }
+
+    [Fact]
+    public void ApplyEncodeSupportReport_should_surface_summary_and_detailed_log()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+        var report = new EncodeSupportReport
+        {
+            Summary = "Encode support: CPU ready | NVIDIA NVENC ready | Intel QSV driver missing",
+            Details =
+            [
+                "CPU: ready",
+                "NVIDIA NVENC: ready",
+                "Intel QSV: install Intel graphics driver"
+            ],
+            RepairActions =
+            [
+                new SupportRepairAction
+                {
+                    Label = "Install Intel driver",
+                    Kind = SupportRepairActionKind.Url,
+                    Target = "https://www.intel.com/content/www/us/en/support/detect.html"
+                }
+            ]
+        };
+
+        viewModel.ApplyEncodeSupportReport(report);
+
+        Assert.Contains("Encode support:", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NVIDIA NVENC: ready", viewModel.LogMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Install Intel driver", viewModel.LogMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))

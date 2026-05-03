@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VhsMp4Optimizer.App.ViewModels;
 using VhsMp4Optimizer.App.Models;
@@ -22,6 +23,9 @@ public partial class MainWindow : Window
     private readonly WorkspaceLayoutService _layoutService = new();
     private readonly AppSessionStateService _sessionStateService = new();
     private readonly NextUpdateService _updateService = new();
+    private readonly EncodeSupportInspectorService _encodeSupportInspectorService = new();
+    private readonly SystemResourceMonitorService _systemResourceMonitorService = new();
+    private readonly DispatcherTimer _systemMonitorTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     public MainWindow()
     {
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
         DragDrop.SetAllowDrop(this, true);
         Opened += OnOpened;
         Closing += OnClosing;
+        _systemMonitorTimer.Tick += SystemMonitorTimerOnTick;
     }
 
     private async void OpenPlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -138,6 +143,43 @@ public partial class MainWindow : Window
             Arguments = "install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements",
             UseShellExecute = true
         });
+    }
+
+    private async void CheckEncodeSupportClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.StatusMessage = "Proveravam encode engine podrsku...";
+        var report = await _encodeSupportInspectorService.InspectAsync(viewModel.ResolvedFfmpegPath);
+        viewModel.ApplyEncodeSupportReport(report);
+    }
+
+    private async void InstallRepairEncodeSupportClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.StatusMessage = "Proveravam sta treba instalirati ili popraviti za encode engine...";
+        var report = await _encodeSupportInspectorService.InspectAsync(viewModel.ResolvedFfmpegPath);
+        viewModel.ApplyEncodeSupportReport(report);
+
+        if (report.RepairActions.Count == 0)
+        {
+            viewModel.StatusMessage = "Sve sto je bitno za encode engine izgleda spremno.";
+            return;
+        }
+
+        foreach (var action in report.RepairActions)
+        {
+            LaunchRepairAction(action);
+        }
+
+        viewModel.StatusMessage = $"Pokrenute su akcije: {string.Join(", ", report.RepairActions.Select(action => action.Label))}";
     }
 
     private async void BrowseInputFilesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -473,11 +515,16 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.ApplySessionState(_sessionStateService.LoadOrDefault());
+            RefreshSystemMonitor(viewModel);
         }
+
+        _systemMonitorTimer.Start();
     }
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        _systemMonitorTimer.Stop();
+        _systemResourceMonitorService.Dispose();
         _layoutService.Save(CaptureLayoutState());
         if (DataContext is MainWindowViewModel viewModel)
         {
@@ -523,5 +570,51 @@ public partial class MainWindow : Window
             StatusPanelHeight = rowDefinitions[9].ActualHeight,
             QueuePaneRatio = queueRatio
         };
+    }
+
+    private void SystemMonitorTimerOnTick(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            RefreshSystemMonitor(viewModel);
+        }
+    }
+
+    private void RefreshSystemMonitor(MainWindowViewModel viewModel)
+    {
+        var snapshot = _systemResourceMonitorService.Capture(viewModel.OutputFolder);
+        viewModel.ApplySystemResourceSnapshot(snapshot);
+    }
+
+    private static void LaunchRepairAction(SupportRepairAction action)
+    {
+        if (action.Kind == SupportRepairActionKind.Url)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = action.Target,
+                UseShellExecute = true
+            });
+            return;
+        }
+
+        const string wingetPrefix = "winget ";
+        if (action.Target.StartsWith(wingetPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "winget",
+                Arguments = action.Target[wingetPrefix.Length..],
+                UseShellExecute = true
+            });
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/c " + action.Target,
+            UseShellExecute = true
+        });
     }
 }

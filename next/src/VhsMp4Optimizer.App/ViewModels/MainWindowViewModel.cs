@@ -96,6 +96,18 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _selectionHint = "Unesi putanju ili izaberi jedan fajl, vise fajlova ili ceo folder.";
 
     [ObservableProperty]
+    private string _cpuUsageText = "CPU --";
+
+    [ObservableProperty]
+    private string _gpuUsageText = "GPU --";
+
+    [ObservableProperty]
+    private string _ramUsageText = "RAM --";
+
+    [ObservableProperty]
+    private string _storageUsageText = "Storage --";
+
+    [ObservableProperty]
     private string _selectedPreset = "USB standard";
 
     [ObservableProperty]
@@ -1391,6 +1403,29 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _ = AutoScanAfterSelectionAsync();
         }
+    }
+
+    public void ApplySystemResourceSnapshot(SystemResourceSnapshot snapshot)
+    {
+        CpuUsageText = $"CPU {Math.Round(snapshot.CpuPercent, MidpointRounding.AwayFromZero):0}%";
+        GpuUsageText = snapshot.GpuPercent is { } gpu
+            ? $"GPU {Math.Round(gpu, MidpointRounding.AwayFromZero):0}%"
+            : "GPU --";
+        RamUsageText = $"RAM {Math.Round(snapshot.RamPercent, MidpointRounding.AwayFromZero):0}%";
+        StorageUsageText = $"Storage {snapshot.StorageLabel} {Math.Round(snapshot.StoragePercent, MidpointRounding.AwayFromZero):0}%";
+    }
+
+    public void ApplyEncodeSupportReport(EncodeSupportReport report)
+    {
+        if (report is null)
+        {
+            return;
+        }
+
+        StatusMessage = report.Summary;
+        var lines = new List<string>(report.Details);
+        lines.AddRange(report.RepairActions.Select(action => $"Install / repair: {action.Label} -> {action.Target}"));
+        AppendLog(string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line))));
     }
 
     public void AutoDetectFfmpeg()
