@@ -8,7 +8,7 @@ public static class FfmpegCommandBuilder
 {
     public static IReadOnlyList<string> BuildArguments(ConversionRequest request)
     {
-        var args = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-nostdin", "-i", request.MediaInfo.SourcePath };
+        var args = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-nostdin", "-progress", "pipe:1", "-nostats", "-i", request.MediaInfo.SourcePath };
         var plan = OutputPlanner.Build(request.MediaInfo, request.Settings, request.TransformSettings);
         var keepRanges = BuildEffectiveRanges(request);
         var hasAudio = !string.IsNullOrWhiteSpace(request.MediaInfo.AudioCodec) && request.MediaInfo.AudioCodec != "--";

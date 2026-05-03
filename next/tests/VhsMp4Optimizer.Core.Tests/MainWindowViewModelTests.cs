@@ -74,6 +74,33 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task StartConversionCommand_should_surface_progress_percent_and_eta()
+    {
+        var filePath = CreateFile("progress.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService
+        {
+            ProgressToReport =
+            [
+                new ConversionProgressInfo(0.25, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(45), "1.0x"),
+                new ConversionProgressInfo(0.75, TimeSpan.FromSeconds(45), TimeSpan.FromSeconds(15), "1.1x"),
+                new ConversionProgressInfo(1.0, TimeSpan.FromSeconds(60), TimeSpan.Zero, "1.0x")
+            ]
+        };
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        Assert.Equal(100, viewModel.ConversionProgressPercent, 3);
+        Assert.Contains("ETA", viewModel.ProgressMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("progress.avi", viewModel.CurrentConversionItemText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task StartConversionCommand_should_create_real_output_file_when_ffmpeg_is_available()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
@@ -253,10 +280,15 @@ public sealed class MainWindowViewModelTests : IDisposable
     private sealed class FakeConversionService : IConversionService
     {
         public List<ConversionRequest> Requests { get; } = [];
+        public IReadOnlyList<ConversionProgressInfo> ProgressToReport { get; init; } = [];
 
-        public Task ConvertAsync(string ffmpegPath, ConversionRequest request, CancellationToken cancellationToken = default)
+        public Task ConvertAsync(string ffmpegPath, ConversionRequest request, IProgress<ConversionProgressInfo>? progress = null, CancellationToken cancellationToken = default)
         {
             Requests.Add(request);
+            foreach (var update in ProgressToReport)
+            {
+                progress?.Report(update);
+            }
             return Task.CompletedTask;
         }
     }

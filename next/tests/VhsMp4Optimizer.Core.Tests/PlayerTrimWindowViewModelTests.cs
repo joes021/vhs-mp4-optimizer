@@ -48,6 +48,29 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Changing_preview_virtual_position_while_paused_should_request_new_preview_frame()
+    {
+        var queueItem = BuildQueueItem();
+        var requestedSeconds = new List<double>();
+        var previewPath = CreateTinyPng("preview.png");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            (_, _) => { },
+            new FakePreviewFrameService((_, _, sourceSeconds, _, _) =>
+            {
+                requestedSeconds.Add(sourceSeconds);
+                return previewPath;
+            }),
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 12;
+        await Task.Delay(250);
+
+        Assert.Contains(requestedSeconds, value => Math.Abs(value - 12d) < 0.01d);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
@@ -69,6 +92,36 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         var playbackMediaField = typeof(PlayerTrimWindowViewModel).GetField("_playbackMedia", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(playbackMediaField);
         Assert.NotNull(playbackMediaField!.GetValue(viewModel));
+    }
+
+    [Fact]
+    public void PlayCommand_should_reuse_existing_media_for_same_source()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-source-reuse.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PlayCommand.Execute(null);
+        viewModel.PauseCommand.Execute(null);
+
+        var playbackMediaField = typeof(PlayerTrimWindowViewModel).GetField("_playbackMedia", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(playbackMediaField);
+        var firstMedia = playbackMediaField!.GetValue(viewModel);
+
+        viewModel.PlayCommand.Execute(null);
+        var secondMedia = playbackMediaField.GetValue(viewModel);
+
+        Assert.Same(firstMedia, secondMedia);
     }
 
     public void Dispose()
@@ -115,6 +168,14 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             throw new InvalidOperationException($"ffmpeg nije uspeo da napravi playback test video: {errorText}");
         }
 
+        return fullPath;
+    }
+
+    private string CreateTinyPng(string fileName)
+    {
+        var fullPath = Path.Combine(_rootPath, fileName);
+        var bytes = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5yR0YAAAAASUVORK5CYII=");
+        File.WriteAllBytes(fullPath, bytes);
         return fullPath;
     }
 

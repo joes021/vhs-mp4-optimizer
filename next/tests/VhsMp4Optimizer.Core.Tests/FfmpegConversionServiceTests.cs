@@ -71,7 +71,7 @@ public sealed class FfmpegConversionServiceTests : IDisposable
                 AudioBitrate = "128k"
             },
             OutputPath = outputPath
-        }, timeout.Token);
+        }, null, timeout.Token);
 
         Assert.True(File.Exists(outputPath));
         Assert.True(new FileInfo(outputPath).Length > 0);

@@ -18,19 +18,24 @@ using CoreServices = VhsMp4Optimizer.Core.Services;
 
 namespace VhsMp4Optimizer.App.ViewModels;
 
-public partial class PlayerTrimWindowViewModel : ViewModelBase
+public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly Action<TimelineProject, ItemTransformSettings?> _saveAction;
     private readonly IPreviewFrameService _previewFrameService;
     private readonly CropDetectService _cropDetectService = new();
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
+    private CancellationTokenSource? _previewDebounceCts;
     private readonly DispatcherTimer _playbackTimer;
     private LibVLC? _libVlc;
     private MediaPlayer? _playbackMediaPlayer;
     private Media? _playbackMedia;
     private long? _pendingPlaybackSeekMilliseconds;
     private bool _previewBusy;
+    private bool _suppressPreviewAutoRefresh;
+    private bool _awaitingPlaybackFrame;
+    private bool _disposed;
+    private double _lastRequestedSourceSeconds;
 
     public PlayerTrimWindowViewModel(
         QueueItemSummary item,
@@ -233,7 +238,16 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         SyncSelectedTimelineBlock();
     }
 
-    partial void OnPreviewVirtualSecondsChanged(double value) => UpdatePreviewTimeTexts();
+    partial void OnPreviewVirtualSecondsChanged(double value)
+    {
+        UpdatePreviewTimeTexts();
+        if (_suppressPreviewAutoRefresh || IsPlaying || _disposed)
+        {
+            return;
+        }
+
+        SchedulePreviewRefresh();
+    }
 
     partial void OnIsPlayingChanged(bool value)
     {
@@ -303,13 +317,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
     private async Task GoToStartAsync()
     {
-        PreviewVirtualSeconds = 0;
+        SetPreviewVirtualSecondsSilently(0);
         await CommitPreviewSliderAsync();
     }
 
     private async Task GoToEndAsync()
     {
-        PreviewVirtualSeconds = PreviewVirtualMaximum;
+        SetPreviewVirtualSecondsSilently(PreviewVirtualMaximum);
         await CommitPreviewSliderAsync();
     }
 
@@ -317,7 +331,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     {
         var frameRate = Math.Max(1d, Item.MediaInfo?.FrameRate ?? 25d);
         var stepSeconds = frameDelta / frameRate;
-        PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum);
+        SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum));
         await CommitPreviewSliderAsync();
     }
 
@@ -338,18 +352,23 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
             return;
         }
 
+        EnsurePlaybackMediaLoaded();
+        if (_playbackMediaPlayer?.Media is null)
+        {
+            EditorHint = "Playback media nije pripremljen.";
+            return;
+        }
+
         var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+        _lastRequestedSourceSeconds = sourceSeconds;
         _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
-        _playbackMediaPlayer!.Stop();
-        _playbackMedia?.Dispose();
-        _playbackMedia = new Media(_libVlc!, new Uri(Item.MediaInfo.SourcePath));
-        _playbackMediaPlayer.Media = _playbackMedia;
+        _awaitingPlaybackFrame = true;
         _playbackMediaPlayer.Play();
         IsPlaying = true;
-        IsVideoPlaybackVisible = true;
-        IsPreviewImageVisible = false;
+        IsVideoPlaybackVisible = false;
+        IsPreviewImageVisible = PreviewBitmap is not null;
         _playbackTimer.Start();
-        EditorHint = "Playback aktivan preko pravog video engine-a.";
+        EditorHint = "Playback se pokrece iz trenutno izabranog mesta...";
     }
 
     private void PausePlayback()
@@ -364,6 +383,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         IsPlaying = false;
         IsVideoPlaybackVisible = false;
         IsPreviewImageVisible = true;
+        _awaitingPlaybackFrame = false;
         _ = LoadPreviewAsync();
         EditorHint = $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
     }
@@ -380,7 +400,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         RefreshState();
-        PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum);
+        SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum));
         await LoadPreviewAsync();
     }
 
@@ -430,7 +450,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         SelectedSegment = segment;
-        PreviewVirtualSeconds = Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum);
+        SetPreviewVirtualSecondsSilently(Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum));
         EditorHint = $"{block.Label} segment selektovan | {block.Summary}";
         _ = CommitPreviewSliderAsync();
     }
@@ -466,7 +486,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
             IsPreviewImageVisible = true;
             IsVideoPlaybackVisible = false;
             PlayCommand.NotifyCanExecuteChanged();
-            EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+            EditorHint = $"Ucitavam preview frame | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
             var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token);
             if (token.IsCancellationRequested)
             {
@@ -576,7 +596,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         if (IsPlaying && _playbackMediaPlayer is not null && Item.MediaInfo is not null)
         {
             var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+            _lastRequestedSourceSeconds = sourceSeconds;
             _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
+            _awaitingPlaybackFrame = true;
             _playbackMediaPlayer.Time = _pendingPlaybackSeekMilliseconds.Value;
             UpdatePreviewTimeTexts();
             return;
@@ -596,9 +618,23 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         {
             _playbackMediaPlayer.Time = pendingSeek;
             _pendingPlaybackSeekMilliseconds = null;
+            return;
         }
 
         var sourceSeconds = Math.Max(0, _playbackMediaPlayer.Time / 1000d);
+        if (_awaitingPlaybackFrame)
+        {
+            var acceptableDrift = _lastRequestedSourceSeconds <= 0.01d ? 0.15d : 0.35d;
+            if (Math.Abs(sourceSeconds - _lastRequestedSourceSeconds) > acceptableDrift)
+            {
+                return;
+            }
+
+            _awaitingPlaybackFrame = false;
+            IsVideoPlaybackVisible = true;
+            IsPreviewImageVisible = false;
+        }
+
         if (!TimelineNavigationService.TryMapSourceToVirtual(Timeline, sourceSeconds, Item.MediaInfo.DurationSeconds, out var virtualSeconds))
         {
             var nextSource = TimelineNavigationService.GetNextKeepSourceStart(Timeline, sourceSeconds, Item.MediaInfo.DurationSeconds);
@@ -635,6 +671,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
                 EnableHardwareDecoding = true
             };
             PlaybackMediaPlayerBinding = _playbackMediaPlayer;
+            EnsurePlaybackMediaLoaded();
         }
         catch (Exception ex)
         {
@@ -656,6 +693,48 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
         InitializePlaybackEngine();
         return _playbackMediaPlayer is not null && _libVlc is not null;
+    }
+
+    private void EnsurePlaybackMediaLoaded()
+    {
+        if (_playbackMedia is not null || _playbackMediaPlayer is null || _libVlc is null || Item.MediaInfo is null)
+        {
+            return;
+        }
+
+        if (!File.Exists(Item.MediaInfo.SourcePath))
+        {
+            return;
+        }
+
+        _playbackMedia = new Media(_libVlc, new Uri(Item.MediaInfo.SourcePath));
+        _playbackMediaPlayer.Media = _playbackMedia;
+    }
+
+    private void SchedulePreviewRefresh()
+    {
+        _previewDebounceCts?.Cancel();
+        _previewDebounceCts?.Dispose();
+        _previewDebounceCts = new CancellationTokenSource();
+        var token = _previewDebounceCts.Token;
+        _ = DebouncedPreviewRefreshAsync(token);
+    }
+
+    private async Task DebouncedPreviewRefreshAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(120, cancellationToken);
+            if (cancellationToken.IsCancellationRequested || IsPlaying || _disposed)
+            {
+                return;
+            }
+
+            await LoadPreviewAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private ItemTransformSettings BuildTransformSettings()
@@ -707,4 +786,37 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
     }
 
+    private void SetPreviewVirtualSecondsSilently(double value)
+    {
+        _suppressPreviewAutoRefresh = true;
+        try
+        {
+            PreviewVirtualSeconds = value;
+        }
+        finally
+        {
+            _suppressPreviewAutoRefresh = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+        _previewDebounceCts?.Cancel();
+        _previewDebounceCts?.Dispose();
+        _playbackTimer.Stop();
+        _playbackTimer.Tick -= PlaybackTimerOnTick;
+        _playbackMediaPlayer?.Stop();
+        _playbackMedia?.Dispose();
+        _playbackMediaPlayer?.Dispose();
+        _libVlc?.Dispose();
+        PreviewBitmap?.Dispose();
+    }
 }

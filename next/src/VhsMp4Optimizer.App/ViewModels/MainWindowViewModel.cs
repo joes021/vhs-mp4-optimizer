@@ -133,6 +133,21 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _logMessage = "Migracioni branch je aktivan. Avalonia verzija sada dobija pravo scan/planned output ponasanje.";
 
     [ObservableProperty]
+    private double _conversionProgressPercent;
+
+    [ObservableProperty]
+    private bool _isConversionProgressIndeterminate;
+
+    [ObservableProperty]
+    private string _currentConversionItemText = "Nema aktivne obrade.";
+
+    [ObservableProperty]
+    private string _conversionEtaText = "ETA: --";
+
+    [ObservableProperty]
+    private int _selectedBottomTabIndex;
+
+    [ObservableProperty]
     private QueueItemSummary? _selectedQueueItem;
 
     [ObservableProperty]
@@ -299,25 +314,33 @@ public partial class MainWindowViewModel : ViewModelBase
         var ffmpegPath = ResolvedFfmpegPath!;
         var settings = BuildSettings();
         var items = QueueItems.ToList();
+        var queuedItems = items.Where(CoreServices.QueueWorkflowService.ShouldConvert).ToList();
+        if (queuedItems.Count == 0)
+        {
+            StatusMessage = "Nema queued stavki za obradu.";
+            return;
+        }
+
         var converted = 0;
         var failed = false;
         _isConverting = true;
         _isBatchPaused = false;
         _pauseRequested = false;
         PauseResumeLabel = "Pause";
+        IsConversionProgressIndeterminate = true;
+        ConversionProgressPercent = 0;
+        CurrentConversionItemText = "Pripremam batch...";
+        ConversionEtaText = "ETA: --";
+        SelectedBottomTabIndex = 1;
         PauseResumeCommand.NotifyCanExecuteChanged();
 
         try
         {
-            foreach (var item in items)
+            foreach (var item in queuedItems)
             {
-                if (!CoreServices.QueueWorkflowService.ShouldConvert(item))
-                {
-                    continue;
-                }
-
                 ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "processing"));
                 ProgressMessage = $"Obrada: {currentDisplayName(item)}";
+                CurrentConversionItemText = item.SourceFile;
 
                 try
                 {
@@ -331,8 +354,22 @@ public partial class MainWindowViewModel : ViewModelBase
                         TransformSettings = item.TransformSettings
                     };
 
-                    await _conversionService.ConvertAsync(ffmpegPath, request);
+                    var completedBeforeCurrentItem = converted;
+                    var progress = new Progress<ConversionProgressInfo>(update =>
+                    {
+                        IsConversionProgressIndeterminate = false;
+                        var overallFraction = Math.Clamp((completedBeforeCurrentItem + update.Fraction) / queuedItems.Count, 0, 1);
+                        ConversionProgressPercent = overallFraction * 100d;
+                        CurrentConversionItemText = $"{item.SourceFile} | {FormatTimeSpan(update.ProcessedDuration)} / {FormatTimeSpan(update.ExpectedDuration)}";
+                        ConversionEtaText = update.EstimatedRemaining is { } eta
+                            ? $"ETA: {FormatTimeSpan(eta)} | brzina {update.SpeedText}"
+                            : $"Brzina: {update.SpeedText}";
+                        ProgressMessage = $"Obrada: {item.SourceFile} | {overallFraction:P0} | {CurrentConversionItemText} | {ConversionEtaText}";
+                    });
+
+                    await _conversionService.ConvertAsync(ffmpegPath, request, progress);
                     converted++;
+                    ConversionProgressPercent = Math.Clamp((double)converted / queuedItems.Count, 0, 1) * 100d;
                     ReplaceItem(item.SourcePath, current => CloneItem(current, current.MediaInfo, current.PlannedOutput, "done"));
                 }
                 catch (Exception ex)
@@ -361,7 +398,13 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (!_isBatchPaused && !failed)
             {
-                ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted}";
+                IsConversionProgressIndeterminate = false;
+                ConversionProgressPercent = 100d;
+                CurrentConversionItemText = converted == 0
+                    ? "Nema obradjenih stavki."
+                    : $"{queuedItems.Last().SourceFile} | batch zavrsen ({converted} stavki)";
+                ConversionEtaText = "ETA: 00:00:00";
+                ProgressMessage = $"Konverzija zavrsena. Obradjeno: {converted} | {ConversionEtaText}";
                 StatusMessage = $"Start Conversion zavrsen. Done: {converted} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
                 LogMessage = $"Output folder: {OutputFolder}";
                 PauseResumeLabel = "Pause";
@@ -1107,4 +1150,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         SetFfmpegPath(detected);
     }
+
+    private static string FormatTimeSpan(TimeSpan? value)
+        => value is null ? "--" : value.Value.ToString(@"hh\:mm\:ss");
 }

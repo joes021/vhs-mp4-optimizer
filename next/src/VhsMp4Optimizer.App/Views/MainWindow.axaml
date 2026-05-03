@@ -76,14 +76,14 @@
 
         <Style Selector="Button.action">
             <Setter Property="MinHeight" Value="40" />
-            <Setter Property="MinWidth" Value="120" />
+            <Setter Property="MinWidth" Value="108" />
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
 
         <Style Selector="Button.batch-action">
             <Setter Property="MinHeight" Value="42" />
-            <Setter Property="MinWidth" Value="150" />
+            <Setter Property="MinWidth" Value="136" />
             <Setter Property="Padding" Value="16,10" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -143,7 +143,7 @@
                 <Border Grid.Column="0" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
                     <StackPanel Spacing="10">
                         <TextBlock Classes="section-title" Text="Input folder" />
-                        <Grid ColumnDefinitions="96,*,96,96" ColumnSpacing="10">
+                        <Grid ColumnDefinitions="96,*,112,112" ColumnSpacing="12">
                             <TextBlock VerticalAlignment="Center" Text="Source" />
                             <TextBox Grid.Column="1" MinHeight="42" VerticalAlignment="Center" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
                             <Button Grid.Column="2" Classes="action" Content="Files..." Click="BrowseInputFilesClick" />
@@ -156,7 +156,7 @@
                 <Border Grid.Column="2" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
                     <StackPanel Spacing="10">
                         <TextBlock Classes="section-title" Text="Output folder" />
-                        <Grid ColumnDefinitions="96,*,112" ColumnSpacing="10">
+                        <Grid ColumnDefinitions="96,*,118" ColumnSpacing="12">
                             <TextBlock VerticalAlignment="Center" Text="Target" />
                             <TextBox Grid.Column="1" MinHeight="42" VerticalAlignment="Center" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
                             <Button Grid.Column="2" Classes="action" Content="Browse..." Click="BrowseOutputFolderClick" />
@@ -173,7 +173,7 @@
                 <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
                     <TextBlock Classes="section-title" Text="Quick Setup" />
 
-                    <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="20">
+                    <Grid Grid.Row="1" ColumnDefinitions="170,190,120,130,130" ColumnSpacing="20" HorizontalAlignment="Left">
                         <StackPanel Grid.Column="0" Spacing="4">
                             <TextBlock Classes="field-label" Text="Workflow preset" />
                             <ComboBox MinHeight="42" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
@@ -208,7 +208,7 @@
                     <Border Grid.Row="3" Classes="subtle-group">
                         <StackPanel Spacing="10">
                             <TextBlock Classes="group-title" Text="Batch actions" />
-                            <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="10">
+                            <Grid ColumnDefinitions="136,136,136,136,136,136" ColumnSpacing="10" HorizontalAlignment="Left">
                                 <Button Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
                                 <Button Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
                                 <Button Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
@@ -266,7 +266,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Width="230" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="250" Margin="0,0,10,10">
                         <StackPanel Spacing="8">
                             <TextBlock Classes="field-label" Text="Split output" />
                             <CheckBox Content="Enable split" IsChecked="{Binding SplitOutput}" />
@@ -275,7 +275,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Classes="subtle-group" Width="320" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="360" Margin="0,0,10,10">
                         <StackPanel Spacing="6">
                             <TextBlock Classes="field-label" Text="Sample clip" />
                             <TextBox Text="{Binding SampleStartText}" PlaceholderText="Sample start (00:00:30)" />
@@ -390,7 +390,7 @@
         <GridSplitter Grid.Row="8" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows"/>
 
         <Border Grid.Row="9" Classes="card">
-            <TabControl>
+            <TabControl SelectedIndex="{Binding SelectedBottomTabIndex}">
                 <TabItem Header="Status">
                     <Border Padding="12">
                         <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
@@ -398,7 +398,16 @@
                 </TabItem>
                 <TabItem Header="Progress">
                     <Border Padding="12">
-                        <TextBlock Text="{Binding ProgressMessage}" TextWrapping="Wrap" />
+                        <StackPanel Spacing="10">
+                            <ProgressBar Minimum="0"
+                                         Maximum="100"
+                                         Height="18"
+                                         IsIndeterminate="{Binding IsConversionProgressIndeterminate}"
+                                         Value="{Binding ConversionProgressPercent}" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding CurrentConversionItemText}" />
+                            <TextBlock Text="{Binding ConversionEtaText}" />
+                            <TextBlock Text="{Binding ProgressMessage}" TextWrapping="Wrap" />
+                        </StackPanel>
                     </Border>
                 </TabItem>
                 <TabItem Header="Log">
