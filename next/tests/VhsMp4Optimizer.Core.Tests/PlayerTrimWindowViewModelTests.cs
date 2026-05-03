@@ -1,16 +1,21 @@
 using VhsMp4Optimizer.App.ViewModels;
+using Avalonia;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Infrastructure.Services;
 using System.Diagnostics;
 using System.Reflection;
+using System.Threading;
+using VhsMp4Optimizer.App;
 
 namespace VhsMp4Optimizer.Core.Tests;
 
 public sealed class PlayerTrimWindowViewModelTests : IDisposable
 {
+    private static int _avaloniaInitialized;
     private readonly string _rootPath;
     public PlayerTrimWindowViewModelTests()
     {
+        EnsureAvaloniaInitialized();
         _rootPath = Path.Combine(Path.GetTempPath(), $"vhs-next-trim-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_rootPath);
     }
@@ -261,12 +266,112 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.Contains(requestedSeconds, value => Math.Abs(value - 1.0d) < 0.05d);
     }
 
+    [Fact]
+    public async Task PrepareForDisplayAsync_should_render_preview_for_large_dv_avi_when_file_is_available()
+    {
+        const string sourcePath = @"F:\Veliki avi\1996 -1 -6 - .avi";
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath) || !File.Exists(sourcePath))
+        {
+            return;
+        }
+
+        var queueItem = new QueueItemSummary
+        {
+            SourceFile = Path.GetFileName(sourcePath),
+            SourcePath = sourcePath,
+            OutputFile = "1996 -1 -6 - .mp4",
+            OutputPath = Path.Combine(_rootPath, "1996 -1 -6 - .mp4"),
+            OutputPattern = Path.Combine(_rootPath, "1996 -1 -6 - .mp4"),
+            Container = "avi",
+            Resolution = "720x576",
+            Duration = "01:49:23",
+            Video = "dvvideo | 720x576 | 25 fps",
+            Audio = "pcm_s16le | 2 ch",
+            Status = "queued",
+            PlannedOutput = new OutputPlanSummary
+            {
+                DisplayOutputName = "1996 -1 -6 - .mp4",
+                Container = "mp4",
+                Resolution = "768x576",
+                DurationText = "01:49:23",
+                VideoCodecLabel = "h264",
+                VideoBitrateComparisonText = "5000k",
+                AudioCodecText = "aac",
+                AudioBitrateText = "160k",
+                BitrateText = "5160 kbps",
+                EncodeEngineText = "CPU",
+                EstimatedSizeText = "4.0 GB",
+                UsbNoteText = "split 2 dela",
+                SplitModeText = "split",
+                CropText = "--",
+                AspectText = "4:3",
+                OutputWidth = 768,
+                OutputHeight = 576
+            },
+            MediaInfo = new MediaInfo
+            {
+                SourceName = Path.GetFileName(sourcePath),
+                SourcePath = sourcePath,
+                Container = "avi",
+                DurationSeconds = 6563.16,
+                DurationText = "01:49:23",
+                SizeBytes = 24955441664,
+                SizeText = "24 GB",
+                OverallBitrateKbps = 30419,
+                OverallBitrateText = "30419 kbps",
+                VideoCodec = "dvvideo",
+                Width = 720,
+                Height = 576,
+                Resolution = "720x576",
+                DisplayAspectRatio = "4:3",
+                SampleAspectRatio = "16:15",
+                FrameRate = 25,
+                FrameRateText = "25 fps",
+                FrameCount = 164079,
+                VideoBitrateKbps = 28800,
+                VideoBitrateText = "28800 kbps",
+                AudioCodec = "pcm_s16le",
+                AudioChannels = 2,
+                AudioSampleRateHz = 48000,
+                AudioBitrateKbps = 1536,
+                AudioBitrateText = "1536 kbps",
+                VideoSummary = "dvvideo | 720x576 | 25 fps",
+                AudioSummary = "pcm_s16le | 2 ch"
+            }
+        };
+
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        await viewModel.PrepareForDisplayAsync();
+
+        Assert.NotNull(viewModel.PreviewBitmap);
+        Assert.DoesNotContain("Preview nije uspeo", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))
         {
             Directory.Delete(_rootPath, true);
         }
+    }
+
+    private static void EnsureAvaloniaInitialized()
+    {
+        if (Interlocked.CompareExchange(ref _avaloniaInitialized, 1, 0) != 0)
+        {
+            return;
+        }
+
+        AppBuilder.Configure<VhsMp4Optimizer.App.App>()
+            .UsePlatformDetect()
+            .WithInterFont()
+            .SetupWithoutStarting();
     }
 
     private string CreateRealVideo(string fileName, string ffmpegPath)

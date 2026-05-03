@@ -217,30 +217,26 @@
                                Text="Workflow preset menja gotovu grupu izlaznih podesavanja, a quality, scale i bitrate mozes odmah rucno da doradis."
                                TextWrapping="Wrap" />
 
-                    <Border Grid.Row="3" Classes="subtle-group">
-                        <StackPanel Spacing="10">
-                            <TextBlock Classes="group-title" Text="Batch actions" />
-                            <Grid ColumnDefinitions="168,168,168,168,168,168" ColumnSpacing="12" HorizontalAlignment="Left">
-                                <Button Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                                <Button Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
-                                <Button Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                                <Button Grid.Column="3" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
-                                <Button Grid.Column="4" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
-                                <Button Grid.Column="5" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Row="3" Spacing="10">
+                        <TextBlock Classes="group-title" Text="Batch actions" />
+                        <Grid ColumnDefinitions="168,168,168,168,168,168" ColumnSpacing="12" HorizontalAlignment="Left">
+                            <Button Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
+                            <Button Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
+                            <Button Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                            <Button Grid.Column="3" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
+                            <Button Grid.Column="4" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
+                            <Button Grid.Column="5" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                        </Grid>
+                    </StackPanel>
                 </Grid>
 
-                <Border Grid.Column="2" Classes="subtle-group">
-                    <StackPanel VerticalAlignment="Stretch" Spacing="12">
-                        <TextBlock Classes="group-title" Text="Render" />
-                        <Button Classes="primary-big" Content="Pokreni konverziju" Command="{Binding StartConversionCommand}" />
-                        <TextBlock Classes="hint"
-                                   Text="Batch konverzija, test sample i trim koriste ista izlazna podesavanja."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
+                <StackPanel Grid.Column="2" VerticalAlignment="Top" Spacing="12">
+                    <TextBlock Classes="group-title" Text="Render" />
+                    <Button Classes="primary-big" Content="Pokreni konverziju" Command="{Binding StartConversionCommand}" />
+                    <TextBlock Classes="hint"
+                               Text="Batch konverzija, test sample i trim koriste ista izlazna podesavanja."
+                               TextWrapping="Wrap" />
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -309,6 +305,12 @@
                                 <TextBox Grid.Column="0" Width="150" Text="{Binding SampleStartText}" PlaceholderText="Sample start" />
                                 <TextBox Grid.Column="1" Width="150" Text="{Binding SampleDurationText}" PlaceholderText="Sample duration" />
                             </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="subtle-group" Width="280" Margin="0,0,10,10">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="field-label" Text="Sample actions" />
                             <Grid ColumnDefinitions="120,120" ColumnSpacing="10" HorizontalAlignment="Left">
                                 <Button Grid.Column="0" Width="120" Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
                                 <Button Grid.Column="1" Width="120" Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />

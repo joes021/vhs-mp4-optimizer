@@ -129,10 +129,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _audioBitrate = "160k";
 
     [ObservableProperty]
-    private string _sampleStartText = string.Empty;
+    private string _sampleStartText = "00:00:00";
 
     [ObservableProperty]
-    private string _sampleDurationText = string.Empty;
+    private string _sampleDurationText = "00:02:00";
 
     [ObservableProperty]
     private string _pauseResumeLabel = "Pause";
@@ -1338,7 +1338,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return Math.Max(0, Math.Min(sourceDurationSeconds, explicitStart));
         }
 
-        return sourceDurationSeconds > 150 ? 30 : 0;
+        return 0;
     }
 
     private double ResolveSampleDurationSeconds(double sourceDurationSeconds, double startSeconds)
@@ -1349,7 +1349,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return Math.Min(clamped, Math.Max(1, sourceDurationSeconds - startSeconds));
         }
 
-        return Math.Min(120, Math.Max(10, sourceDurationSeconds - startSeconds));
+        return Math.Min(120, Math.Max(1, sourceDurationSeconds - startSeconds));
     }
 
     private static bool TryParseTimeText(string value, out double seconds)

@@ -17,6 +17,7 @@ public sealed class PlayerTrimWindowMarkupTests
         var markup = File.ReadAllText(markupPath);
 
         Assert.Contains("<controls:EmbeddedVideoView", markup, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsVideoPlaybackVisible}\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("<vlc:VideoView", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"Preview Frame\"", markup, StringComparison.Ordinal);
@@ -69,6 +70,25 @@ public sealed class PlayerTrimWindowMarkupTests
 
         Assert.Contains("PreviewSliderPointerPressed", source, StringComparison.Ordinal);
         Assert.Contains("BeginManualPreviewNavigation", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindowViewModel_should_open_vlc_media_from_source_path()
+    {
+        var projectRoot = FindProjectRoot();
+        var sourcePath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "ViewModels",
+            "PlayerTrimWindowViewModel.cs");
+
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("new Media(_libVlc, Item.MediaInfo.SourcePath, FromType.FromPath)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Media(_libVlc, new Uri(Item.MediaInfo.SourcePath))", source, StringComparison.Ordinal);
+        Assert.Contains("media.AddOption(\":demux=avformat\")", source, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string text, string value)

@@ -105,6 +105,15 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void MainWindowViewModel_should_start_with_default_sample_clip_values()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        Assert.Equal("00:00:00", viewModel.SampleStartText);
+        Assert.Equal("00:02:00", viewModel.SampleDurationText);
+    }
+
+    [Fact]
     public async Task StartConversionCommand_should_write_report_and_surface_output_and_report_paths_in_log()
     {
         var filePath = CreateFile("convert-report.avi");
@@ -199,6 +208,27 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         Assert.True(viewModel.TestSampleCommand.CanExecute(null));
         Assert.True(viewModel.StartConversionCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task TestSampleCommand_should_use_default_sample_start_and_duration_immediately()
+    {
+        var filePath = CreateFile("sample-defaults.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        await viewModel.TestSampleCommand.ExecuteAsync(null);
+
+        Assert.Single(conversionService.Requests);
+        var request = conversionService.Requests[0];
+        Assert.True(request.IsSample);
+        Assert.Equal(0, request.SampleStartSeconds);
+        Assert.Equal(120, request.SampleDurationSeconds);
     }
 
     [Fact]

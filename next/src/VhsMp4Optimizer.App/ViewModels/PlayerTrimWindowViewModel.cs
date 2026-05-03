@@ -731,8 +731,24 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        _playbackMedia = new Media(_libVlc, new Uri(Item.MediaInfo.SourcePath));
+        var media = new Media(_libVlc, Item.MediaInfo.SourcePath, FromType.FromPath);
+        if (ShouldForceAvformatDemux(Item.MediaInfo))
+        {
+            media.AddOption(":demux=avformat");
+        }
+
+        _playbackMedia = media;
         _playbackMediaPlayer.Media = _playbackMedia;
+    }
+
+    private static bool ShouldForceAvformatDemux(MediaInfo mediaInfo)
+    {
+        if (string.Equals(mediaInfo.Container, "avi", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(mediaInfo.VideoCodec, "dvvideo", StringComparison.OrdinalIgnoreCase);
     }
 
     private void SchedulePreviewRefresh()

@@ -61,6 +61,8 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("Text=\"Batch actions\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"5\" Classes=\"batch-action\" Content=\"{Binding PauseResumeLabel}\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Border Grid.Row=\"3\" Classes=\"subtle-group\">", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Border Grid.Column=\"2\" Classes=\"subtle-group\">", markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -84,7 +86,7 @@ public sealed class MainWindowMarkupTests
     }
 
     [Fact]
-    public void MainWindow_should_keep_sample_clip_fields_and_buttons_compact()
+    public void MainWindow_should_keep_sample_clip_and_actions_in_separate_compact_groups()
     {
         var projectRoot = FindProjectRoot();
         var markupPath = Path.Combine(
@@ -98,8 +100,11 @@ public sealed class MainWindowMarkupTests
         var markup = File.ReadAllText(markupPath);
 
         Assert.Contains("Text=\"Sample clip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Sample actions\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"150,150\"", markup, StringComparison.Ordinal);
         Assert.Contains("Width=\"120\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Test Sample\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Open Sample\"", markup, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()

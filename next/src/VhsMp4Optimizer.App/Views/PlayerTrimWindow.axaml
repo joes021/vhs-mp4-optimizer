@@ -90,6 +90,7 @@
                     <Grid>
                         <controls:EmbeddedVideoView x:Name="PlaybackVideoView"
                                                     MediaPlayer="{Binding PlaybackMediaPlayerBinding}"
+                                                    IsVisible="{Binding IsVideoPlaybackVisible}"
                                                     HorizontalAlignment="Stretch"
                                                     VerticalAlignment="Stretch" />
                         <Image Source="{Binding PreviewBitmap}"
