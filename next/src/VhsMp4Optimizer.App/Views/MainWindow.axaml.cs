@@ -20,6 +20,8 @@ public partial class MainWindow : Window
 {
     private PlayerTrimWindow? _playerTrimWindow;
     private readonly WorkspaceLayoutService _layoutService = new();
+    private readonly AppSessionStateService _sessionStateService = new();
+    private readonly NextUpdateService _updateService = new();
 
     public MainWindow()
     {
@@ -271,18 +273,45 @@ public partial class MainWindow : Window
         });
     }
 
-    private void CheckForUpdatesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void CheckForUpdatesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel viewModel)
+        if (DataContext is not MainWindowViewModel viewModel)
         {
-            viewModel.StatusMessage = "Otvaram GitHub release stranicu za VHS MP4 Optimizer Next.";
+            return;
         }
 
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = "https://github.com/joes021/vhs-mp4-optimizer/releases",
-            UseShellExecute = true
-        });
+            viewModel.StatusMessage = "Proveravam da li postoji novija Next verzija...";
+            var assembly = typeof(MainWindow).Assembly;
+            var currentVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+', 2)[0]
+                ?? assembly.GetName().Version?.ToString()
+                ?? "0.0.0";
+
+            var latest = await _updateService.GetLatestReleaseAsync();
+            if (latest is null)
+            {
+                viewModel.StatusMessage = "Nisam uspeo da procitam GitHub release informacije.";
+                return;
+            }
+
+            if (NextUpdateService.IsNewerVersion(currentVersion, latest.TagName))
+            {
+                viewModel.StatusMessage = $"Pronadjena je novija verzija ({latest.TagName}). Otvaram release stranicu.";
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = latest.ReleaseUrl,
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            viewModel.StatusMessage = $"Vec koristis aktuelnu Next verziju ({currentVersion}).";
+        }
+        catch (Exception ex)
+        {
+            viewModel.StatusMessage = $"Provera update-a nije uspela: {ex.Message}";
+        }
     }
 
     private async void SaveQueueClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -423,11 +452,19 @@ public partial class MainWindow : Window
     private void OnOpened(object? sender, EventArgs e)
     {
         ApplyLayoutState(_layoutService.LoadOrDefault());
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.ApplySessionState(_sessionStateService.LoadOrDefault());
+        }
     }
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         _layoutService.Save(CaptureLayoutState());
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            _sessionStateService.Save(viewModel.CaptureSessionState());
+        }
     }
 
     private void ApplyLayoutState(WorkspaceLayoutState state)

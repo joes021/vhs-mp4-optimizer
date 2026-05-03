@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using VhsMp4Optimizer.Core.Models;
 using CoreServices = VhsMp4Optimizer.Core.Services;
 using VhsMp4Optimizer.Infrastructure.Services;
+using VhsMp4Optimizer.App.Models;
 
 namespace VhsMp4Optimizer.App.ViewModels;
 
@@ -594,6 +595,38 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(folderPath))
         {
             OutputFolder = Path.GetFullPath(folderPath);
+        }
+    }
+
+    public AppSessionState CaptureSessionState() => new()
+    {
+        InputFolder = InputFolder,
+        OutputFolder = OutputFolder,
+        FfmpegPath = ResolvedFfmpegPath
+    };
+
+    public void ApplySessionState(AppSessionState? state)
+    {
+        if (state is null)
+        {
+            return;
+        }
+
+        _suppressSelectionReset = true;
+        try
+        {
+            InputFolder = state.InputFolder;
+        }
+        finally
+        {
+            _suppressSelectionReset = false;
+        }
+
+        OutputFolder = state.OutputFolder;
+        if (!string.IsNullOrWhiteSpace(state.FfmpegPath))
+        {
+            ResolvedFfmpegPath = state.FfmpegPath;
+            StatusMessage = $"FFmpeg putanja je vracena iz poslednje sesije: {ResolvedFfmpegPath}";
         }
     }
 
