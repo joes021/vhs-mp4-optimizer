@@ -47,11 +47,15 @@ public partial class MainWindow : Window
             viewModel.ApplyEditorState(selectedItem.SourcePath, timeline, transformSettings);
         });
 
-        if (_playerTrimWindow is null || !_playerTrimWindow.IsVisible)
+        if (_playerTrimWindow is { IsVisible: true })
         {
-            _playerTrimWindow = new PlayerTrimWindow();
+            _playerTrimWindow.DataContext = editorViewModel;
+            _playerTrimWindow.Activate();
+            return;
         }
 
+        _playerTrimWindow = new PlayerTrimWindow();
+        _playerTrimWindow.Closed += (_, _) => _playerTrimWindow = null;
         _playerTrimWindow.DataContext = editorViewModel;
         _playerTrimWindow.Show();
         _playerTrimWindow.Activate();

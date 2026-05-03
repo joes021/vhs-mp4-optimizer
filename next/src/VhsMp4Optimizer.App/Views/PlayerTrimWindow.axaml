@@ -87,13 +87,17 @@
 
                 <Border Grid.Row="1" Background="#0F172A" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
                     <Grid>
-                        <Image Source="{Binding PreviewBitmap}" IsVisible="{Binding IsPreviewImageVisible}" Stretch="Uniform" />
-                        <vlc:VideoView MediaPlayer="{Binding PlaybackMediaPlayerBinding}"
-                                       IsVisible="{Binding IsVideoPlaybackVisible}"
+                        <vlc:VideoView x:Name="PlaybackVideoView"
+                                       MediaPlayer="{Binding PlaybackMediaPlayerBinding}"
                                        HorizontalAlignment="Stretch"
                                        VerticalAlignment="Stretch" />
+                        <Image Source="{Binding PreviewBitmap}"
+                               IsVisible="{Binding IsPreviewImageVisible}"
+                               IsHitTestVisible="False"
+                               Stretch="Uniform" />
                         <Border IsVisible="{Binding IsPreviewLoading}"
                                 Background="#B30F172A"
+                                IsHitTestVisible="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Padding="16,12"
