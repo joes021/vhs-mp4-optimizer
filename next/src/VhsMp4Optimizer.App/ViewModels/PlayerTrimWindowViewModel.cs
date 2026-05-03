@@ -383,25 +383,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     private void PausePlayback()
     {
-        if (!IsPlaying)
-        {
-            return;
-        }
+        PausePlaybackCore(loadPreviewAfterPause: true, $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}");
+    }
 
-        _playbackTimer.Stop();
-        _playbackMediaPlayer?.Pause();
-        IsPlaying = false;
-        IsVideoPlaybackVisible = false;
-        IsPreviewImageVisible = true;
-        _awaitingPlaybackFrame = false;
-        _unmuteWhenPlaybackFrameArrives = false;
-        if (_playbackMediaPlayer is not null)
-        {
-            _playbackMediaPlayer.Mute = false;
-        }
-
-        _ = LoadPreviewAsync();
-        EditorHint = $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+    public void BeginManualPreviewNavigation()
+    {
+        PausePlaybackCore(loadPreviewAfterPause: false, "Pomeraj timeline za precizan trim frame.");
     }
 
     private void SetInPointFromCurrent() => InPointText = PreviewSourceTimeText;
@@ -834,6 +821,34 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             _suppressPreviewAutoRefresh = false;
+        }
+    }
+
+    private void PausePlaybackCore(bool loadPreviewAfterPause, string hint)
+    {
+        if (!IsPlaying && !IsVideoPlaybackVisible)
+        {
+            EditorHint = hint;
+            return;
+        }
+
+        _playbackTimer.Stop();
+        _playbackMediaPlayer?.Pause();
+        IsPlaying = false;
+        IsVideoPlaybackVisible = false;
+        IsPreviewImageVisible = true;
+        _awaitingPlaybackFrame = false;
+        _unmuteWhenPlaybackFrameArrives = false;
+        _pendingPlaybackSeekMilliseconds = null;
+        if (_playbackMediaPlayer is not null)
+        {
+            _playbackMediaPlayer.Mute = false;
+        }
+
+        EditorHint = hint;
+        if (loadPreviewAfterPause)
+        {
+            _ = LoadPreviewAsync();
         }
     }
 

@@ -147,6 +147,31 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.Same(firstMedia, secondMedia);
     }
 
+    [Fact]
+    public void BeginManualPreviewNavigation_should_leave_playback_mode_and_return_to_trim_preview()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-source-manual-nav.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PlayCommand.Execute(null);
+        viewModel.BeginManualPreviewNavigation();
+
+        Assert.False(viewModel.IsPlaying);
+        Assert.False(viewModel.IsVideoPlaybackVisible);
+        Assert.True(viewModel.IsPreviewImageVisible);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))

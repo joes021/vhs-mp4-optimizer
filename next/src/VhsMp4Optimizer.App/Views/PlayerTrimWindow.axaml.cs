@@ -22,6 +22,14 @@ public partial class PlayerTrimWindow : Window
         }
     }
 
+    private void PreviewSliderPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is PlayerTrimWindowViewModel viewModel)
+        {
+            viewModel.BeginManualPreviewNavigation();
+        }
+    }
+
     private void ClosePlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)

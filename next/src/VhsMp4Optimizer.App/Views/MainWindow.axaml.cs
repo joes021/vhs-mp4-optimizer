@@ -54,17 +54,17 @@ public partial class MainWindow : Window
                 disposable.Dispose();
             }
             _playerTrimWindow.DataContext = editorViewModel;
-            await editorViewModel.PrepareForDisplayAsync();
             _playerTrimWindow.Activate();
+            await editorViewModel.PrepareForDisplayAsync();
             return;
         }
 
         _playerTrimWindow = new PlayerTrimWindow();
         _playerTrimWindow.Closed += (_, _) => _playerTrimWindow = null;
         _playerTrimWindow.DataContext = editorViewModel;
-        await editorViewModel.PrepareForDisplayAsync();
-        _playerTrimWindow.Show();
+        _playerTrimWindow.Show(this);
         _playerTrimWindow.Activate();
+        await editorViewModel.PrepareForDisplayAsync();
     }
 
     private void QueueListDoubleTapped(object? sender, TappedEventArgs e)

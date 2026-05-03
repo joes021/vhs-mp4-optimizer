@@ -19,6 +19,12 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("<controls:EmbeddedVideoView", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("<vlc:VideoView", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Preview Frame\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"In\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Out\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"250 &gt;&gt;&gt;\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"&lt;&lt;&lt; 250\"", markup, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(markup, "Text=\"{Binding EditorHint}\""));
     }
 
     [Fact]
@@ -37,6 +43,40 @@ public sealed class PlayerTrimWindowMarkupTests
 
         Assert.Contains("_playerTrimWindow.Closed +=", source, StringComparison.Ordinal);
         Assert.Contains("_playerTrimWindow = null;", source, StringComparison.Ordinal);
+        Assert.Contains("_playerTrimWindow.Show(this);", source, StringComparison.Ordinal);
+        Assert.True(source.IndexOf("_playerTrimWindow.Show(this);", StringComparison.Ordinal) <
+                    source.LastIndexOf("await editorViewModel.PrepareForDisplayAsync();", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_codebehind_should_pause_playback_for_manual_slider_seek()
+    {
+        var projectRoot = FindProjectRoot();
+        var sourcePath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "Views",
+            "PlayerTrimWindow.axaml.cs");
+
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("PreviewSliderPointerPressed", source, StringComparison.Ordinal);
+        Assert.Contains("BeginManualPreviewNavigation", source, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 
     private static string FindProjectRoot()
