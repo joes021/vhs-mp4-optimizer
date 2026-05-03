@@ -382,20 +382,25 @@ public partial class MainWindow : Window
     private void OpenAboutClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var assembly = typeof(MainWindow).Assembly;
-        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? assembly.GetName().Version?.ToString()
-            ?? "dev";
         var guidePath = DesktopGuideLocator.FindGuidePath(AppContext.BaseDirectory) ?? "Guide nije pronadjen";
+        var aboutInfo = AboutDisplayInfoBuilder.Build(
+            informationalVersion: assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+            fallbackVersion: assembly.GetName().Version?.ToString(),
+            installPath: AppContext.BaseDirectory,
+            guidePath: guidePath,
+            branchHint: "codex/avalonia-migration");
 
         var window = new AboutWindow
         {
             DataContext = new AboutWindowViewModel
             {
-                AppName = "VHS MP4 Optimizer Next",
-                Version = version,
-                InstallPath = AppContext.BaseDirectory,
-                GuidePath = guidePath,
-                BranchHint = "codex/avalonia-migration"
+                AppName = aboutInfo.AppName,
+                Version = aboutInfo.Version,
+                ReleaseTag = aboutInfo.ReleaseTag,
+                GitRef = aboutInfo.GitRef,
+                InstallPath = aboutInfo.InstallPath,
+                GuidePath = aboutInfo.GuidePath,
+                BranchHint = aboutInfo.BranchHint
             }
         };
 
