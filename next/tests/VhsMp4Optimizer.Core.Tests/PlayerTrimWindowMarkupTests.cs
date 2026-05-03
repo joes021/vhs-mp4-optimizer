@@ -29,6 +29,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"&gt;\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"&lt;\"", markup, StringComparison.Ordinal);
         Assert.Equal(1, CountOccurrences(markup, "Text=\"{Binding EditorHint}\""));
+        Assert.DoesNotContain("Ucitavam preview", markup, StringComparison.Ordinal);
     }
 
     [Fact]

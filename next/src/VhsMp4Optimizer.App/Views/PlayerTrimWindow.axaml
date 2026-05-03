@@ -111,16 +111,10 @@
                     <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding PreviewSourceTimeText}" />
                 </Grid>
 
-                <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Grid Grid.Row="3" ColumnDefinitions="*">
                     <TextBlock VerticalAlignment="Center"
                                TextWrapping="Wrap"
                                Text="{Binding EditorHint}" />
-                    <Border Grid.Column="1"
-                            Classes="subtle-group"
-                            IsVisible="{Binding IsPreviewLoading}"
-                            Padding="10,6">
-                        <TextBlock FontWeight="SemiBold" Text="Ucitavam preview..." />
-                    </Border>
                 </Grid>
 
                 <ScrollViewer Grid.Row="4" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">

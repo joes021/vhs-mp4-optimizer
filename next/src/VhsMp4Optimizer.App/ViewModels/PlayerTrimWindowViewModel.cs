@@ -375,10 +375,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         IsPlaying = true;
-        IsVideoPlaybackVisible = false;
-        IsPreviewImageVisible = PreviewBitmap is not null;
+        IsVideoPlaybackVisible = true;
+        IsPreviewImageVisible = false;
         _playbackTimer.Start();
-        EditorHint = "Playback se pokrece iz trenutno izabranog mesta...";
+        EditorHint = "Playback se pokrece iz trenutno izabranog mesta.";
     }
 
     private void PausePlayback()
@@ -399,7 +399,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     {
         if (IsPlaying)
         {
-            PausePlayback();
+            PausePlaybackCore(loadPreviewAfterPause: false, "Prelazim na preview posle izmene timeline/crop stanja.");
         }
 
         RefreshState();
@@ -500,7 +500,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             IsPreviewImageVisible = true;
             IsVideoPlaybackVisible = false;
             PlayCommand.NotifyCanExecuteChanged();
-            EditorHint = $"Ucitavam preview frame | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
             var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token);
             if (token.IsCancellationRequested)
             {
@@ -526,7 +525,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
                 var previous = PreviewBitmap;
                 PreviewBitmap = bitmap;
                 previous?.Dispose();
-                EditorHint = $"Preview spreman | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
             });
         }
         catch (OperationCanceledException)
@@ -620,6 +618,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
             _awaitingPlaybackFrame = true;
             _playbackMediaPlayer.Time = _pendingPlaybackSeekMilliseconds.Value;
+            _pendingPlaybackSeekMilliseconds = null;
             UpdatePreviewTimeTexts();
             return;
         }

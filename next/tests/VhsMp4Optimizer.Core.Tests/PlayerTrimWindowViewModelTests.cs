@@ -172,6 +172,41 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.True(viewModel.IsPreviewImageVisible);
     }
 
+    [Fact]
+    public async Task CommitPreviewSliderAsync_should_render_exact_preview_frame_after_playback_navigation()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-source-preview-frame.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var requestedSeconds = new List<double>();
+        var previewPath = CreateTinyPng("post-playback-preview.png");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            new FakePreviewFrameService((_, _, sourceSeconds, _, _) =>
+            {
+                requestedSeconds.Add(sourceSeconds);
+                return previewPath;
+            }),
+            autoLoadPreview: false);
+
+        viewModel.PlayCommand.Execute(null);
+        viewModel.BeginManualPreviewNavigation();
+        viewModel.PreviewVirtualSeconds = 1.0d;
+        await viewModel.CommitPreviewSliderAsync();
+
+        Assert.False(viewModel.IsPlaying);
+        Assert.False(viewModel.IsVideoPlaybackVisible);
+        Assert.True(viewModel.IsPreviewImageVisible);
+        Assert.Contains(requestedSeconds, value => Math.Abs(value - 1.0d) < 0.05d);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))
