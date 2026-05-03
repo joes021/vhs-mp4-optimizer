@@ -16,7 +16,7 @@ public sealed class MainWindowMarkupTests
 
         var markup = File.ReadAllText(markupPath);
 
-        Assert.Contains("ColumnDefinitions=\"*,*,*,*,*\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"150,150,150,150,150\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnSpacing=\"20\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Converted File\"", markup, StringComparison.Ordinal);
@@ -81,6 +81,25 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("ColumnDefinitions=\"Auto,18,Auto,110\"", markup, StringComparison.Ordinal);
         Assert.Contains("VerticalAlignment=\"Center\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Max part GB\" />\r\n                            <NumericUpDown", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_should_keep_sample_clip_fields_and_buttons_compact()
+    {
+        var projectRoot = FindProjectRoot();
+        var markupPath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "Views",
+            "MainWindow.axaml");
+
+        var markup = File.ReadAllText(markupPath);
+
+        Assert.Contains("Text=\"Sample clip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"150,150\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Width=\"120\"", markup, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()

@@ -185,30 +185,30 @@
                 <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
                     <TextBlock Classes="section-title" Text="Quick Setup" />
 
-                    <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="20" HorizontalAlignment="Stretch">
+                    <Grid Grid.Row="1" ColumnDefinitions="150,150,150,150,150" ColumnSpacing="20" HorizontalAlignment="Left">
                         <StackPanel Grid.Column="0" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Workflow preset" />
-                            <ComboBox MinHeight="42" HorizontalAlignment="Stretch" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
+                            <ComboBox MinHeight="42" Width="150" HorizontalAlignment="Left" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Quality mode" />
-                            <ComboBox MinHeight="42" HorizontalAlignment="Stretch" ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
+                            <ComboBox MinHeight="42" Width="150" HorizontalAlignment="Left" ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Scale" />
-                            <ComboBox MinHeight="42" HorizontalAlignment="Stretch" ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
+                            <ComboBox MinHeight="42" Width="150" HorizontalAlignment="Left" ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="3" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Video bitrate" />
-                            <TextBox MinHeight="42" HorizontalAlignment="Stretch" Text="{Binding VideoBitrate}" />
+                            <TextBox MinHeight="42" Width="150" HorizontalAlignment="Left" Text="{Binding VideoBitrate}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="4" Spacing="4" HorizontalAlignment="Stretch">
                             <TextBlock Classes="field-label" Text="Audio bitrate" />
-                            <TextBox MinHeight="42" HorizontalAlignment="Stretch" Text="{Binding AudioBitrate}" />
+                            <TextBox MinHeight="42" Width="150" HorizontalAlignment="Left" Text="{Binding AudioBitrate}" />
                         </StackPanel>
                     </Grid>
 
@@ -302,14 +302,16 @@
                         </Grid>
                     </Border>
 
-                    <Border Classes="subtle-group" Width="440" Margin="0,0,10,10">
+                    <Border Classes="subtle-group" Width="360" Margin="0,0,10,10">
                         <StackPanel Spacing="6">
                             <TextBlock Classes="field-label" Text="Sample clip" />
-                            <TextBox Text="{Binding SampleStartText}" PlaceholderText="Sample start (00:00:30)" />
-                            <TextBox Text="{Binding SampleDurationText}" PlaceholderText="Sample duration (00:02:00)" />
-                            <Grid ColumnDefinitions="1.1*,1.1*" ColumnSpacing="10">
-                                <Button Grid.Column="0" Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
-                                <Button Grid.Column="1" Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
+                            <Grid ColumnDefinitions="150,150" ColumnSpacing="10" HorizontalAlignment="Left">
+                                <TextBox Grid.Column="0" Width="150" Text="{Binding SampleStartText}" PlaceholderText="Sample start" />
+                                <TextBox Grid.Column="1" Width="150" Text="{Binding SampleDurationText}" PlaceholderText="Sample duration" />
+                            </Grid>
+                            <Grid ColumnDefinitions="120,120" ColumnSpacing="10" HorizontalAlignment="Left">
+                                <Button Grid.Column="0" Width="120" Classes="action" Content="Test Sample" Command="{Binding TestSampleCommand}" />
+                                <Button Grid.Column="1" Width="120" Classes="action" Content="Open Sample" Command="{Binding OpenSampleCommand}" />
                             </Grid>
                         </StackPanel>
                     </Border>
