@@ -26,6 +26,7 @@ public partial class PlayerTrimWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        PlaybackVideoView.MediaPlayer = null;
         if (DataContext is IDisposable disposable)
         {
             disposable.Dispose();

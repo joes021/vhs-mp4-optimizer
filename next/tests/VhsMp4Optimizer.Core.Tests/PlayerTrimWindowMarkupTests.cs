@@ -16,8 +16,8 @@ public sealed class PlayerTrimWindowMarkupTests
 
         var markup = File.ReadAllText(markupPath);
 
-        Assert.Contains("<vlc:VideoView", markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsVisible=\"{Binding IsVideoPlaybackVisible}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("<controls:EmbeddedVideoView", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("<vlc:VideoView", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
     }
 
