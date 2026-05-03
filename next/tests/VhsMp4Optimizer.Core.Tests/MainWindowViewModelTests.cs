@@ -53,6 +53,47 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(Path.GetFullPath(folderPath), scanner.ScanCalls[0].Settings.InputPath);
     }
 
+    [Fact]
+    public async Task StartConversionCommand_should_convert_queued_items_and_mark_them_done()
+    {
+        var filePath = CreateFile("convert-me.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService();
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        Assert.Single(conversionService.Requests);
+        Assert.Equal(filePath, conversionService.Requests[0].MediaInfo.SourcePath);
+        Assert.Equal("done", viewModel.QueueItems.Single().Status);
+        Assert.Contains("Done: 1", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task StartConversionCommand_should_create_real_output_file_when_ffmpeg_is_available()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var filePath = await CreateRealVideoAsync("real-convert-source.avi", ffmpegPath);
+        var viewModel = new MainWindowViewModel(ffmpegPath: ffmpegPath);
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        viewModel.SetOutputFolderPath(_rootPath);
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        var converted = viewModel.QueueItems.Single();
+        Assert.Equal("done", converted.Status);
+        Assert.True(File.Exists(converted.OutputPath));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))
@@ -65,6 +106,45 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var fullPath = Path.Combine(_rootPath, fileName);
         File.WriteAllText(fullPath, "stub");
+        return fullPath;
+    }
+
+    private async Task<string> CreateRealVideoAsync(string fileName, string ffmpegPath)
+    {
+        var fullPath = Path.Combine(_rootPath, fileName);
+        var startInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = ffmpegPath,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var argument in new[]
+                 {
+                     "-y",
+                     "-f", "lavfi",
+                     "-i", "testsrc=size=320x240:rate=25",
+                     "-f", "lavfi",
+                     "-i", "sine=frequency=1000:sample_rate=48000",
+                     "-t", "2",
+                     "-c:v", "mpeg4",
+                     "-c:a", "mp3",
+                     fullPath
+                 })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(startInfo) ?? throw new InvalidOperationException("ffmpeg test source proces nije pokrenut.");
+        await process.WaitForExitAsync();
+        var errorText = await process.StandardError.ReadToEndAsync();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"ffmpeg nije uspeo da napravi test video: {errorText}");
+        }
+
         return fullPath;
     }
 
@@ -167,6 +247,17 @@ public sealed class MainWindowViewModelTests : IDisposable
             }
 
             return Path.Combine(Path.GetDirectoryName(Path.GetFullPath(inputPath))!, "vhs-mp4-output");
+        }
+    }
+
+    private sealed class FakeConversionService : IConversionService
+    {
+        public List<ConversionRequest> Requests { get; } = [];
+
+        public Task ConvertAsync(string ffmpegPath, ConversionRequest request, CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.CompletedTask;
         }
     }
 }

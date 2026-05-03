@@ -1,6 +1,8 @@
 using VhsMp4Optimizer.App.ViewModels;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Infrastructure.Services;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace VhsMp4Optimizer.Core.Tests;
 
@@ -45,6 +47,30 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.Equal("00:05:00.00", viewModel.PreviewSourceTimeText);
     }
 
+    [Fact]
+    public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-source.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PlayCommand.Execute(null);
+
+        var playbackMediaField = typeof(PlayerTrimWindowViewModel).GetField("_playbackMedia", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(playbackMediaField);
+        Assert.NotNull(playbackMediaField!.GetValue(viewModel));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))
@@ -53,12 +79,51 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         }
     }
 
-    private static QueueItemSummary BuildQueueItem()
+    private string CreateRealVideo(string fileName, string ffmpegPath)
+    {
+        var fullPath = Path.Combine(_rootPath, fileName);
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = ffmpegPath,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var argument in new[]
+                 {
+                     "-y",
+                     "-f", "lavfi",
+                     "-i", "testsrc=size=320x240:rate=25",
+                     "-f", "lavfi",
+                     "-i", "sine=frequency=1000:sample_rate=48000",
+                     "-t", "2",
+                     "-c:v", "mpeg4",
+                     "-c:a", "mp3",
+                     fullPath
+                 })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("ffmpeg test source proces nije pokrenut.");
+        process.WaitForExit();
+        var errorText = process.StandardError.ReadToEnd();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"ffmpeg nije uspeo da napravi playback test video: {errorText}");
+        }
+
+        return fullPath;
+    }
+
+    private static QueueItemSummary BuildQueueItem(string sourcePath = @"C:\video\clip.avi")
     {
         var mediaInfo = new MediaInfo
         {
             SourceName = "clip.avi",
-            SourcePath = @"C:\video\clip.avi",
+            SourcePath = sourcePath,
             Container = "avi",
             DurationSeconds = 300,
             DurationText = "00:05:00",

@@ -10,6 +10,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LibVLCSharp.Shared;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Core.Services;
 using VhsMp4Optimizer.Infrastructure.Services;
@@ -25,6 +26,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
     private readonly DispatcherTimer _playbackTimer;
+    private LibVLC? _libVlc;
+    private MediaPlayer? _playbackMediaPlayer;
+    private Media? _playbackMedia;
+    private long? _pendingPlaybackSeekMilliseconds;
     private bool _previewBusy;
 
     public PlayerTrimWindowViewModel(
@@ -84,10 +89,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
         _playbackTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(250)
+            Interval = TimeSpan.FromMilliseconds(40)
         };
         _playbackTimer.Tick += PlaybackTimerOnTick;
 
+        InitializePlaybackEngine();
         RefreshState();
         if (autoLoadPreview)
         {
@@ -150,6 +156,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     public IRelayCommand PauseCommand { get; }
 
     [ObservableProperty]
+    private MediaPlayer? _playbackMediaPlayerBinding;
+
+    [ObservableProperty]
     private string _windowTitle = string.Empty;
 
     [ObservableProperty]
@@ -209,6 +218,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isPlaying;
 
+    [ObservableProperty]
+    private bool _isVideoPlaybackVisible;
+
+    [ObservableProperty]
+    private bool _isPreviewImageVisible = true;
+
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
     {
         DeleteSegmentCommand.NotifyCanExecuteChanged();
@@ -225,8 +240,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         PlayCommand.NotifyCanExecuteChanged();
         PauseCommand.NotifyCanExecuteChanged();
     }
-
-    public Task CommitPreviewSliderAsync() => LoadPreviewAsync();
 
     private async Task ApplyCutSegmentAsync()
     {
@@ -291,13 +304,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
     private async Task GoToStartAsync()
     {
         PreviewVirtualSeconds = 0;
-        await LoadPreviewAsync();
+        await CommitPreviewSliderAsync();
     }
 
     private async Task GoToEndAsync()
     {
         PreviewVirtualSeconds = PreviewVirtualMaximum;
-        await LoadPreviewAsync();
+        await CommitPreviewSliderAsync();
     }
 
     private async Task StepFramesAsync(int frameDelta)
@@ -305,7 +318,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         var frameRate = Math.Max(1d, Item.MediaInfo?.FrameRate ?? 25d);
         var stepSeconds = frameDelta / frameRate;
         PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum);
-        await LoadPreviewAsync();
+        await CommitPreviewSliderAsync();
     }
 
     private bool CanStartPlayback() => !IsPlaying && PreviewVirtualMaximum > 0 && !_previewBusy;
@@ -314,14 +327,29 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
     private void StartPlayback()
     {
-        if (IsPlaying || _previewBusy)
+        if (IsPlaying || _previewBusy || !EnsurePlaybackReady())
         {
             return;
         }
 
+        if (Item.MediaInfo is null || !File.Exists(Item.MediaInfo.SourcePath))
+        {
+            EditorHint = "Ulazni fajl nije dostupan za playback.";
+            return;
+        }
+
+        var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+        _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
+        _playbackMediaPlayer!.Stop();
+        _playbackMedia?.Dispose();
+        _playbackMedia = new Media(_libVlc!, new Uri(Item.MediaInfo.SourcePath));
+        _playbackMediaPlayer.Media = _playbackMedia;
+        _playbackMediaPlayer.Play();
         IsPlaying = true;
+        IsVideoPlaybackVisible = true;
+        IsPreviewImageVisible = false;
         _playbackTimer.Start();
-        EditorHint = "Playback aktivan preko preview timeline-a.";
+        EditorHint = "Playback aktivan preko pravog video engine-a.";
     }
 
     private void PausePlayback()
@@ -332,7 +360,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
 
         _playbackTimer.Stop();
+        _playbackMediaPlayer?.Pause();
         IsPlaying = false;
+        IsVideoPlaybackVisible = false;
+        IsPreviewImageVisible = true;
+        _ = LoadPreviewAsync();
         EditorHint = $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
     }
 
@@ -342,6 +374,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
 
     private async Task RefreshStateAndPreviewAsync()
     {
+        if (IsPlaying)
+        {
+            PausePlayback();
+        }
+
         RefreshState();
         PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum);
         await LoadPreviewAsync();
@@ -395,7 +432,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         SelectedSegment = segment;
         PreviewVirtualSeconds = Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum);
         EditorHint = $"{block.Label} segment selektovan | {block.Summary}";
-        _ = LoadPreviewAsync();
+        _ = CommitPreviewSliderAsync();
     }
 
     private async Task LoadPreviewAsync()
@@ -426,6 +463,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         {
             _previewBusy = true;
             IsPreviewLoading = true;
+            IsPreviewImageVisible = true;
+            IsVideoPlaybackVisible = false;
             PlayCommand.NotifyCanExecuteChanged();
             EditorHint = $"Preview: virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
             var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token);
@@ -532,6 +571,93 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         PreviewSourceTimeText = TimelineEditorService.FormatSeconds(sourceSeconds);
     }
 
+    public async Task CommitPreviewSliderAsync()
+    {
+        if (IsPlaying && _playbackMediaPlayer is not null && Item.MediaInfo is not null)
+        {
+            var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+            _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
+            _playbackMediaPlayer.Time = _pendingPlaybackSeekMilliseconds.Value;
+            UpdatePreviewTimeTexts();
+            return;
+        }
+
+        await LoadPreviewAsync();
+    }
+
+    private void PlaybackTimerOnTick(object? sender, EventArgs e)
+    {
+        if (!IsPlaying || _playbackMediaPlayer is null || Item.MediaInfo is null)
+        {
+            return;
+        }
+
+        if (_pendingPlaybackSeekMilliseconds is { } pendingSeek)
+        {
+            _playbackMediaPlayer.Time = pendingSeek;
+            _pendingPlaybackSeekMilliseconds = null;
+        }
+
+        var sourceSeconds = Math.Max(0, _playbackMediaPlayer.Time / 1000d);
+        if (!TimelineNavigationService.TryMapSourceToVirtual(Timeline, sourceSeconds, Item.MediaInfo.DurationSeconds, out var virtualSeconds))
+        {
+            var nextSource = TimelineNavigationService.GetNextKeepSourceStart(Timeline, sourceSeconds, Item.MediaInfo.DurationSeconds);
+            if (nextSource is null || nextSource.Value >= Item.MediaInfo.DurationSeconds)
+            {
+                PausePlayback();
+                return;
+            }
+
+            _playbackMediaPlayer.Time = (long)Math.Round(nextSource.Value * 1000d);
+            if (TimelineNavigationService.TryMapSourceToVirtual(Timeline, nextSource.Value, Item.MediaInfo.DurationSeconds, out var nextVirtual))
+            {
+                PreviewVirtualSeconds = Math.Clamp(nextVirtual, 0, PreviewVirtualMaximum);
+            }
+
+            return;
+        }
+
+        PreviewVirtualSeconds = Math.Clamp(virtualSeconds, 0, PreviewVirtualMaximum);
+        if (PreviewVirtualSeconds >= PreviewVirtualMaximum)
+        {
+            PausePlayback();
+        }
+    }
+
+    private void InitializePlaybackEngine()
+    {
+        try
+        {
+            LibVLCSharp.Shared.Core.Initialize();
+            _libVlc = new LibVLC("--quiet");
+            _playbackMediaPlayer = new MediaPlayer(_libVlc)
+            {
+                EnableHardwareDecoding = true
+            };
+            PlaybackMediaPlayerBinding = _playbackMediaPlayer;
+        }
+        catch (Exception ex)
+        {
+            _libVlc?.Dispose();
+            _playbackMediaPlayer?.Dispose();
+            _libVlc = null;
+            _playbackMediaPlayer = null;
+            PlaybackMediaPlayerBinding = null;
+            EditorHint = $"Playback engine nije dostupan: {ex.Message}";
+        }
+    }
+
+    private bool EnsurePlaybackReady()
+    {
+        if (_playbackMediaPlayer is not null && _libVlc is not null)
+        {
+            return true;
+        }
+
+        InitializePlaybackEngine();
+        return _playbackMediaPlayer is not null && _libVlc is not null;
+    }
+
     private ItemTransformSettings BuildTransformSettings()
     {
         return new ItemTransformSettings
@@ -581,26 +707,4 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase
         }
     }
 
-    private async void PlaybackTimerOnTick(object? sender, EventArgs e)
-    {
-        if (!IsPlaying)
-        {
-            return;
-        }
-
-        if (_previewBusy)
-        {
-            return;
-        }
-
-        var step = 0.25;
-        if (PreviewVirtualSeconds >= PreviewVirtualMaximum)
-        {
-            PausePlayback();
-            return;
-        }
-
-        PreviewVirtualSeconds = Math.Min(PreviewVirtualMaximum, PreviewVirtualSeconds + step);
-        await LoadPreviewAsync();
-    }
 }

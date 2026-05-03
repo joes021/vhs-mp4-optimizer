@@ -55,6 +55,60 @@ public static class TimelineNavigationService
         return Clamp(keepSegments[^1].SourceEndSeconds, 0, sourceDurationSeconds);
     }
 
+    public static bool TryMapSourceToVirtual(TimelineProject? project, double sourceSeconds, double sourceDurationSeconds, out double virtualSeconds)
+    {
+        if (project is null)
+        {
+            virtualSeconds = Clamp(sourceSeconds, 0, sourceDurationSeconds);
+            return true;
+        }
+
+        var keepSegments = project.Segments
+            .Where(segment => segment.Kind == TimelineSegmentKind.Keep)
+            .OrderBy(segment => segment.TimelineStartSeconds)
+            .ToList();
+
+        var clampedSource = Clamp(sourceSeconds, 0, sourceDurationSeconds);
+        double cursor = 0;
+        foreach (var segment in keepSegments)
+        {
+            if (clampedSource >= segment.SourceStartSeconds && clampedSource <= segment.SourceEndSeconds)
+            {
+                virtualSeconds = cursor + Math.Max(0, clampedSource - segment.SourceStartSeconds);
+                return true;
+            }
+
+            cursor += segment.DurationSeconds;
+        }
+
+        virtualSeconds = 0;
+        return false;
+    }
+
+    public static double? GetNextKeepSourceStart(TimelineProject? project, double sourceSeconds, double sourceDurationSeconds)
+    {
+        if (project is null)
+        {
+            return Clamp(sourceSeconds, 0, sourceDurationSeconds);
+        }
+
+        var clampedSource = Clamp(sourceSeconds, 0, sourceDurationSeconds);
+        var keepSegments = project.Segments
+            .Where(segment => segment.Kind == TimelineSegmentKind.Keep)
+            .OrderBy(segment => segment.TimelineStartSeconds)
+            .ToList();
+
+        foreach (var segment in keepSegments)
+        {
+            if (clampedSource <= segment.SourceEndSeconds)
+            {
+                return Math.Max(segment.SourceStartSeconds, clampedSource);
+            }
+        }
+
+        return keepSegments.Count > 0 ? keepSegments[^1].SourceEndSeconds : null;
+    }
+
     private static double Clamp(double value, double min, double max)
         => Math.Min(max, Math.Max(min, value));
 }

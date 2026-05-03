@@ -76,14 +76,16 @@
 
         <Style Selector="Button.action">
             <Setter Property="MinHeight" Value="40" />
+            <Setter Property="MinWidth" Value="120" />
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
 
         <Style Selector="Button.batch-action">
             <Setter Property="MinHeight" Value="42" />
-            <Setter Property="MinWidth" Value="152" />
+            <Setter Property="MinWidth" Value="150" />
             <Setter Property="Padding" Value="16,10" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
 
@@ -139,23 +141,27 @@
         <Border Grid.Row="1" Classes="card">
             <Grid ColumnDefinitions="*,16,*">
                 <Border Grid.Column="0" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <Grid ColumnDefinitions="96,*,96,96" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
-                        <TextBlock Classes="section-title" Grid.ColumnSpan="4" Text="Input folder" />
-                        <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Source" />
-                        <TextBox Grid.Row="1" Grid.Column="1" MinHeight="42" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
-                        <Button Grid.Row="1" Grid.Column="2" Classes="action" Content="Files..." Click="BrowseInputFilesClick" />
-                        <Button Grid.Row="1" Grid.Column="3" Classes="action" Content="Folder..." Click="BrowseInputFolderClick" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Classes="hint" Text="{Binding SelectionHint}" TextWrapping="Wrap" />
-                    </Grid>
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="section-title" Text="Input folder" />
+                        <Grid ColumnDefinitions="96,*,96,96" ColumnSpacing="10">
+                            <TextBlock VerticalAlignment="Center" Text="Source" />
+                            <TextBox Grid.Column="1" MinHeight="42" VerticalAlignment="Center" Text="{Binding InputFolder}" PlaceholderText="Izaberi ulazni folder ili fajlove" />
+                            <Button Grid.Column="2" Classes="action" Content="Files..." Click="BrowseInputFilesClick" />
+                            <Button Grid.Column="3" Classes="action" Content="Folder..." Click="BrowseInputFolderClick" />
+                        </Grid>
+                        <TextBlock Margin="106,0,0,0" Classes="hint" Text="{Binding SelectionHint}" TextWrapping="Wrap" />
+                    </StackPanel>
                 </Border>
 
                 <Border Grid.Column="2" Background="#F8FAFD" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="10" Padding="12">
-                    <Grid ColumnDefinitions="96,*,112" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="8">
-                        <TextBlock Classes="section-title" Grid.ColumnSpan="3" Text="Output folder" />
-                        <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Target" />
-                        <TextBox Grid.Row="1" Grid.Column="1" MinHeight="42" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
-                        <Button Grid.Row="1" Grid.Column="2" Classes="action" Content="Browse..." Click="BrowseOutputFolderClick" />
-                    </Grid>
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="section-title" Text="Output folder" />
+                        <Grid ColumnDefinitions="96,*,112" ColumnSpacing="10">
+                            <TextBlock VerticalAlignment="Center" Text="Target" />
+                            <TextBox Grid.Column="1" MinHeight="42" VerticalAlignment="Center" Text="{Binding OutputFolder}" PlaceholderText="Podrazumevani izlazni folder" />
+                            <Button Grid.Column="2" Classes="action" Content="Browse..." Click="BrowseOutputFolderClick" />
+                        </Grid>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Border>
@@ -163,61 +169,65 @@
         <GridSplitter Grid.Row="2" Classes="h-splitter" HorizontalAlignment="Stretch" ResizeDirection="Rows" />
 
         <Border Grid.Row="3" Classes="card">
-            <Grid ColumnDefinitions="*,16,560" ColumnSpacing="0">
-                <StackPanel Grid.Column="0" Spacing="12">
+            <Grid ColumnDefinitions="*,20,340">
+                <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
                     <TextBlock Classes="section-title" Text="Quick Setup" />
-                    <WrapPanel Orientation="Horizontal">
-                        <StackPanel Width="200" Spacing="4" Margin="0,0,12,8">
+
+                    <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="20">
+                        <StackPanel Grid.Column="0" Spacing="4">
                             <TextBlock Classes="field-label" Text="Workflow preset" />
-                            <ComboBox ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
-                            <TextBlock Classes="hint" Text="Brz izbor tipicnih izlaznih podesavanja." TextWrapping="Wrap" />
+                            <ComboBox MinHeight="42" ItemsSource="{Binding WorkflowPresets}" SelectedItem="{Binding SelectedPreset}" />
                         </StackPanel>
 
-                        <StackPanel Width="180" Spacing="4" Margin="0,0,12,8">
+                        <StackPanel Grid.Column="1" Spacing="4">
                             <TextBlock Classes="field-label" Text="Quality mode" />
-                            <ComboBox ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
+                            <ComboBox MinHeight="42" ItemsSource="{Binding QualityModes}" SelectedItem="{Binding QualityMode}" />
                         </StackPanel>
 
-                        <StackPanel Width="140" Spacing="4" Margin="0,0,12,8">
+                        <StackPanel Grid.Column="2" Spacing="4">
                             <TextBlock Classes="field-label" Text="Scale" />
-                            <ComboBox ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
+                            <ComboBox MinHeight="42" ItemsSource="{Binding ScaleModes}" SelectedItem="{Binding ScaleMode}" />
                         </StackPanel>
 
-                        <StackPanel Width="150" Spacing="4" Margin="0,0,12,8">
+                        <StackPanel Grid.Column="3" Spacing="4">
                             <TextBlock Classes="field-label" Text="Video bitrate" />
-                            <TextBox MinHeight="40" Text="{Binding VideoBitrate}" />
+                            <TextBox MinHeight="42" Text="{Binding VideoBitrate}" />
                         </StackPanel>
 
-                        <StackPanel Width="150" Spacing="4" Margin="0,0,0,8">
+                        <StackPanel Grid.Column="4" Spacing="4">
                             <TextBlock Classes="field-label" Text="Audio bitrate" />
-                            <TextBox MinHeight="40" Text="{Binding AudioBitrate}" />
+                            <TextBox MinHeight="42" Text="{Binding AudioBitrate}" />
                         </StackPanel>
-                    </WrapPanel>
-                </StackPanel>
+                    </Grid>
+
+                    <TextBlock Grid.Row="2"
+                               Classes="hint"
+                               Text="Workflow preset menja gotovu grupu izlaznih podesavanja, a quality, scale i bitrate mozes odmah rucno da doradis."
+                               TextWrapping="Wrap" />
+
+                    <Border Grid.Row="3" Classes="subtle-group">
+                        <StackPanel Spacing="10">
+                            <TextBlock Classes="group-title" Text="Batch actions" />
+                            <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="10">
+                                <Button Grid.Column="0" Classes="batch-action" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
+                                <Button Grid.Column="1" Classes="batch-action" Content="Player / Trim" Click="OpenPlayerTrimClick" />
+                                <Button Grid.Column="2" Classes="batch-action" Content="Open Output" Command="{Binding OpenOutputCommand}" />
+                                <Button Grid.Column="3" Classes="batch-action" Content="Save Queue" Click="SaveQueueClick" />
+                                <Button Grid.Column="4" Classes="batch-action" Content="Load Queue" Click="LoadQueueClick" />
+                                <Button Grid.Column="5" Classes="batch-action" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
 
                 <Border Grid.Column="2" Classes="subtle-group">
-                    <Grid ColumnDefinitions="1.2*,260" RowDefinitions="Auto,*" ColumnSpacing="16">
-                        <TextBlock Classes="group-title" Text="Batch actions" />
-                        <TextBlock Grid.Column="1" Classes="group-title" Text="Render" />
-
-                        <WrapPanel Grid.Row="1" Orientation="Horizontal">
-                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Scan Files" Command="{Binding ScanFilesCommand}" />
-                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Open Player / Trim" Click="OpenPlayerTrimClick" />
-                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Open Output" Command="{Binding OpenOutputCommand}" />
-                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Save Queue" Click="SaveQueueClick" />
-                            <Button Classes="batch-action" Margin="0,0,10,10" Content="Load Queue" Click="LoadQueueClick" />
-                            <Button Classes="batch-action" Margin="0,0,10,10" Content="{Binding PauseResumeLabel}" Command="{Binding PauseResumeCommand}" />
-                        </WrapPanel>
-
-                        <Border Grid.Row="1" Grid.Column="1" Background="#F4FAFC" BorderBrush="#B8DDE5" BorderThickness="1" CornerRadius="10" Padding="12">
-                            <StackPanel VerticalAlignment="Center" Spacing="12">
-                                <Button Classes="primary-big" Content="Pokreni konverziju" Command="{Binding StartConversionCommand}" />
-                                <TextBlock Classes="hint"
-                                           Text="Batch konverzija, test sample i trim koriste ista izlazna podesavanja."
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                    <StackPanel VerticalAlignment="Stretch" Spacing="12">
+                        <TextBlock Classes="group-title" Text="Render" />
+                        <Button Classes="primary-big" Content="POKRENI KONVERZIJU" Command="{Binding StartConversionCommand}" />
+                        <TextBlock Classes="hint"
+                                   Text="Batch konverzija, test sample i trim koriste ista izlazna podesavanja."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
                 </Border>
             </Grid>
         </Border>

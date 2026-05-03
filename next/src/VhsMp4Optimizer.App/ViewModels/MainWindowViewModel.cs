@@ -16,7 +16,7 @@ namespace VhsMp4Optimizer.App.ViewModels;
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ISourceScanService _sourceScanService;
-    private readonly FfmpegConversionService _conversionService = new();
+    private readonly IConversionService _conversionService;
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly QueueSnapshotService _queueSnapshotService = new();
     private IReadOnlyList<string>? _explicitSourcePaths;
@@ -26,9 +26,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _pauseRequested;
     private bool _isBatchPaused;
 
-    public MainWindowViewModel(ISourceScanService? sourceScanService = null, string? ffmpegPath = null)
+    public MainWindowViewModel(
+        ISourceScanService? sourceScanService = null,
+        IConversionService? conversionService = null,
+        string? ffmpegPath = null)
     {
         _sourceScanService = sourceScanService ?? new SourceScanService();
+        _conversionService = conversionService ?? new FfmpegConversionService();
         ResolvedFfmpegPath = ffmpegPath ?? FfmpegLocator.Resolve();
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));

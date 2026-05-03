@@ -3,7 +3,7 @@ using VhsMp4Optimizer.Core.Models;
 
 namespace VhsMp4Optimizer.Infrastructure.Services;
 
-public sealed class FfmpegConversionService
+public sealed class FfmpegConversionService : IConversionService
 {
     public async Task ConvertAsync(string ffmpegPath, ConversionRequest request, CancellationToken cancellationToken = default)
     {
@@ -24,12 +24,39 @@ public sealed class FfmpegConversionService
         }
 
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("FFmpeg proces nije pokrenut.");
-        await process.WaitForExitAsync(cancellationToken);
-        var errorText = await process.StandardError.ReadToEndAsync(cancellationToken);
+        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            TryKillProcess(process);
+            throw;
+        }
+
+        var errorText = await stderrTask;
+        _ = await stdoutTask;
 
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException($"FFmpeg nije uspeo: {errorText}");
+        }
+    }
+
+    private static void TryKillProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
         }
     }
 }

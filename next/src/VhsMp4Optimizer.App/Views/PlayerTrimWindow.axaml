@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:VhsMp4Optimizer.App.ViewModels"
         xmlns:core="using:VhsMp4Optimizer.Core.Models"
+        xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -79,7 +80,11 @@
 
                 <Border Grid.Row="1" Background="#0F172A" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
                     <Grid>
-                        <Image Source="{Binding PreviewBitmap}" Stretch="Uniform" />
+                        <Image Source="{Binding PreviewBitmap}" IsVisible="{Binding IsPreviewImageVisible}" Stretch="Uniform" />
+                        <vlc:VideoView MediaPlayer="{Binding PlaybackMediaPlayerBinding}"
+                                       IsVisible="{Binding IsVideoPlaybackVisible}"
+                                       HorizontalAlignment="Stretch"
+                                       VerticalAlignment="Stretch" />
                         <Border VerticalAlignment="Bottom" Margin="12" Padding="10,8" CornerRadius="8" Background="#B30F172A">
                             <StackPanel Spacing="2">
                                 <TextBlock Foreground="White" FontWeight="SemiBold" Text="Preview / Playback" />
