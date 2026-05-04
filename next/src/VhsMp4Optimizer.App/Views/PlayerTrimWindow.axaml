@@ -328,7 +328,7 @@
         </Grid>
 
         <Border Grid.Row="2" Classes="panel" Margin="0,14,0,0">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="10">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="2">
                         <TextBlock Classes="section-title" Text="Timeline" />
@@ -378,6 +378,36 @@
                 </Border>
 
                 <Border Grid.Row="2" Classes="panel-muted">
+                    <Grid ColumnDefinitions="74,*" ColumnSpacing="10">
+                        <Border Classes="panel"
+                                Padding="8"
+                                CornerRadius="6"
+                                Background="#0D131A"
+                                BorderBrush="#314055">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                                <TextBlock FontWeight="Bold" HorizontalAlignment="Center" Text="Marker Rail" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Cuts" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <TextBlock Text="Mark In" />
+                            </Border>
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <TextBlock Text="Mark Out" />
+                            </Border>
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <TextBlock Text="Prev Cut" />
+                            </Border>
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <TextBlock Text="Next Cut" />
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="3" Classes="panel-muted">
                     <Grid ColumnDefinitions="74,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="8"
@@ -443,7 +473,7 @@
                     </Grid>
                 </Border>
 
-                <StackPanel Grid.Row="3" Spacing="8">
+                <StackPanel Grid.Row="4" Spacing="8">
                     <TextBlock Classes="field-label" Text="Edit Tools" />
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -469,7 +499,7 @@
                     </ScrollViewer>
                 </StackPanel>
 
-                <Border Grid.Row="4" Classes="panel-muted">
+                <Border Grid.Row="5" Classes="panel-muted">
                     <Grid ColumnDefinitions="2.2*,1.2*,1*" ColumnSpacing="12">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Selection" />
