@@ -64,6 +64,8 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"00:30\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"01:00\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TimelinePlayheadIndicator\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelinePlayheadBadge\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding PreviewVirtualTimeText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"CLIP\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"DUR\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Marker Rail\"", markup, StringComparison.Ordinal);
