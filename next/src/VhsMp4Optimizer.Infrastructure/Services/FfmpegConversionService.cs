@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Core.Services;
 
@@ -13,7 +14,10 @@ public sealed class FfmpegConversionService : IConversionService
         IProgress<ConversionProgressInfo>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(request.OutputPath)!);
+        var outputDirectory = Path.GetDirectoryName(request.OutputPath)
+            ?? Path.GetDirectoryName(request.OutputPattern ?? string.Empty)
+            ?? throw new InvalidOperationException("Izlazni direktorijum nije validan.");
+        Directory.CreateDirectory(outputDirectory);
 
         var startInfo = new ProcessStartInfo
         {
@@ -49,6 +53,19 @@ public sealed class FfmpegConversionService : IConversionService
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException($"FFmpeg nije uspeo: {errorText}");
+        }
+
+        if (request.Settings.SplitOutput && !request.IsSample)
+        {
+            var splitOutputs = ResolveSplitOutputs(request);
+            if (splitOutputs.Count == 0)
+            {
+                throw new InvalidOperationException("FFmpeg je zavrsio bez greske, ali split output nije napravio nijedan part fajl.");
+            }
+        }
+        else if (!File.Exists(request.OutputPath))
+        {
+            throw new InvalidOperationException("FFmpeg je zavrsio bez greske, ali izlazni fajl nije pronadjen.");
         }
     }
 
@@ -179,5 +196,31 @@ public sealed class FfmpegConversionService : IConversionService
         return TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var parsed)
             ? parsed.TotalSeconds
             : 0;
+    }
+
+    private static IReadOnlyList<string> ResolveSplitOutputs(ConversionRequest request)
+    {
+        var pattern = request.OutputPattern;
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            return File.Exists(request.OutputPath) ? new[] { request.OutputPath } : Array.Empty<string>();
+        }
+
+        var directory = Path.GetDirectoryName(pattern);
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            return Array.Empty<string>();
+        }
+
+        var fileNamePattern = Path.GetFileName(pattern);
+        if (string.IsNullOrWhiteSpace(fileNamePattern))
+        {
+            return Array.Empty<string>();
+        }
+
+        var searchPattern = fileNamePattern.Replace("%03d", "*").Replace("%3d", "*");
+        return Directory.EnumerateFiles(directory, searchPattern, SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }

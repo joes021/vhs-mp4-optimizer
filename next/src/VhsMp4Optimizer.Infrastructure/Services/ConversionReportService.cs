@@ -28,6 +28,10 @@ public sealed class ConversionReportService : IConversionReportService
         builder.AppendLine($"Source path: {item.SourcePath}");
         builder.AppendLine($"Output file: {item.OutputFile}");
         builder.AppendLine($"Output path: {item.OutputPath}");
+        if (request.Settings.SplitOutput && !string.IsNullOrWhiteSpace(item.OutputPattern))
+        {
+            builder.AppendLine($"Output pattern: {item.OutputPattern}");
+        }
         builder.AppendLine($"Workflow preset: {presetName}");
         builder.AppendLine($"Elapsed: {FormatTimeSpan(elapsed)}");
         builder.AppendLine();
@@ -112,6 +116,10 @@ public sealed class ConversionReportService : IConversionReportService
         {
             builder.AppendLine($"- {item.SourceFile} -> {item.OutputFile} | status: {item.Status}");
             builder.AppendLine($"  Output path: {item.OutputPath}");
+            if (!string.IsNullOrWhiteSpace(item.OutputPattern) && !string.Equals(item.OutputPattern, item.OutputPath, StringComparison.OrdinalIgnoreCase))
+            {
+                builder.AppendLine($"  Output pattern: {item.OutputPattern}");
+            }
             if (!string.IsNullOrWhiteSpace(item.ReportPath))
             {
                 builder.AppendLine($"  Item report: {item.ReportPath}");

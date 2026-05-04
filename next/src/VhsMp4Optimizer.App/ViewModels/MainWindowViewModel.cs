@@ -24,6 +24,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Func<string?, Task<EncodeSupportReport>> _inspectEncodeSupportAsync;
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly QueueSnapshotService _queueSnapshotService = new();
+    private readonly OutputSettingsSnapshotService _outputSettingsSnapshotService = new();
     private IReadOnlyList<string>? _explicitSourcePaths;
     private bool _suppressSelectionReset;
     private bool _applyingPreset;
@@ -524,6 +525,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         MediaInfo = mediaInfo,
                         Settings = settings,
                         OutputPath = item.OutputPath,
+                        OutputPattern = item.OutputPattern,
                         TimelineProject = item.TimelineProject,
                         TransformSettings = item.TransformSettings
                     };
@@ -653,6 +655,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 MediaInfo = SelectedQueueItem.MediaInfo,
                 Settings = settings,
                 OutputPath = samplePath,
+                OutputPattern = samplePath,
                 TimelineProject = SelectedQueueItem.TimelineProject,
                 TransformSettings = SelectedQueueItem.TransformSettings,
                 IsSample = true,
@@ -1088,6 +1091,36 @@ public partial class MainWindowViewModel : ViewModelBase
         LogMessage = outputPath;
     }
 
+    public async Task SaveOutputSettingsAsync(string? outputPath)
+    {
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            StatusMessage = "Izaberi putanju za output settings fajl.";
+            return;
+        }
+
+        var snapshot = new OutputSettingsSnapshot
+        {
+            SelectedPreset = SelectedPreset,
+            QualityMode = QualityMode,
+            ScaleMode = ScaleMode,
+            AspectMode = AspectMode,
+            DeinterlaceMode = DeinterlaceMode,
+            DenoiseMode = DenoiseMode,
+            EncodeEngine = EncodeEngine,
+            VideoBitrate = VideoBitrate,
+            AudioBitrate = AudioBitrate,
+            SplitOutput = SplitOutput,
+            MaxPartGb = MaxPartGb,
+            SampleStartText = SampleStartText,
+            SampleDurationText = SampleDurationText
+        };
+
+        await _outputSettingsSnapshotService.SaveAsync(outputPath, snapshot);
+        StatusMessage = $"Output settings sacuvan: {Path.GetFileName(outputPath)}";
+        LogMessage = outputPath;
+    }
+
     public async Task LoadQueueAsync(string? inputPath)
     {
         if (string.IsNullOrWhiteSpace(inputPath))
@@ -1155,6 +1188,44 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = $"Queue ucitan: {Path.GetFileName(inputPath)} | {CoreServices.QueueWorkflowService.BuildSummary(QueueItems)}";
         LogMessage = inputPath;
         RefreshComparisonRows(SelectedQueueItem);
+        RefreshCommandStates();
+    }
+
+    public async Task LoadOutputSettingsAsync(string? inputPath)
+    {
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            StatusMessage = "Izaberi output settings fajl za ucitavanje.";
+            return;
+        }
+
+        var snapshot = await _outputSettingsSnapshotService.LoadAsync(inputPath);
+        _applyingPreset = true;
+        try
+        {
+            SelectedPreset = snapshot.SelectedPreset;
+            QualityMode = snapshot.QualityMode;
+            ScaleMode = snapshot.ScaleMode;
+            AspectMode = snapshot.AspectMode;
+            DeinterlaceMode = snapshot.DeinterlaceMode;
+            DenoiseMode = snapshot.DenoiseMode;
+            EncodeEngine = snapshot.EncodeEngine;
+            VideoBitrate = snapshot.VideoBitrate;
+            AudioBitrate = snapshot.AudioBitrate;
+            SplitOutput = snapshot.SplitOutput;
+            MaxPartGb = snapshot.MaxPartGb;
+            SampleStartText = snapshot.SampleStartText;
+            SampleDurationText = snapshot.SampleDurationText;
+        }
+        finally
+        {
+            _applyingPreset = false;
+        }
+
+        EncodeEngineHint = BuildEncodeEngineHint(EncodeEngine, QualityMode, _lastEncodeSupportReport);
+        RefreshPlannedOutput();
+        StatusMessage = $"Output settings ucitan: {Path.GetFileName(inputPath)}";
+        LogMessage = inputPath;
         RefreshCommandStates();
     }
 

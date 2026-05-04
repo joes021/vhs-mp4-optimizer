@@ -303,6 +303,55 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_and_load_output_settings_should_roundtrip_current_output_configuration()
+    {
+        var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
+        var settingsPath = Path.Combine(_rootPath, "output-settings.json");
+
+        viewModel.SelectedPreset = WorkflowPresetService.Custom;
+        viewModel.QualityMode = QualityModes.HevcForNewerDevices;
+        viewModel.ScaleMode = ScaleModes.Pal576p;
+        viewModel.AspectMode = AspectModes.KeepOriginal;
+        viewModel.DeinterlaceMode = DeinterlaceModes.Yadif;
+        viewModel.DenoiseMode = DenoiseModes.Medium;
+        viewModel.EncodeEngine = EncodeEngines.Auto;
+        viewModel.VideoBitrate = "4200k";
+        viewModel.AudioBitrate = "128k";
+        viewModel.SplitOutput = true;
+        viewModel.MaxPartGb = 2.9;
+        viewModel.SampleStartText = "00:00:10";
+        viewModel.SampleDurationText = "00:01:00";
+
+        await viewModel.SaveOutputSettingsAsync(settingsPath);
+
+        viewModel.QualityMode = QualityModes.StandardVhs;
+        viewModel.ScaleMode = ScaleModes.Original;
+        viewModel.AspectMode = AspectModes.Auto;
+        viewModel.DeinterlaceMode = DeinterlaceModes.Off;
+        viewModel.DenoiseMode = DenoiseModes.Off;
+        viewModel.VideoBitrate = "5000k";
+        viewModel.AudioBitrate = "160k";
+        viewModel.SplitOutput = false;
+        viewModel.MaxPartGb = 3.8;
+        viewModel.SampleStartText = "00:00:00";
+        viewModel.SampleDurationText = "00:02:00";
+
+        await viewModel.LoadOutputSettingsAsync(settingsPath);
+
+        Assert.Equal(QualityModes.HevcForNewerDevices, viewModel.QualityMode);
+        Assert.Equal(ScaleModes.Pal576p, viewModel.ScaleMode);
+        Assert.Equal(AspectModes.KeepOriginal, viewModel.AspectMode);
+        Assert.Equal(DeinterlaceModes.Yadif, viewModel.DeinterlaceMode);
+        Assert.Equal(DenoiseModes.Medium, viewModel.DenoiseMode);
+        Assert.Equal("4200k", viewModel.VideoBitrate);
+        Assert.Equal("128k", viewModel.AudioBitrate);
+        Assert.True(viewModel.SplitOutput);
+        Assert.Equal(2.9, viewModel.MaxPartGb);
+        Assert.Equal("00:00:10", viewModel.SampleStartText);
+        Assert.Equal("00:01:00", viewModel.SampleDurationText);
+    }
+
+    [Fact]
     public async Task OpenConvertedFileCommand_should_open_selected_done_output_file()
     {
         var filePath = CreateFile("open-output.avi");

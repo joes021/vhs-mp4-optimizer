@@ -21,6 +21,8 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("ColumnDefinitions=\"168,168,168,168,168,168\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Converted File\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Open Report\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Save Output Settings\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Load Output Settings\"", markup, StringComparison.Ordinal);
         Assert.Contains("Header=\"Check Encode Support\"", markup, StringComparison.Ordinal);
         Assert.Contains("Header=\"Install / Repair Encode Support\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding EncodeEngineHint}\"", markup, StringComparison.Ordinal);

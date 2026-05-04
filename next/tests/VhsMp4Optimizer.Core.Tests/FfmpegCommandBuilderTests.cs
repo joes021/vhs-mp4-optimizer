@@ -248,6 +248,37 @@ public sealed class FfmpegCommandBuilderTests
         Assert.DoesNotContain("libx264", args);
     }
 
+    [Fact]
+    public void Should_build_segment_output_when_split_output_is_enabled()
+    {
+        var mediaInfo = CreateMediaInfo(@"F:\split.avi");
+        var request = new ConversionRequest
+        {
+            MediaInfo = mediaInfo,
+            Settings = new BatchSettings
+            {
+                InputPath = mediaInfo.SourcePath,
+                OutputDirectory = @"F:\out",
+                QualityMode = QualityModes.StandardVhs,
+                ScaleMode = ScaleModes.Pal576p,
+                SplitOutput = true,
+                MaxPartGb = 0.5,
+                AudioBitrate = "160k"
+            },
+            OutputPath = @"F:\out\split-part001.mp4",
+            OutputPattern = @"F:\out\split-part%03d.mp4"
+        };
+
+        var joined = string.Join(" ", FfmpegCommandBuilder.BuildArguments(request));
+
+        Assert.Contains("-f segment", joined);
+        Assert.Contains("-segment_time", joined);
+        Assert.Contains("-segment_start_number 1", joined);
+        Assert.Contains("-segment_format mp4", joined);
+        Assert.Contains("split-part%03d.mp4", joined);
+        Assert.Contains("-force_key_frames", joined);
+    }
+
     private static MediaInfo CreateMediaInfo(string sourcePath)
     {
         return new MediaInfo

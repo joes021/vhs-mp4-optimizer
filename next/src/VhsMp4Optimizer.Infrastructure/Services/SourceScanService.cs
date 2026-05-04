@@ -54,10 +54,12 @@ public sealed class SourceScanService : ISourceScanService
     private QueueItemSummary BuildItem(string sourcePath, string outputDirectory, BatchSettings settings, string ffmpegPath)
     {
         var sourceName = Path.GetFileName(sourcePath);
-        var outputPath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(sourceName) + ".mp4");
-        var outputPattern = settings.SplitOutput
-            ? Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(sourceName) + "-part%03d.mp4")
-            : outputPath;
+        var baseName = Path.GetFileNameWithoutExtension(sourceName);
+        var defaultOutputPath = Path.Combine(outputDirectory, baseName + ".mp4");
+        var splitOutputPattern = Path.Combine(outputDirectory, baseName + "-part%03d.mp4");
+        var splitFirstOutputPath = Path.Combine(outputDirectory, baseName + "-part001.mp4");
+        var outputPath = settings.SplitOutput ? splitFirstOutputPath : defaultOutputPath;
+        var outputPattern = settings.SplitOutput ? splitOutputPattern : defaultOutputPath;
         var mediaInfo = _probeMediaInfo(sourcePath, ffmpegPath);
         var plannedOutput = OutputPlanner.Build(mediaInfo, settings);
 

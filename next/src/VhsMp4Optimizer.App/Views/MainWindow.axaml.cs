@@ -427,6 +427,61 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void SaveOutputSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Sacuvaj output settings",
+            SuggestedFileName = "vhs-output-settings.json",
+            DefaultExtension = ".json",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("JSON")
+                {
+                    Patterns = ["*.json"]
+                }
+            ]
+        });
+
+        var outputPath = target?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(outputPath))
+        {
+            await viewModel.SaveOutputSettingsAsync(outputPath);
+        }
+    }
+
+    private async void LoadOutputSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Ucitaj output settings",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("JSON")
+                {
+                    Patterns = ["*.json"]
+                }
+            ]
+        });
+
+        var inputPath = files.FirstOrDefault()?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(inputPath))
+        {
+            await viewModel.LoadOutputSettingsAsync(inputPath);
+        }
+    }
+
     private void OpenAboutClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var assembly = typeof(MainWindow).Assembly;

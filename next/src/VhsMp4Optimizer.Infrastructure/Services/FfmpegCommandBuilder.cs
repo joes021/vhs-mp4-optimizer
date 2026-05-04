@@ -22,6 +22,14 @@ public static class FfmpegCommandBuilder
 
         var profile = EncodingProfileService.Resolve(request.Settings.QualityMode);
         var videoEncoder = ResolveVideoEncoder(request.Settings.EncodeEngine, profile.VideoCodec);
+        var useSplitOutput = request.Settings.SplitOutput && !request.IsSample;
+        var splitVideoMaxKbps = ResolveVideoKbps(profile, request.Settings.VideoBitrate);
+        var splitSegmentSeconds = useSplitOutput
+            ? ComputeSplitSegmentSeconds(request.Settings.MaxPartGb, splitVideoMaxKbps, request.Settings.AudioBitrate, profile.AudioBitrate)
+            : 0;
+        var outputTarget = useSplitOutput && !string.IsNullOrWhiteSpace(request.OutputPattern)
+            ? request.OutputPattern!
+            : request.OutputPath;
 
         if (useFilterComplex)
         {
@@ -50,15 +58,44 @@ public static class FfmpegCommandBuilder
             args.Add(profile.Crf.ToString(CultureInfo.InvariantCulture));
         }
 
+        if (useSplitOutput && string.IsNullOrWhiteSpace(request.Settings.VideoBitrate))
+        {
+            args.Add("-maxrate");
+            args.Add($"{splitVideoMaxKbps}k");
+            args.Add("-bufsize");
+            args.Add($"{splitVideoMaxKbps * 2}k");
+        }
+
         args.Add("-preset");
         args.Add(profile.Preset);
         args.Add("-c:a");
         args.Add("aac");
         args.Add("-b:a");
         args.Add(string.IsNullOrWhiteSpace(request.Settings.AudioBitrate) ? profile.AudioBitrate : request.Settings.AudioBitrate);
+
+        if (useSplitOutput)
+        {
+            args.Add("-force_key_frames");
+            args.Add($"expr:gte(t,n_forced*{FormatSeconds(splitSegmentSeconds)})");
+            args.Add("-f");
+            args.Add("segment");
+            args.Add("-segment_time");
+            args.Add(FormatSeconds(splitSegmentSeconds));
+            args.Add("-segment_start_number");
+            args.Add("1");
+            args.Add("-reset_timestamps");
+            args.Add("1");
+            args.Add("-segment_format");
+            args.Add("mp4");
+            args.Add("-segment_format_options");
+            args.Add("movflags=+faststart");
+            args.Add(outputTarget);
+            return args;
+        }
+
         args.Add("-movflags");
         args.Add("+faststart");
-        args.Add(request.OutputPath);
+        args.Add(outputTarget);
         return args;
     }
 
@@ -122,6 +159,35 @@ public static class FfmpegCommandBuilder
     }
 
     private static string FormatSeconds(double seconds) => seconds.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static int ResolveVideoKbps(EncodingProfile profile, string overrideBitrate)
+    {
+        var parsed = ParseKbps(overrideBitrate);
+        return parsed > 0 ? parsed : profile.VideoKbps;
+    }
+
+    private static int ParseKbps(string bitrateText)
+    {
+        if (string.IsNullOrWhiteSpace(bitrateText))
+        {
+            return 0;
+        }
+
+        var trimmed = bitrateText.Trim().TrimEnd('k', 'K');
+        return int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0;
+    }
+
+    private static double ComputeSplitSegmentSeconds(double maxPartGb, int videoMaxKbps, string audioBitrateOverride, string profileAudioBitrate)
+    {
+        var audioKbps = ParseKbps(string.IsNullOrWhiteSpace(audioBitrateOverride) ? profileAudioBitrate : audioBitrateOverride);
+        var totalKbps = Math.Max(1, videoMaxKbps + Math.Max(1, audioKbps));
+        var targetBytes = maxPartGb * Math.Pow(1024d, 3d);
+        var safetyFactor = 0.95d;
+        var segmentSeconds = Math.Floor((targetBytes * 8d * safetyFactor) / (totalKbps * 1000d));
+        return Math.Max(1d, segmentSeconds);
+    }
 
     private static bool HasVideoFilters(BatchSettings settings, bool hasCrop, int outputWidth, int outputHeight, MediaInfo mediaInfo)
     {

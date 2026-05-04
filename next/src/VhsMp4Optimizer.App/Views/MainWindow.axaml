@@ -115,6 +115,8 @@
                 <Separator />
                 <MenuItem Header="Save Queue" Click="SaveQueueClick" />
                 <MenuItem Header="Load Queue" Click="LoadQueueClick" />
+                <MenuItem Header="Save Output Settings" Click="SaveOutputSettingsClick" />
+                <MenuItem Header="Load Output Settings" Click="LoadOutputSettingsClick" />
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="Save Layout" Click="SaveLayoutClick" />

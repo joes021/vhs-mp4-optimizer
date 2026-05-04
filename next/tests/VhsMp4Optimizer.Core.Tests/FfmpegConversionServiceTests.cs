@@ -77,7 +77,73 @@ public sealed class FfmpegConversionServiceTests : IDisposable
         Assert.True(new FileInfo(outputPath).Length > 0);
     }
 
-    private async Task<string> CreateRealVideoAsync(string fileName, string ffmpegPath)
+    [Fact]
+    public async Task ConvertAsync_should_create_multiple_parts_when_split_output_is_enabled()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var inputPath = await CreateRealVideoAsync("split-source.avi", ffmpegPath, durationSeconds: 6);
+        var outputPattern = Path.Combine(_rootPath, "split-source-part%03d.mp4");
+        var service = new FfmpegConversionService();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+
+        await service.ConvertAsync(ffmpegPath, new ConversionRequest
+        {
+            MediaInfo = new MediaInfo
+            {
+                SourceName = Path.GetFileName(inputPath),
+                SourcePath = inputPath,
+                Container = "avi",
+                DurationSeconds = 6,
+                DurationText = "00:00:06",
+                SizeBytes = new FileInfo(inputPath).Length,
+                SizeText = "--",
+                OverallBitrateKbps = 0,
+                OverallBitrateText = "--",
+                VideoCodec = "mpeg4",
+                Width = 320,
+                Height = 240,
+                Resolution = "320x240",
+                DisplayAspectRatio = "4:3",
+                SampleAspectRatio = "1:1",
+                FrameRate = 25,
+                FrameRateText = "25 fps",
+                FrameCount = 150,
+                VideoBitrateKbps = 0,
+                VideoBitrateText = "--",
+                AudioCodec = "mp3",
+                AudioChannels = 2,
+                AudioSampleRateHz = 48000,
+                AudioBitrateKbps = 0,
+                AudioBitrateText = "--",
+                VideoSummary = "mpeg4 | 320x240 | 25 fps",
+                AudioSummary = "mp3 | 2 ch"
+            },
+            Settings = new BatchSettings
+            {
+                InputPath = inputPath,
+                OutputDirectory = _rootPath,
+                QualityMode = VhsMp4Optimizer.Core.Services.QualityModes.SmallMp4H264,
+                ScaleMode = VhsMp4Optimizer.Core.Services.ScaleModes.Original,
+                AspectMode = VhsMp4Optimizer.Core.Services.AspectModes.Auto,
+                VideoBitrate = "1200k",
+                AudioBitrate = "128k",
+                SplitOutput = true,
+                MaxPartGb = 0.00005
+            },
+            OutputPath = Path.Combine(_rootPath, "split-source-part001.mp4"),
+            OutputPattern = outputPattern
+        }, null, timeout.Token);
+
+        var outputs = Directory.GetFiles(_rootPath, "split-source-part*.mp4", SearchOption.TopDirectoryOnly);
+        Assert.True(outputs.Length >= 2, $"Ocekivana su najmanje 2 split fajla, a pronadjeno je {outputs.Length}.");
+    }
+
+    private async Task<string> CreateRealVideoAsync(string fileName, string ffmpegPath, int durationSeconds = 2)
     {
         var fullPath = Path.Combine(_rootPath, fileName);
         var startInfo = new ProcessStartInfo
@@ -96,7 +162,7 @@ public sealed class FfmpegConversionServiceTests : IDisposable
                      "-i", "testsrc=size=320x240:rate=25",
                      "-f", "lavfi",
                      "-i", "sine=frequency=1000:sample_rate=48000",
-                     "-t", "2",
+                     "-t", durationSeconds.ToString(),
                      "-c:v", "mpeg4",
                      "-c:a", "mp3",
                      fullPath
