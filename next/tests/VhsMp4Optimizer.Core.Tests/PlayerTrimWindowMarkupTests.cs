@@ -34,6 +34,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"00:00\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"00:30\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"01:00\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelinePlayheadIndicator\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Transform\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Timeline Info\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Metadata\"", markup, StringComparison.Ordinal);
