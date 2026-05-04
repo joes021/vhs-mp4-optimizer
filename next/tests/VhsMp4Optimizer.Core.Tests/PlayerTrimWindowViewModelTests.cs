@@ -385,6 +385,29 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task MergeWithNextCommand_should_join_selected_segment_with_following_compatible_segment()
+    {
+        var queueItem = BuildQueueItem();
+        TimelineProject? savedTimeline = null;
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (timeline, _) => savedTimeline = timeline,
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.SelectedSegment = viewModel.Segments[0];
+        await viewModel.MergeWithNextCommand.ExecuteAsync(null);
+        viewModel.SaveToQueueCommand.Execute(null);
+
+        Assert.NotNull(savedTimeline);
+        Assert.Single(savedTimeline!.Segments);
+        Assert.Equal(0d, savedTimeline.Segments[0].SourceStartSeconds, 3);
+        Assert.Equal(300d, savedTimeline.Segments[0].SourceEndSeconds, 3);
+    }
+
+    [Fact]
     public async Task PrepareForDisplayAsync_should_render_preview_for_large_dv_avi_when_file_is_available()
     {
         const string sourcePath = @"F:\Veliki avi\1996 -1 -6 - .avi";

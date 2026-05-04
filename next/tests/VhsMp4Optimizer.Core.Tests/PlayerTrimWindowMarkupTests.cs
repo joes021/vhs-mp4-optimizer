@@ -25,6 +25,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"Trim Selected\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Duplicate Selected\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Close All Gaps\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Merge With Next\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"Preview Frame\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"In\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Out\"", markup, StringComparison.Ordinal);

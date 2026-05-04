@@ -275,6 +275,37 @@ public static class TimelineEditorService
         return Normalize(project, rebuilt, preserveSequence: true);
     }
 
+    public static TimelineProject MergeSegmentWithNext(TimelineProject project, Guid segmentId)
+    {
+        var ordered = project.Segments.OrderBy(segment => segment.TimelineStartSeconds).ToList();
+        var index = ordered.FindIndex(segment => segment.Id == segmentId);
+        if (index < 0 || index >= ordered.Count - 1)
+        {
+            return project;
+        }
+
+        var current = ordered[index];
+        var next = ordered[index + 1];
+        var contiguousSource = Math.Abs(current.SourceEndSeconds - next.SourceStartSeconds) <= 0.0001d;
+        if (current.Kind != next.Kind || !contiguousSource)
+        {
+            return project;
+        }
+
+        var merged = new TimelineSegment
+        {
+            Id = current.Id,
+            Kind = current.Kind,
+            TimelineStartSeconds = current.TimelineStartSeconds,
+            SourceStartSeconds = current.SourceStartSeconds,
+            SourceEndSeconds = next.SourceEndSeconds
+        };
+
+        ordered[index] = merged;
+        ordered.RemoveAt(index + 1);
+        return Normalize(project, ordered, preserveSequence: true);
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 

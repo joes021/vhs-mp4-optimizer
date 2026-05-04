@@ -75,6 +75,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         TrimSelectedToInOutCommand = new AsyncRelayCommand(TrimSelectedToInOutAsync, CanModifySelectedSegment);
         DuplicateSelectedCommand = new AsyncRelayCommand(DuplicateSelectedAsync, CanModifySelectedSegment);
         CloseAllGapsCommand = new AsyncRelayCommand(CloseAllGapsAsync, HasGapSegments);
+        MergeWithNextCommand = new AsyncRelayCommand(MergeWithNextAsync, CanMergeSelectedWithNext);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -132,6 +133,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand DuplicateSelectedCommand { get; }
 
     public IAsyncRelayCommand CloseAllGapsCommand { get; }
+
+    public IAsyncRelayCommand MergeWithNextCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -256,6 +259,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         TrimSelectedToInOutCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         CloseAllGapsCommand.NotifyCanExecuteChanged();
+        MergeWithNextCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
     }
 
@@ -344,6 +348,18 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = "Sve rupe na timeline-u su zatvorene.";
     }
 
+    private async Task MergeWithNextAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return;
+        }
+
+        Timeline = TimelineEditorService.MergeSegmentWithNext(Timeline, SelectedSegment.Id);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = "Izabrani segment je spojen sa narednim.";
+    }
+
     private async Task DeleteSegmentAsync()
     {
         if (SelectedSegment is null)
@@ -393,6 +409,25 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private bool CanModifySelectedSegment() => SelectedSegment is not null;
 
     private bool HasGapSegments() => Timeline.Segments.Any(segment => segment.Kind == TimelineSegmentKind.Gap);
+
+    private bool CanMergeSelectedWithNext()
+    {
+        if (SelectedSegment is null)
+        {
+            return false;
+        }
+
+        var ordered = Timeline.Segments.OrderBy(segment => segment.TimelineStartSeconds).ToList();
+        var index = ordered.FindIndex(segment => segment.Id == SelectedSegment.Id);
+        if (index < 0 || index >= ordered.Count - 1)
+        {
+            return false;
+        }
+
+        var next = ordered[index + 1];
+        return SelectedSegment.Kind == next.Kind
+            && Math.Abs(SelectedSegment.SourceEndSeconds - next.SourceStartSeconds) <= 0.0001d;
+    }
 
     private async Task GoToStartAsync()
     {
