@@ -784,6 +784,21 @@
                     </Grid>
                 </Border>
 
+                <Grid Grid.Row="3"
+                      Grid.RowSpan="3"
+                      ColumnDefinitions="112,*"
+                      IsHitTestVisible="False">
+                    <Border x:Name="TimelineMasterPlayheadGuide"
+                            Grid.Column="1"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Stretch"
+                            Width="2"
+                            Margin="0,8,0,8"
+                            CornerRadius="1"
+                            Background="#F97316"
+                            Opacity="0.75" />
+                </Grid>
+
                 <StackPanel Grid.Row="6" Spacing="8">
                     <TextBlock Classes="field-label" Text="Edit Tools" />
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
