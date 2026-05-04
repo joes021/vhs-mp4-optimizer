@@ -489,6 +489,26 @@
                                 <TextBlock Text="Link" />
                                 <TextBlock Text="Zoom -" />
                                 <TextBlock Text="Zoom +" />
+                                <Button Classes="transport"
+                                        Classes.active-chip="{Binding IsZoom1sActive}"
+                                        Command="{Binding SelectZoomPresetCommand}"
+                                        CommandParameter="1s"
+                                        Content="1s" />
+                                <Button Classes="transport"
+                                        Classes.active-chip="{Binding IsZoom5sActive}"
+                                        Command="{Binding SelectZoomPresetCommand}"
+                                        CommandParameter="5s"
+                                        Content="5s" />
+                                <Button Classes="transport"
+                                        Classes.active-chip="{Binding IsZoom10sActive}"
+                                        Command="{Binding SelectZoomPresetCommand}"
+                                        CommandParameter="10s"
+                                        Content="10s" />
+                                <Button Classes="transport"
+                                        Classes.active-chip="{Binding IsZoomFullActive}"
+                                        Command="{Binding SelectZoomPresetCommand}"
+                                        CommandParameter="Full"
+                                        Content="Full" />
                             </StackPanel>
                         </Border>
                     </StackPanel>

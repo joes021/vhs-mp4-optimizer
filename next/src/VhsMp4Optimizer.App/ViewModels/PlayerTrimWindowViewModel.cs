@@ -114,6 +114,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SelectMonitorTabCommand = new RelayCommand<string?>(SelectMonitorTab);
         SelectInspectorTabCommand = new RelayCommand<string?>(SelectInspectorTab);
         SelectToolCommand = new RelayCommand<string?>(SelectTool);
+        SelectZoomPresetCommand = new RelayCommand<string?>(SelectZoomPreset);
         ToggleTrackLockCommand = new RelayCommand(ToggleTrackLock);
         ToggleTrackMuteCommand = new RelayCommand(ToggleTrackMute);
         ToggleTrackSoloCommand = new RelayCommand(ToggleTrackSolo);
@@ -224,6 +225,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public IRelayCommand<string?> SelectToolCommand { get; }
 
+    public IRelayCommand<string?> SelectZoomPresetCommand { get; }
+
     public IRelayCommand ToggleTrackLockCommand { get; }
 
     public IRelayCommand ToggleTrackMuteCommand { get; }
@@ -315,6 +318,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private string _activeTool = "Select";
 
     [ObservableProperty]
+    private string _activeZoomPreset = "Full";
+
+    [ObservableProperty]
     private bool _isTrackLocked;
 
     [ObservableProperty]
@@ -340,6 +346,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public bool IsBladeToolActive => string.Equals(ActiveTool, "Blade", StringComparison.Ordinal);
     public bool IsSlipToolActive => string.Equals(ActiveTool, "Slip", StringComparison.Ordinal);
     public bool IsRollToolActive => string.Equals(ActiveTool, "Roll", StringComparison.Ordinal);
+    public bool IsZoom1sActive => string.Equals(ActiveZoomPreset, "1s", StringComparison.Ordinal);
+    public bool IsZoom5sActive => string.Equals(ActiveZoomPreset, "5s", StringComparison.Ordinal);
+    public bool IsZoom10sActive => string.Equals(ActiveZoomPreset, "10s", StringComparison.Ordinal);
+    public bool IsZoomFullActive => string.Equals(ActiveZoomPreset, "Full", StringComparison.Ordinal);
     public bool IsTrackLockActive => IsTrackLocked;
     public bool IsTrackMuteActive => IsTrackMuted;
     public bool IsTrackSoloActive => IsTrackSolo;
@@ -391,6 +401,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     partial void OnActiveInspectorTabChanged(string value) => NotifyEditorChromeStateChanged();
 
     partial void OnActiveToolChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnActiveZoomPresetChanged(string value) => NotifyEditorChromeStateChanged();
 
     partial void OnIsTrackLockedChanged(bool value) => NotifyEditorChromeStateChanged();
 
@@ -741,6 +753,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = $"Aktivna alatka: {tool}.";
     }
 
+    private void SelectZoomPreset(string? preset)
+    {
+        if (string.IsNullOrWhiteSpace(preset))
+        {
+            return;
+        }
+
+        ActiveZoomPreset = preset;
+        EditorHint = $"Timeline zoom preset aktivan: {preset}.";
+    }
+
     private void ToggleTrackLock()
     {
         IsTrackLocked = !IsTrackLocked;
@@ -930,6 +953,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsBladeToolActive));
         OnPropertyChanged(nameof(IsSlipToolActive));
         OnPropertyChanged(nameof(IsRollToolActive));
+        OnPropertyChanged(nameof(IsZoom1sActive));
+        OnPropertyChanged(nameof(IsZoom5sActive));
+        OnPropertyChanged(nameof(IsZoom10sActive));
+        OnPropertyChanged(nameof(IsZoomFullActive));
         OnPropertyChanged(nameof(IsTrackLockActive));
         OnPropertyChanged(nameof(IsTrackMuteActive));
         OnPropertyChanged(nameof(IsTrackSoloActive));

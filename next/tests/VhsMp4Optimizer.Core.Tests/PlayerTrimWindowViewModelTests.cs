@@ -142,6 +142,23 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void SelectZoomPresetCommand_should_update_active_zoom_state_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectZoomPresetCommand.Execute("10s");
+
+        Assert.True(viewModel.IsZoom10sActive);
+        Assert.False(viewModel.IsZoomFullActive);
+        Assert.Contains("10s", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
