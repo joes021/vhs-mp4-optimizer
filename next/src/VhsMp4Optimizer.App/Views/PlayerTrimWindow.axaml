@@ -149,6 +149,14 @@
                                 <Border Classes="panel-muted" Padding="10,6" Background="#1E2A38" BorderBrush="#40617F">
                                     <TextBlock FontWeight="SemiBold" Text="Program" />
                                 </Border>
+                                <Border Classes="panel-muted" Padding="10,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Fit" />
+                                        <TextBlock Text="100%" />
+                                        <TextBlock Text="Safe" />
+                                        <TextBlock Text="Proxy Off" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                             <StackPanel Spacing="2">
                                 <TextBlock Classes="section-title" Text="Program Monitor" />
