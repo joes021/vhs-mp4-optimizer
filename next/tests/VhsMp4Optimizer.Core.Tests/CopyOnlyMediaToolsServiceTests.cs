@@ -1,5 +1,6 @@
 using VhsMp4Optimizer.Core.Models;
 using VhsMp4Optimizer.Infrastructure.Services;
+using System.Diagnostics;
 
 namespace VhsMp4Optimizer.Core.Tests;
 
@@ -43,12 +44,52 @@ public sealed class CopyOnlyMediaToolsServiceTests
         Assert.Contains("copy", args);
     }
 
-    private static MediaInfo CreateMediaInfo(long sizeBytes, double durationSeconds)
+    [Fact]
+    public async Task SplitAsync_should_create_multiple_real_parts_when_ffmpeg_is_available()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var rootPath = Path.Combine(Path.GetTempPath(), $"vhs-next-copy-split-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+
+        try
+        {
+            var inputPath = await CreateRealDvAviAsync(rootPath, ffmpegPath);
+            var mediaInfo = CreateMediaInfo(
+                sizeBytes: new FileInfo(inputPath).Length,
+                durationSeconds: 12,
+                sourcePath: inputPath,
+                sourceName: Path.GetFileName(inputPath));
+            var service = new CopyOnlyMediaToolsService();
+
+            var outputs = await service.SplitAsync(ffmpegPath, mediaInfo, rootPath, 0.02);
+
+            Assert.True(outputs.Count >= 2, $"Ocekivana su najmanje 2 dela, a pronadjeno je {outputs.Count}.");
+            Assert.All(outputs, output =>
+            {
+                Assert.True(File.Exists(output), $"Split izlaz ne postoji: {output}");
+                Assert.True(new FileInfo(output).Length > 0, $"Split izlaz je prazan: {output}");
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, true);
+            }
+        }
+    }
+
+    private static MediaInfo CreateMediaInfo(long sizeBytes, double durationSeconds, string sourcePath = @"F:\source.mp4", string sourceName = "source.mp4")
     {
         return new MediaInfo
         {
-            SourceName = "source.mp4",
-            SourcePath = @"F:\source.mp4",
+            SourceName = sourceName,
+            SourcePath = sourcePath,
             Container = "mov,mp4,m4a,3gp,3g2,mj2",
             DurationSeconds = durationSeconds,
             DurationText = "01:06:40",
@@ -75,5 +116,49 @@ public sealed class CopyOnlyMediaToolsServiceTests
             VideoSummary = "h264 | 1920x1080 | 16:9 | 25 fps",
             AudioSummary = "aac | 2 ch | 48000 Hz | 192 kbps"
         };
+    }
+
+    private static async Task<string> CreateRealDvAviAsync(string rootPath, string ffmpegPath)
+    {
+        var fullPath = Path.Combine(rootPath, "copy-split-source.avi");
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = ffmpegPath,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var argument in new[]
+                 {
+                     "-y",
+                     "-f", "lavfi",
+                     "-i", "testsrc=size=720x576:rate=25",
+                     "-f", "lavfi",
+                     "-i", "sine=frequency=1000:sample_rate=48000",
+                     "-t", "12",
+                     "-c:v", "dvvideo",
+                     "-pix_fmt", "yuv420p",
+                     "-c:a", "pcm_s16le",
+                     fullPath
+                 })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("ffmpeg nije pokrenut za copy split test source.");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        _ = await outputTask;
+        var errorText = await errorTask;
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"ffmpeg nije uspeo da napravi DV AVI test source: {errorText}");
+        }
+
+        return fullPath;
     }
 }
