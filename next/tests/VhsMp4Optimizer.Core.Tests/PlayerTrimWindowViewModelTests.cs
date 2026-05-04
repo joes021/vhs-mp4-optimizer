@@ -481,6 +481,28 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task InsertGapAtPlayheadCommand_should_add_one_second_gap_at_current_position()
+    {
+        var queueItem = BuildQueueItem();
+        TimelineProject? savedTimeline = null;
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (timeline, _) => savedTimeline = timeline,
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.InsertGapAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.SaveToQueueCommand.Execute(null);
+
+        Assert.NotNull(savedTimeline);
+        Assert.Equal(3, savedTimeline!.Segments.Count);
+        Assert.Equal(TimelineSegmentKind.Gap, savedTimeline.Segments[1].Kind);
+        Assert.Equal(120d, savedTimeline.Segments[1].TimelineStartSeconds, 3);
+        Assert.Equal(121d, savedTimeline.Segments[2].TimelineStartSeconds, 3);
+    }
+
+    [Fact]
     public async Task PrepareForDisplayAsync_should_render_preview_for_large_dv_avi_when_file_is_available()
     {
         const string sourcePath = @"F:\Veliki avi\1996 -1 -6 - .avi";

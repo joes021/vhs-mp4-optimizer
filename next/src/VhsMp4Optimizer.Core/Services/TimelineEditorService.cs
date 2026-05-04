@@ -351,6 +351,56 @@ public static class TimelineEditorService
         return Normalize(project, ordered, preserveSequence: true);
     }
 
+    public static TimelineProject InsertGapAtPlayhead(TimelineProject project, double virtualSeconds, double gapDurationSeconds)
+    {
+        var targetSeconds = Math.Clamp(virtualSeconds, 0, project.SourceDurationSeconds);
+        var gapDuration = Math.Max(0.0001d, gapDurationSeconds);
+        var rebuilt = new List<TimelineSegment>();
+        var inserted = false;
+
+        foreach (var segment in project.Segments.OrderBy(s => s.TimelineStartSeconds))
+        {
+            var segmentStart = segment.TimelineStartSeconds;
+            var segmentEnd = segment.TimelineStartSeconds + segment.DurationSeconds;
+
+            if (inserted || segment.Kind != TimelineSegmentKind.Keep)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            if (targetSeconds < segmentStart - 0.0001d || targetSeconds > segmentEnd + 0.0001d)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            var sourceSplitPoint = segment.SourceStartSeconds + Math.Clamp(targetSeconds - segmentStart, 0, segment.DurationSeconds);
+            if (targetSeconds > segmentStart + 0.0001d)
+            {
+                rebuilt.Add(CloneSegment(segment, segmentStart, segment.SourceStartSeconds, sourceSplitPoint, segment.Kind));
+            }
+
+            rebuilt.Add(new TimelineSegment
+            {
+                Id = Guid.NewGuid(),
+                Kind = TimelineSegmentKind.Gap,
+                TimelineStartSeconds = targetSeconds,
+                SourceStartSeconds = 0,
+                SourceEndSeconds = gapDuration
+            });
+
+            if (sourceSplitPoint < segment.SourceEndSeconds - 0.0001d)
+            {
+                rebuilt.Add(CloneSegment(segment, targetSeconds + gapDuration, sourceSplitPoint, segment.SourceEndSeconds, segment.Kind));
+            }
+
+            inserted = true;
+        }
+
+        return inserted ? Normalize(project, rebuilt, preserveSequence: true) : project;
+    }
+
     public static TimelineProject SlipSegment(TimelineProject project, Guid segmentId, double deltaSeconds, double sourceDurationSeconds)
     {
         var rebuilt = new List<TimelineSegment>(project.Segments.Count);

@@ -79,6 +79,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         MergeWithNextCommand = new AsyncRelayCommand(MergeWithNextAsync, CanMergeSelectedWithNext);
         RollLeftCommand = new AsyncRelayCommand(() => RollSelectedAsync(-1), CanRollSelectedWithNext);
         RollRightCommand = new AsyncRelayCommand(() => RollSelectedAsync(1), CanRollSelectedWithNext);
+        InsertGapAtPlayheadCommand = new AsyncRelayCommand(InsertGapAtPlayheadAsync);
         SlipLeftCommand = new AsyncRelayCommand(() => SlipSelectedAsync(-1), CanSlipSelected);
         SlipRightCommand = new AsyncRelayCommand(() => SlipSelectedAsync(1), CanSlipSelected);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
@@ -146,6 +147,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand RollLeftCommand { get; }
 
     public IAsyncRelayCommand RollRightCommand { get; }
+
+    public IAsyncRelayCommand InsertGapAtPlayheadCommand { get; }
 
     public IAsyncRelayCommand SlipLeftCommand { get; }
 
@@ -409,6 +412,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         Timeline = TimelineEditorService.RollBoundaryWithNext(Timeline, SelectedSegment.Id, frameDelta / frameRate);
         await RefreshStateAndPreviewAsync();
         EditorHint = $"Granica izmedju izabranog i sledeceg segmenta je pomerena za {frameDelta} frejm.";
+    }
+
+    private async Task InsertGapAtPlayheadAsync()
+    {
+        Timeline = TimelineEditorService.InsertGapAtPlayhead(Timeline, PreviewVirtualSeconds, 1d);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = $"Ubacena je rupa od 1s na {PreviewVirtualTimeText}.";
     }
 
     private async Task SlipSelectedAsync(int frameDelta)
