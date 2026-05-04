@@ -34,7 +34,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"Edit Index\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mixer\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"25 fps\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Snap On\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{Binding SnapStatusText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Linked Selection\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Cut\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Edit\"", markup, StringComparison.Ordinal);
@@ -69,6 +69,8 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"01:00\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TimelinePlayheadIndicator\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TimelinePlayheadBadge\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SnapGuideLeft\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SnapGuideRight\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding PreviewVirtualTimeText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"DUR\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding SelectionBadgeText}\"", markup, StringComparison.Ordinal);
@@ -82,7 +84,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"Timeline Info\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Metadata\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Timeline Controls\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Magnet\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Magnet\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Link\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Zoom -\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Zoom +\"", markup, StringComparison.Ordinal);
@@ -106,6 +108,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Command=\"{Binding ToggleTrackLockCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ToggleTrackMuteCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ToggleTrackSoloCommand}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ToggleSnapCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Split at Playhead\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Toggle Keep/Cut\"", markup, StringComparison.Ordinal);

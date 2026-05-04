@@ -198,6 +198,22 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ToggleSnapCommand_should_update_snap_state_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.ToggleSnapCommand.Execute(null);
+
+        Assert.False(viewModel.IsSnapEnabled);
+        Assert.Contains("snap", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();

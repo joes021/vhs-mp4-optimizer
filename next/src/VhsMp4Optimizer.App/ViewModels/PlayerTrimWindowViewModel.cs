@@ -116,6 +116,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SelectToolCommand = new RelayCommand<string?>(SelectTool);
         SelectZoomPresetCommand = new RelayCommand<string?>(SelectZoomPreset);
         SelectBottomDockCommand = new RelayCommand<string?>(SelectBottomDock);
+        ToggleSnapCommand = new RelayCommand(ToggleSnap);
         ToggleTrackLockCommand = new RelayCommand(ToggleTrackLock);
         ToggleTrackMuteCommand = new RelayCommand(ToggleTrackMute);
         ToggleTrackSoloCommand = new RelayCommand(ToggleTrackSolo);
@@ -230,6 +231,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public IRelayCommand<string?> SelectBottomDockCommand { get; }
 
+    public IRelayCommand ToggleSnapCommand { get; }
+
     public IRelayCommand ToggleTrackLockCommand { get; }
 
     public IRelayCommand ToggleTrackMuteCommand { get; }
@@ -330,6 +333,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private string _activeBottomDock = "Timeline";
 
     [ObservableProperty]
+    private bool _isSnapEnabled = true;
+
+    [ObservableProperty]
     private bool _isTrackLocked;
 
     [ObservableProperty]
@@ -364,6 +370,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public bool IsMetadataBottomDockActive => string.Equals(ActiveBottomDock, "Metadata", StringComparison.Ordinal);
     public bool IsMarkersBottomDockActive => string.Equals(ActiveBottomDock, "Markers", StringComparison.Ordinal);
     public bool IsScopesBottomDockActive => string.Equals(ActiveBottomDock, "Scopes", StringComparison.Ordinal);
+    public string SnapStatusText => IsSnapEnabled ? "Snap On" : "Snap Off";
     public bool IsTrackLockActive => IsTrackLocked;
     public bool IsTrackMuteActive => IsTrackMuted;
     public bool IsTrackSoloActive => IsTrackSolo;
@@ -427,6 +434,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     partial void OnActiveZoomPresetChanged(string value) => NotifyEditorChromeStateChanged();
 
     partial void OnActiveBottomDockChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnIsSnapEnabledChanged(bool value) => NotifyEditorChromeStateChanged();
 
     partial void OnIsTrackLockedChanged(bool value) => NotifyEditorChromeStateChanged();
 
@@ -800,6 +809,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = $"Donji dock aktivan: {dock}.";
     }
 
+    private void ToggleSnap()
+    {
+        IsSnapEnabled = !IsSnapEnabled;
+        EditorHint = IsSnapEnabled
+            ? "Timeline snap je ukljucen."
+            : "Timeline snap je iskljucen.";
+    }
+
     private void ToggleTrackLock()
     {
         IsTrackLocked = !IsTrackLocked;
@@ -999,6 +1016,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsMetadataBottomDockActive));
         OnPropertyChanged(nameof(IsMarkersBottomDockActive));
         OnPropertyChanged(nameof(IsScopesBottomDockActive));
+        OnPropertyChanged(nameof(SnapStatusText));
         OnPropertyChanged(nameof(IsTrackLockActive));
         OnPropertyChanged(nameof(IsTrackMuteActive));
         OnPropertyChanged(nameof(IsTrackSoloActive));
