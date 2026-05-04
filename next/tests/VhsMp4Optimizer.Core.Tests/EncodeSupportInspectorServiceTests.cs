@@ -18,6 +18,7 @@ public sealed class EncodeSupportInspectorServiceTests
         var nvidia = Assert.Single(report.Engines.Where(engine => engine.EngineName == "NVIDIA NVENC"));
         Assert.True(nvidia.IsReady, report.Summary + Environment.NewLine + string.Join(Environment.NewLine, report.Details));
         Assert.Equal("ready", nvidia.Status);
+        Assert.Equal(VhsMp4Optimizer.Core.Services.EncodeEngines.NvidiaNvenc, report.PreferredEngine);
         Assert.DoesNotContain(report.RepairActions, action => action.Label.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -48,6 +49,7 @@ public sealed class EncodeSupportInspectorServiceTests
 
         Assert.Contains("FFmpeg nije pronadjen", report.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(report.RepairActions, action => action.Kind == SupportRepairActionKind.Command && action.Target.Contains("winget install", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(VhsMp4Optimizer.Core.Services.EncodeEngines.Cpu, report.PreferredEngine);
     }
 
     private static string CreateStubExecutable(string fileName)

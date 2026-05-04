@@ -3,6 +3,7 @@ using System.Linq;
 using System.IO;
 using System.Reflection;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -119,6 +120,7 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(selectedPath))
         {
             viewModel.SetFfmpegPath(selectedPath);
+            _ = RefreshEncodeSupportAsync(viewModel);
         }
     }
 
@@ -127,6 +129,7 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.AutoDetectFfmpeg();
+            _ = RefreshEncodeSupportAsync(viewModel);
         }
     }
 
@@ -516,6 +519,7 @@ public partial class MainWindow : Window
         {
             viewModel.ApplySessionState(_sessionStateService.LoadOrDefault());
             RefreshSystemMonitor(viewModel);
+            _ = RefreshEncodeSupportAsync(viewModel);
         }
 
         _systemMonitorTimer.Start();
@@ -584,6 +588,17 @@ public partial class MainWindow : Window
     {
         var snapshot = _systemResourceMonitorService.Capture(viewModel.OutputFolder);
         viewModel.ApplySystemResourceSnapshot(snapshot);
+    }
+
+    private async Task RefreshEncodeSupportAsync(MainWindowViewModel viewModel)
+    {
+        if (string.IsNullOrWhiteSpace(viewModel.ResolvedFfmpegPath))
+        {
+            return;
+        }
+
+        var report = await _encodeSupportInspectorService.InspectAsync(viewModel.ResolvedFfmpegPath);
+        viewModel.ApplyEncodeSupportReport(report);
     }
 
     private static void LaunchRepairAction(SupportRepairAction action)

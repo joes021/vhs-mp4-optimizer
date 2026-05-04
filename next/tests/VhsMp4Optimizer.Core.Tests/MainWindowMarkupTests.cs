@@ -23,6 +23,7 @@ public sealed class MainWindowMarkupTests
         Assert.Contains("Content=\"Open Report\"", markup, StringComparison.Ordinal);
         Assert.Contains("Header=\"Check Encode Support\"", markup, StringComparison.Ordinal);
         Assert.Contains("Header=\"Install / Repair Encode Support\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding EncodeEngineHint}\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Migracioni branch je aktivan", markup, StringComparison.OrdinalIgnoreCase);
     }
 

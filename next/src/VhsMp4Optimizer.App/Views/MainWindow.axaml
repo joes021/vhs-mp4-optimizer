@@ -273,6 +273,7 @@
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Encode engine" />
                             <ComboBox ItemsSource="{Binding EncodeEngines}" SelectedItem="{Binding EncodeEngine}" />
+                            <TextBlock Classes="hint" Text="{Binding EncodeEngineHint}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
 

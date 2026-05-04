@@ -8,6 +8,8 @@ public sealed class EncodeSupportReport
     public IReadOnlyList<string> Details { get; init; } = [];
     public IReadOnlyList<EncodeEngineSupportStatus> Engines { get; init; } = [];
     public IReadOnlyList<SupportRepairAction> RepairActions { get; init; } = [];
+    public string PreferredEngine { get; init; } = string.Empty;
+    public string PreferredEngineReason { get; init; } = string.Empty;
 }
 
 public sealed class EncodeEngineSupportStatus

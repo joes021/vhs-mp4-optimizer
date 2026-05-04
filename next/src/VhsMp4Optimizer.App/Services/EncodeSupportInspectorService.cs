@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VhsMp4Optimizer.App.Models;
+using VhsMp4Optimizer.Core.Services;
 
 namespace VhsMp4Optimizer.App.Services;
 
@@ -97,20 +98,71 @@ public sealed class EncodeSupportInspectorService
             $"FFmpeg: {(ffmpegReady ? ffmpegPath : "nije pronadjen")}",
             gpuNames.Count > 0 ? $"GPU adapteri: {string.Join(", ", gpuNames)}" : "GPU adapteri: nisu detektovani"
         };
+        var preferredEngine = ResolvePreferredEngine(engines);
+        var preferredReason = BuildPreferredEngineReason(preferredEngine, engines);
         details.AddRange(engines.Select(engine => $"{engine.EngineName}: {engine.Status}{(string.IsNullOrWhiteSpace(engine.Details) ? string.Empty : $" | {engine.Details}")}"));
+        details.Add($"Recommended engine: {preferredEngine} | {preferredReason}");
         if (repairActions.Count > 0)
         {
             details.AddRange(repairActions.Select(action => $"Repair action: {action.Label} -> {action.Target}"));
         }
 
         var summaryPrefix = ffmpegReady ? "Encode support" : "FFmpeg nije pronadjen";
-        var summary = summaryPrefix + ": " + string.Join(" | ", engines.Select(engine => $"{engine.EngineName} {engine.Status}"));
+        var summary = summaryPrefix + ": " + string.Join(" | ", engines.Select(engine => $"{engine.EngineName} {engine.Status}")) + $" | preporuka: {preferredEngine}";
         return new EncodeSupportReport
         {
             Summary = summary,
             Details = details,
             Engines = engines,
-            RepairActions = repairActions
+            RepairActions = repairActions,
+            PreferredEngine = preferredEngine,
+            PreferredEngineReason = preferredReason
+        };
+    }
+
+    public static string ResolvePreferredEngine(IReadOnlyList<EncodeEngineSupportStatus> engines)
+    {
+        if (IsReady(engines, "NVIDIA NVENC"))
+        {
+            return EncodeEngines.NvidiaNvenc;
+        }
+
+        if (IsReady(engines, "Intel QSV"))
+        {
+            return EncodeEngines.IntelQsv;
+        }
+
+        if (IsReady(engines, "AMD AMF"))
+        {
+            return EncodeEngines.AmdAmf;
+        }
+
+        return EncodeEngines.Cpu;
+    }
+
+    private static bool IsReady(IReadOnlyList<EncodeEngineSupportStatus> engines, string engineName)
+        => engines.Any(engine =>
+            string.Equals(engine.EngineName, engineName, StringComparison.OrdinalIgnoreCase)
+            && engine.IsReady);
+
+    private static string BuildPreferredEngineReason(string preferredEngine, IReadOnlyList<EncodeEngineSupportStatus> engines)
+    {
+        var gpuReady = engines
+            .Where(engine => !string.Equals(engine.EngineName, "CPU", StringComparison.OrdinalIgnoreCase) && engine.IsReady)
+            .Select(engine => engine.EngineName)
+            .ToList();
+
+        return preferredEngine switch
+        {
+            var value when string.Equals(value, EncodeEngines.NvidiaNvenc, StringComparison.OrdinalIgnoreCase)
+                => "NVIDIA GPU i NVENC encoder su spremni.",
+            var value when string.Equals(value, EncodeEngines.IntelQsv, StringComparison.OrdinalIgnoreCase)
+                => "Intel GPU i QSV encoder su spremni.",
+            var value when string.Equals(value, EncodeEngines.AmdAmf, StringComparison.OrdinalIgnoreCase)
+                => "AMD GPU i AMF encoder su spremni.",
+            _ when gpuReady.Count > 0
+                => $"GPU encode nije stabilno spreman za: {string.Join(", ", gpuReady)}. Koristi se CPU fallback.",
+            _ => "GPU encode nije dostupan ili ffmpeg nije spreman. Koristi se CPU encode."
         };
     }
 

@@ -21,6 +21,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IConversionService _conversionService;
     private readonly IConversionReportService _conversionReportService;
     private readonly IExternalLauncher _externalLauncher;
+    private readonly Func<string?, Task<EncodeSupportReport>> _inspectEncodeSupportAsync;
     private readonly CopyOnlyMediaToolsService _copyOnlyMediaToolsService = new();
     private readonly QueueSnapshotService _queueSnapshotService = new();
     private IReadOnlyList<string>? _explicitSourcePaths;
@@ -32,18 +33,22 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isInitializing = true;
     private string? _lastConvertedOutputPath;
     private string? _lastBatchReportPath;
+    private EncodeSupportReport? _lastEncodeSupportReport;
 
     public MainWindowViewModel(
         ISourceScanService? sourceScanService = null,
         IConversionService? conversionService = null,
         string? ffmpegPath = null,
         IExternalLauncher? launcher = null,
-        IConversionReportService? reportService = null)
+        IConversionReportService? reportService = null,
+        Func<string?, Task<EncodeSupportReport>>? inspectEncodeSupportAsync = null)
     {
         _sourceScanService = sourceScanService ?? new SourceScanService();
         _conversionService = conversionService ?? new FfmpegConversionService();
         _conversionReportService = reportService ?? new ConversionReportService();
         _externalLauncher = launcher ?? new ExternalLauncher();
+        _inspectEncodeSupportAsync = inspectEncodeSupportAsync
+            ?? (path => new EncodeSupportInspectorService().InspectAsync(path));
         QueueItems = new ObservableCollection<QueueItemSummary>();
         ComparisonRows = new ObservableCollection<PropertyComparisonRow>(CoreServices.PropertyComparisonBuilder.Build(null));
         WorkflowPresets = new ObservableCollection<string>(CoreServices.WorkflowPresetService.Names);
@@ -106,6 +111,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _storageUsageText = "Storage --";
+
+    [ObservableProperty]
+    private string _encodeEngineHint = "Auto bira najbolji spreman engine na osnovu ffmpeg i GPU podrske.";
 
     [ObservableProperty]
     private string _selectedPreset = "USB standard";
@@ -329,6 +337,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        EncodeEngineHint = string.Equals(value, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase)
+            ? _lastEncodeSupportReport is null
+                ? "Auto bira najbolji spreman engine na osnovu ffmpeg i GPU podrske."
+                : $"Auto trenutno koristi: {_lastEncodeSupportReport.PreferredEngine}"
+            : $"Rucno izabran engine: {value}";
         RefreshPlannedOutput();
     }
 
@@ -424,7 +437,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        var settings = BuildSettings();
+        var settings = BuildPlannerSettings();
         var outputDirectory = _sourceScanService.ResolveOutputDirectory(InputFolder, OutputFolder);
         OutputFolder = outputDirectory;
         var items = _sourceScanService.Scan(settings with { OutputDirectory = outputDirectory }, ResolvedFfmpegPath, _explicitSourcePaths);
@@ -470,7 +483,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var ffmpegPath = ResolvedFfmpegPath!;
-        var settings = BuildSettings();
+        var settings = await BuildEffectiveSettingsAsync();
+        if (string.Equals(EncodeEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            AppendLog($"Auto encode izbor za batch: {settings.EncodeEngine}");
+        }
         var items = QueueItems.ToList();
         var queuedItems = items.Where(CoreServices.QueueWorkflowService.ShouldConvert).ToList();
         if (queuedItems.Count == 0)
@@ -629,7 +646,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var samplePath = Path.Combine(sampleDirectory, $"{Path.GetFileNameWithoutExtension(SelectedQueueItem.SourceFile)}-sample.mp4");
         var start = ResolveSampleStartSeconds(SelectedQueueItem.MediaInfo.DurationSeconds);
         var duration = ResolveSampleDurationSeconds(SelectedQueueItem.MediaInfo.DurationSeconds, start);
-        var settings = BuildSettings();
+        var settings = await BuildEffectiveSettingsAsync();
 
         var ffmpegPath = ResolvedFfmpegPath!;
         try
@@ -649,7 +666,7 @@ public partial class MainWindowViewModel : ViewModelBase
             LastSamplePath = samplePath;
             StatusMessage = $"Test Sample napravljen: {Path.GetFileName(samplePath)}";
             ProgressMessage = $"Sample start: {start:0}s | duration: {duration:0}s";
-            LogMessage = samplePath;
+            LogMessage = $"{samplePath}{Environment.NewLine}Encode engine: {settings.EncodeEngine}";
         }
         catch (Exception ex)
         {
@@ -673,7 +690,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var settings = BuildSettings();
+        var settings = BuildPlannerSettings();
         var existingItems = QueueItems.ToList();
         QueueItems.Clear();
         foreach (var item in existingItems)
@@ -716,7 +733,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private BatchSettings BuildSettings() => new()
+    private BatchSettings BuildRequestedSettings() => new()
     {
         InputPath = InputFolder,
         OutputDirectory = OutputFolder,
@@ -732,6 +749,41 @@ public partial class MainWindowViewModel : ViewModelBase
         SplitOutput = SplitOutput,
         MaxPartGb = MaxPartGb
     };
+
+    private BatchSettings BuildPlannerSettings()
+        => ApplyPreferredEncodeEngine(BuildRequestedSettings(), _lastEncodeSupportReport);
+
+    private async Task<BatchSettings> BuildEffectiveSettingsAsync()
+    {
+        var requestedSettings = BuildRequestedSettings();
+        if (!string.Equals(requestedSettings.EncodeEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            return requestedSettings;
+        }
+
+        var report = _lastEncodeSupportReport;
+        if (report is null)
+        {
+            report = await _inspectEncodeSupportAsync(ResolvedFfmpegPath);
+            ApplyEncodeSupportReport(report);
+        }
+
+        return ApplyPreferredEncodeEngine(requestedSettings, report);
+    }
+
+    private static BatchSettings ApplyPreferredEncodeEngine(BatchSettings settings, EncodeSupportReport? report)
+    {
+        if (!string.Equals(settings.EncodeEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            return settings;
+        }
+
+        var preferred = string.IsNullOrWhiteSpace(report?.PreferredEngine)
+            ? CoreServices.EncodeEngines.Cpu
+            : report!.PreferredEngine;
+
+        return settings with { EncodeEngine = preferred };
+    }
 
     private void ApplyPreset(string presetName)
     {
@@ -898,7 +950,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             var effectiveTransform = transformSettings ?? item.TransformSettings;
-            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, BuildSettings(), effectiveTransform);
+            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, BuildPlannerSettings(), effectiveTransform);
             if (planned is not null)
             {
                 planned = new OutputPlanSummary
@@ -1040,7 +1092,7 @@ public partial class MainWindowViewModel : ViewModelBase
         QueueItems.Clear();
         foreach (var item in snapshot.QueueItems)
         {
-            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, BuildSettings(), item.TransformSettings);
+            var planned = item.MediaInfo is null ? null : CoreServices.OutputPlanner.Build(item.MediaInfo, BuildPlannerSettings(), item.TransformSettings);
             QueueItems.Add(new QueueItemSummary
             {
                 SourceFile = item.SourceFile,
@@ -1396,6 +1448,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         ResolvedFfmpegPath = Path.GetFullPath(ffmpegPath);
+        _lastEncodeSupportReport = null;
+        EncodeEngineHint = "Auto bira najbolji spreman engine na osnovu ffmpeg i GPU podrske.";
         StatusMessage = $"ffmpeg putanja je postavljena: {ResolvedFfmpegPath}";
         LogMessage = $"FFmpeg: {ResolvedFfmpegPath}";
         SplitSelectedCopyCommand.NotifyCanExecuteChanged();
@@ -1422,10 +1476,18 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        _lastEncodeSupportReport = report;
+        EncodeEngineHint = string.Equals(EncodeEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase)
+            ? $"Auto trenutno koristi: {report.PreferredEngine}"
+            : $"Rucno izabran engine: {EncodeEngine}";
         StatusMessage = report.Summary;
         var lines = new List<string>(report.Details);
         lines.AddRange(report.RepairActions.Select(action => $"Install / repair: {action.Label} -> {action.Target}"));
         AppendLog(string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line))));
+        if (string.Equals(EncodeEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            RefreshPlannedOutput();
+        }
     }
 
     public void AutoDetectFfmpeg()

@@ -77,6 +77,31 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task StartConversionCommand_should_resolve_auto_encode_engine_to_best_ready_hardware()
+    {
+        var filePath = CreateFile("convert-auto-engine.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            inspectEncodeSupportAsync: _ => Task.FromResult(new EncodeSupportReport
+            {
+                Summary = "Encode support: preporuka NVIDIA NVENC",
+                PreferredEngine = EncodeEngines.NvidiaNvenc,
+                PreferredEngineReason = "NVIDIA GPU i NVENC encoder su spremni."
+            }));
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        viewModel.EncodeEngine = EncodeEngines.Auto;
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        Assert.Single(conversionService.Requests);
+        Assert.Equal(EncodeEngines.NvidiaNvenc, conversionService.Requests[0].Settings.EncodeEngine);
+    }
+
+    [Fact]
     public void ApplySessionState_should_not_restore_input_and_output_paths_on_startup()
     {
         var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");
@@ -306,6 +331,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         var report = new EncodeSupportReport
         {
             Summary = "Encode support: CPU ready | NVIDIA NVENC ready | Intel QSV driver missing",
+            PreferredEngine = EncodeEngines.NvidiaNvenc,
+            PreferredEngineReason = "NVIDIA GPU i NVENC encoder su spremni.",
             Details =
             [
                 "CPU: ready",
@@ -326,6 +353,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         viewModel.ApplyEncodeSupportReport(report);
 
         Assert.Contains("Encode support:", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NVIDIA NVENC", viewModel.EncodeEngineHint, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("NVIDIA NVENC: ready", viewModel.LogMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Install Intel driver", viewModel.LogMessage, StringComparison.OrdinalIgnoreCase);
     }
