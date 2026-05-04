@@ -42,6 +42,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"Link\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Zoom -\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Zoom +\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Selection\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Playhead\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Mode\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Edit Tools\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Split at Playhead\"", markup, StringComparison.Ordinal);
