@@ -690,8 +690,8 @@
                                                     BorderThickness="{Binding BorderThickness}">
                                                 <StackPanel Margin="8" Spacing="4">
                                                     <Grid ColumnDefinitions="Auto,*">
-                                                        <Border Background="#0F1720" BorderBrush="#5C6C7F" BorderThickness="1" CornerRadius="4" Padding="6,2">
-                                                            <TextBlock FontSize="10" FontWeight="Bold" Text="CLIP" />
+                                                        <Border Background="{Binding AccentBrush}" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                                                            <TextBlock FontSize="10" FontWeight="Bold" Text="{Binding SelectionBadgeText}" />
                                                         </Border>
                                                         <TextBlock Grid.Column="1"
                                                                    Margin="8,0,0,0"
@@ -813,6 +813,16 @@
                             <TextBlock Text="{Binding EditorHint}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
+                            <Border Classes="panel"
+                                    Padding="8,6"
+                                    CornerRadius="6"
+                                    Background="#16202B"
+                                    BorderBrush="#36506B">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Classes="field-label" Text="Selected Clip" />
+                                    <TextBlock Text="{Binding SelectedClipSummary}" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="4">
                             <TextBlock Classes="field-label" Text="Playhead" />

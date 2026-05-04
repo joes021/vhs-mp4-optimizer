@@ -246,6 +246,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private string _fileSummary = string.Empty;
 
     [ObservableProperty]
+    private string _selectedClipSummary = "Nijedan segment nije selektovan.";
+
+    [ObservableProperty]
     private TimelineProject _timeline;
 
     [ObservableProperty]
@@ -384,6 +387,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
+        UpdateSelectedClipSummary();
     }
 
     partial void OnPreviewVirtualSecondsChanged(double value)
@@ -956,6 +960,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
         UpdatePreviewTimeTexts();
+        UpdateSelectedClipSummary();
     }
 
     private void NotifyEditorChromeStateChanged()
@@ -1366,6 +1371,20 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         {
             block.IsSelected = block.SegmentId == selectedId;
         }
+    }
+
+    private void UpdateSelectedClipSummary()
+    {
+        if (SelectedSegment is null)
+        {
+            SelectedClipSummary = "Nijedan segment nije selektovan.";
+            return;
+        }
+
+        SelectedClipSummary =
+            $"{SelectedSegment.Kind.ToString().ToUpperInvariant()} | " +
+            $"{TimelineEditorService.FormatSeconds(SelectedSegment.SourceStartSeconds)} -> " +
+            $"{TimelineEditorService.FormatSeconds(SelectedSegment.SourceEndSeconds)}";
     }
 
     private void SetPreviewVirtualSecondsSilently(double value)

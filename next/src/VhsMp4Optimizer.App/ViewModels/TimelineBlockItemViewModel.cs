@@ -32,13 +32,21 @@ public partial class TimelineBlockItemViewModel : ObservableObject
         ? Brush.Parse("#FBBF24")
         : Brush.Parse("#0F172A");
 
+    public IBrush AccentBrush => IsSelected
+        ? Brush.Parse("#F59E0B")
+        : Brush.Parse("#64748B");
+
     public Thickness BorderThickness => IsSelected
         ? new Thickness(3)
         : new Thickness(1);
 
+    public string SelectionBadgeText => IsSelected ? "SELECTED" : "CLIP";
+
     partial void OnIsSelectedChanged(bool value)
     {
         OnPropertyChanged(nameof(BorderBrush));
+        OnPropertyChanged(nameof(AccentBrush));
         OnPropertyChanged(nameof(BorderThickness));
+        OnPropertyChanged(nameof(SelectionBadgeText));
     }
 }
