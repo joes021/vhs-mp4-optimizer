@@ -93,6 +93,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"Selection\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Playhead\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Mode\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Markers\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Scopes\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SelectBottomDockCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Edit Tools\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding SelectModeCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding SelectWorkspaceDockCommand}\"", markup, StringComparison.Ordinal);

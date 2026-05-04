@@ -115,6 +115,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SelectInspectorTabCommand = new RelayCommand<string?>(SelectInspectorTab);
         SelectToolCommand = new RelayCommand<string?>(SelectTool);
         SelectZoomPresetCommand = new RelayCommand<string?>(SelectZoomPreset);
+        SelectBottomDockCommand = new RelayCommand<string?>(SelectBottomDock);
         ToggleTrackLockCommand = new RelayCommand(ToggleTrackLock);
         ToggleTrackMuteCommand = new RelayCommand(ToggleTrackMute);
         ToggleTrackSoloCommand = new RelayCommand(ToggleTrackSolo);
@@ -227,6 +228,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public IRelayCommand<string?> SelectZoomPresetCommand { get; }
 
+    public IRelayCommand<string?> SelectBottomDockCommand { get; }
+
     public IRelayCommand ToggleTrackLockCommand { get; }
 
     public IRelayCommand ToggleTrackMuteCommand { get; }
@@ -321,6 +324,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private string _activeZoomPreset = "Full";
 
     [ObservableProperty]
+    private string _activeBottomDock = "Timeline";
+
+    [ObservableProperty]
     private bool _isTrackLocked;
 
     [ObservableProperty]
@@ -350,6 +356,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public bool IsZoom5sActive => string.Equals(ActiveZoomPreset, "5s", StringComparison.Ordinal);
     public bool IsZoom10sActive => string.Equals(ActiveZoomPreset, "10s", StringComparison.Ordinal);
     public bool IsZoomFullActive => string.Equals(ActiveZoomPreset, "Full", StringComparison.Ordinal);
+    public bool IsTimelineBottomDockActive => string.Equals(ActiveBottomDock, "Timeline", StringComparison.Ordinal);
+    public bool IsMixerBottomDockActive => string.Equals(ActiveBottomDock, "Mixer", StringComparison.Ordinal);
+    public bool IsMetadataBottomDockActive => string.Equals(ActiveBottomDock, "Metadata", StringComparison.Ordinal);
+    public bool IsMarkersBottomDockActive => string.Equals(ActiveBottomDock, "Markers", StringComparison.Ordinal);
+    public bool IsScopesBottomDockActive => string.Equals(ActiveBottomDock, "Scopes", StringComparison.Ordinal);
     public bool IsTrackLockActive => IsTrackLocked;
     public bool IsTrackMuteActive => IsTrackMuted;
     public bool IsTrackSoloActive => IsTrackSolo;
@@ -403,6 +414,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     partial void OnActiveToolChanged(string value) => NotifyEditorChromeStateChanged();
 
     partial void OnActiveZoomPresetChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnActiveBottomDockChanged(string value) => NotifyEditorChromeStateChanged();
 
     partial void OnIsTrackLockedChanged(bool value) => NotifyEditorChromeStateChanged();
 
@@ -764,6 +777,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = $"Timeline zoom preset aktivan: {preset}.";
     }
 
+    private void SelectBottomDock(string? dock)
+    {
+        if (string.IsNullOrWhiteSpace(dock))
+        {
+            return;
+        }
+
+        ActiveBottomDock = dock;
+        EditorHint = $"Donji dock aktivan: {dock}.";
+    }
+
     private void ToggleTrackLock()
     {
         IsTrackLocked = !IsTrackLocked;
@@ -957,6 +981,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsZoom5sActive));
         OnPropertyChanged(nameof(IsZoom10sActive));
         OnPropertyChanged(nameof(IsZoomFullActive));
+        OnPropertyChanged(nameof(IsTimelineBottomDockActive));
+        OnPropertyChanged(nameof(IsMixerBottomDockActive));
+        OnPropertyChanged(nameof(IsMetadataBottomDockActive));
+        OnPropertyChanged(nameof(IsMarkersBottomDockActive));
+        OnPropertyChanged(nameof(IsScopesBottomDockActive));
         OnPropertyChanged(nameof(IsTrackLockActive));
         OnPropertyChanged(nameof(IsTrackMuteActive));
         OnPropertyChanged(nameof(IsTrackSoloActive));

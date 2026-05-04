@@ -159,6 +159,23 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void SelectBottomDockCommand_should_update_active_bottom_dock_state_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectBottomDockCommand.Execute("Scopes");
+
+        Assert.True(viewModel.IsScopesBottomDockActive);
+        Assert.False(viewModel.IsTimelineBottomDockActive);
+        Assert.Contains("Scopes", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();

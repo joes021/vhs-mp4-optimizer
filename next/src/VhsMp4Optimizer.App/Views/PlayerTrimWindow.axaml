@@ -524,7 +524,7 @@
         </Grid>
 
         <Border Grid.Row="2" Classes="panel" Margin="0,14,0,0">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" RowSpacing="10">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" RowSpacing="10">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="2">
                         <TextBlock Classes="section-title" Text="Timeline" />
@@ -777,6 +777,36 @@
                 </StackPanel>
 
                 <Border Grid.Row="6" Classes="panel-muted">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsTimelineBottomDockActive}"
+                                Command="{Binding SelectBottomDockCommand}"
+                                CommandParameter="Timeline"
+                                Content="Timeline" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsMixerBottomDockActive}"
+                                Command="{Binding SelectBottomDockCommand}"
+                                CommandParameter="Mixer"
+                                Content="Mixer" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsMetadataBottomDockActive}"
+                                Command="{Binding SelectBottomDockCommand}"
+                                CommandParameter="Metadata"
+                                Content="Metadata" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsMarkersBottomDockActive}"
+                                Command="{Binding SelectBottomDockCommand}"
+                                CommandParameter="Markers"
+                                Content="Markers" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsScopesBottomDockActive}"
+                                Command="{Binding SelectBottomDockCommand}"
+                                CommandParameter="Scopes"
+                                Content="Scopes" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="7" Classes="panel-muted">
                     <Grid ColumnDefinitions="2.2*,1.2*,1*" ColumnSpacing="12">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Selection" />
