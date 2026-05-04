@@ -181,22 +181,24 @@
                         </ScrollViewer>
                     </Border>
 
-                    <Grid ColumnDefinitions="*,*,*,*,*,*,*,*,*" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="*,*,*,*,*,*,*,*,*,*" ColumnSpacing="8">
                         <Button Grid.Column="0" Classes="transport" Content="Split at Playhead" Command="{Binding SplitAtPlayheadCommand}" />
                         <Button Grid.Column="1" Classes="transport" Content="Toggle Keep/Cut" Command="{Binding ToggleKeepCutCommand}" />
                         <Button Grid.Column="2" Classes="transport" Content="Trim Selected" Command="{Binding TrimSelectedToInOutCommand}" />
                         <Button Grid.Column="3" Classes="transport" Content="Duplicate Selected" Command="{Binding DuplicateSelectedCommand}" />
                         <Button Grid.Column="4" Classes="transport" Content="Merge With Next" Command="{Binding MergeWithNextCommand}" />
                         <Button Grid.Column="5" Classes="transport" Content="Close All Gaps" Command="{Binding CloseAllGapsCommand}" />
-                        <Button Grid.Column="6" Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
-                        <Button Grid.Column="7" Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
-                        <Button Grid.Column="8" Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+                        <Button Grid.Column="6" Classes="transport" Content="Slip &lt;" Command="{Binding SlipLeftCommand}" />
+                        <Button Grid.Column="7" Classes="transport" Content="Slip &gt;" Command="{Binding SlipRightCommand}" />
+                        <Button Grid.Column="8" Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
+                        <Button Grid.Column="9" Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
                     </Grid>
 
-                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                        <Button Grid.Column="0" Classes="transport" Content="Move Left" Command="{Binding MoveLeftCommand}" />
-                        <Button Grid.Column="1" Classes="transport" Content="Move Right" Command="{Binding MoveRightCommand}" />
-                        <Button Grid.Column="2" Classes="primary" Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+                        <Button Grid.Column="1" Classes="transport" Content="Move Left" Command="{Binding MoveLeftCommand}" />
+                        <Button Grid.Column="2" Classes="transport" Content="Move Right" Command="{Binding MoveRightCommand}" />
+                        <Button Grid.Column="3" Classes="primary" Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
                     </Grid>
                 </StackPanel>
             </Border>

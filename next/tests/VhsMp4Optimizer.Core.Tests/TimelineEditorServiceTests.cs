@@ -424,4 +424,48 @@ public sealed class TimelineEditorServiceTests
         Assert.Equal(0, merged.Segments[0].SourceStartSeconds);
         Assert.Equal(100, merged.Segments[0].SourceEndSeconds);
     }
+
+    [Fact]
+    public void Slip_segment_should_shift_source_window_without_changing_timeline_duration()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            Container = "avi",
+            DurationSeconds = 100,
+            DurationText = "00:01:40",
+            SizeBytes = 1000,
+            SizeText = "1000 B",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 2500,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "pcm",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo",
+            AudioSummary = "pcm"
+        };
+
+        var timeline = TimelineEditorService.SplitAtPlayhead(TimelineEditorService.CreateInitial(mediaInfo), 20);
+        timeline = TimelineEditorService.SplitAtPlayhead(timeline, 60);
+        var slipped = TimelineEditorService.SlipSegment(timeline, timeline.Segments[1].Id, 1d / 25d, mediaInfo.DurationSeconds);
+
+        Assert.Equal(20, slipped.Segments[1].TimelineStartSeconds);
+        Assert.Equal(40, slipped.Segments[1].DurationSeconds);
+        Assert.Equal(20.04, slipped.Segments[1].SourceStartSeconds, 2);
+        Assert.Equal(60.04, slipped.Segments[1].SourceEndSeconds, 2);
+    }
 }

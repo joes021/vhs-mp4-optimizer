@@ -306,6 +306,36 @@ public static class TimelineEditorService
         return Normalize(project, ordered, preserveSequence: true);
     }
 
+    public static TimelineProject SlipSegment(TimelineProject project, Guid segmentId, double deltaSeconds, double sourceDurationSeconds)
+    {
+        var rebuilt = new List<TimelineSegment>(project.Segments.Count);
+        var slipped = false;
+
+        foreach (var segment in project.Segments.OrderBy(segment => segment.TimelineStartSeconds))
+        {
+            if (segment.Id != segmentId || segment.Kind == TimelineSegmentKind.Gap)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            var duration = segment.DurationSeconds;
+            var maxStart = Math.Max(0, sourceDurationSeconds - duration);
+            var newStart = Math.Clamp(segment.SourceStartSeconds + deltaSeconds, 0, maxStart);
+            rebuilt.Add(new TimelineSegment
+            {
+                Id = segment.Id,
+                Kind = segment.Kind,
+                TimelineStartSeconds = segment.TimelineStartSeconds,
+                SourceStartSeconds = newStart,
+                SourceEndSeconds = newStart + duration
+            });
+            slipped = true;
+        }
+
+        return slipped ? Normalize(project, rebuilt, preserveSequence: true) : project;
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 
