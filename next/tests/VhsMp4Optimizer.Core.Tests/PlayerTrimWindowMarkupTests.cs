@@ -22,6 +22,11 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Background=\"#14181F\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Inspector\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Timeline\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Tool Rail\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Select\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Blade\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Slip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Roll\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"V1\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Edit Tools\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);

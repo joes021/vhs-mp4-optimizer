@@ -101,8 +101,44 @@
                     Click="ClosePlayerTrimClick" />
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*,360" ColumnSpacing="14">
+        <Grid Grid.Row="1" ColumnDefinitions="92,*,360" ColumnSpacing="14">
             <Border Classes="panel">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="section-title"
+                               FontSize="12"
+                               Text="Tool Rail" />
+
+                    <Border Classes="panel-muted" Padding="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Select" />
+                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Pointer" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-muted" Padding="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Blade" />
+                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Cut" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-muted" Padding="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Slip" />
+                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Shift" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-muted" Padding="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Roll" />
+                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Edge" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Classes="panel">
                 <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="12">
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
@@ -173,7 +209,7 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Column="1" Spacing="12">
+            <StackPanel Grid.Column="2" Spacing="12">
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
                         <TextBlock Classes="section-title" Text="Inspector" />
