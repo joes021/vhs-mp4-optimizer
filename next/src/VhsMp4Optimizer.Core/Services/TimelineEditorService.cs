@@ -116,6 +116,35 @@ public static class TimelineEditorService
     public static TimelineProject MoveSegmentRight(TimelineProject project, Guid segmentId)
         => SwapWithNeighbor(project, segmentId, 1);
 
+    public static TimelineProject SplitAtPlayhead(TimelineProject project, double virtualSeconds)
+    {
+        var targetSeconds = Math.Clamp(virtualSeconds, 0, project.SourceDurationSeconds);
+        var rebuilt = new List<TimelineSegment>();
+        var splitApplied = false;
+
+        foreach (var segment in project.Segments.OrderBy(s => s.TimelineStartSeconds))
+        {
+            var segmentStart = segment.TimelineStartSeconds;
+            var segmentEnd = segment.TimelineStartSeconds + segment.DurationSeconds;
+
+            if (splitApplied
+                || targetSeconds <= segmentStart + 0.0001d
+                || targetSeconds >= segmentEnd - 0.0001d
+                || segment.Kind != TimelineSegmentKind.Keep)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            var sourceSplitPoint = segment.SourceStartSeconds + (targetSeconds - segmentStart);
+            rebuilt.Add(CloneSegment(segment, segmentStart, segment.SourceStartSeconds, sourceSplitPoint, segment.Kind));
+            rebuilt.Add(CloneSegment(segment, targetSeconds, sourceSplitPoint, segment.SourceEndSeconds, segment.Kind));
+            splitApplied = true;
+        }
+
+        return splitApplied ? Normalize(project, rebuilt, preserveSequence: true) : project;
+    }
+
     public static TimelineProject MoveSegmentBefore(TimelineProject project, Guid movingSegmentId, Guid targetSegmentId)
     {
         if (movingSegmentId == targetSegmentId)

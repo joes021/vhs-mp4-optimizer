@@ -70,6 +70,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OutPointText = TimelineEditorService.FormatSeconds(item.MediaInfo.DurationSeconds);
 
         CutSegmentCommand = new AsyncRelayCommand(ApplyCutSegmentAsync);
+        SplitAtPlayheadCommand = new AsyncRelayCommand(SplitAtPlayheadAsync);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -117,6 +118,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<string> AspectModes { get; }
 
     public IAsyncRelayCommand CutSegmentCommand { get; }
+
+    public IAsyncRelayCommand SplitAtPlayheadCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -267,6 +270,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         Timeline = TimelineEditorService.CutSegment(Timeline, inSeconds, outSeconds);
         await RefreshStateAndPreviewAsync();
+    }
+
+    private async Task SplitAtPlayheadAsync()
+    {
+        Timeline = TimelineEditorService.SplitAtPlayhead(Timeline, PreviewVirtualSeconds);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = $"Segment je podeljen na playhead-u | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
     }
 
     private async Task DeleteSegmentAsync()

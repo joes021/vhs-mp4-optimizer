@@ -181,10 +181,11 @@
                         </ScrollViewer>
                     </Border>
 
-                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                        <Button Grid.Column="0" Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
-                        <Button Grid.Column="1" Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
-                        <Button Grid.Column="2" Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Classes="transport" Content="Split at Playhead" Command="{Binding SplitAtPlayheadCommand}" />
+                        <Button Grid.Column="1" Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
+                        <Button Grid.Column="2" Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
+                        <Button Grid.Column="3" Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
