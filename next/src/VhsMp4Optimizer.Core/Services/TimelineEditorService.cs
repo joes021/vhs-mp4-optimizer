@@ -336,6 +336,66 @@ public static class TimelineEditorService
         return slipped ? Normalize(project, rebuilt, preserveSequence: true) : project;
     }
 
+    public static TimelineProject ExtractSegmentToRange(TimelineProject project, Guid segmentId, double sourceStartSeconds, double sourceEndSeconds)
+    {
+        var rebuilt = new List<TimelineSegment>(project.Segments.Count + 2);
+        var extracted = false;
+
+        foreach (var segment in project.Segments.OrderBy(segment => segment.TimelineStartSeconds))
+        {
+            if (segment.Id != segmentId)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            var start = Math.Clamp(Math.Min(sourceStartSeconds, sourceEndSeconds), segment.SourceStartSeconds, segment.SourceEndSeconds);
+            var end = Math.Clamp(Math.Max(sourceStartSeconds, sourceEndSeconds), segment.SourceStartSeconds, segment.SourceEndSeconds);
+            if (end - start <= 0.0001d)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            if (start > segment.SourceStartSeconds)
+            {
+                rebuilt.Add(new TimelineSegment
+                {
+                    Id = Guid.NewGuid(),
+                    Kind = segment.Kind,
+                    TimelineStartSeconds = segment.TimelineStartSeconds,
+                    SourceStartSeconds = segment.SourceStartSeconds,
+                    SourceEndSeconds = start
+                });
+            }
+
+            rebuilt.Add(new TimelineSegment
+            {
+                Id = segment.Id,
+                Kind = segment.Kind,
+                TimelineStartSeconds = segment.TimelineStartSeconds + Math.Max(0, start - segment.SourceStartSeconds),
+                SourceStartSeconds = start,
+                SourceEndSeconds = end
+            });
+
+            if (end < segment.SourceEndSeconds)
+            {
+                rebuilt.Add(new TimelineSegment
+                {
+                    Id = Guid.NewGuid(),
+                    Kind = segment.Kind,
+                    TimelineStartSeconds = segment.TimelineStartSeconds + Math.Max(0, end - segment.SourceStartSeconds),
+                    SourceStartSeconds = end,
+                    SourceEndSeconds = segment.SourceEndSeconds
+                });
+            }
+
+            extracted = true;
+        }
+
+        return extracted ? Normalize(project, rebuilt, preserveSequence: true) : project;
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 

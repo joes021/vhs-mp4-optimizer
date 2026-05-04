@@ -73,6 +73,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SplitAtPlayheadCommand = new AsyncRelayCommand(SplitAtPlayheadAsync);
         ToggleKeepCutCommand = new AsyncRelayCommand(ToggleKeepCutAsync, CanModifySelectedSegment);
         TrimSelectedToInOutCommand = new AsyncRelayCommand(TrimSelectedToInOutAsync, CanModifySelectedSegment);
+        ExtractSelectedToInOutCommand = new AsyncRelayCommand(ExtractSelectedToInOutAsync, CanModifySelectedSegment);
         DuplicateSelectedCommand = new AsyncRelayCommand(DuplicateSelectedAsync, CanModifySelectedSegment);
         CloseAllGapsCommand = new AsyncRelayCommand(CloseAllGapsAsync, HasGapSegments);
         MergeWithNextCommand = new AsyncRelayCommand(MergeWithNextAsync, CanMergeSelectedWithNext);
@@ -131,6 +132,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand ToggleKeepCutCommand { get; }
 
     public IAsyncRelayCommand TrimSelectedToInOutCommand { get; }
+
+    public IAsyncRelayCommand ExtractSelectedToInOutCommand { get; }
 
     public IAsyncRelayCommand DuplicateSelectedCommand { get; }
 
@@ -263,6 +266,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         MoveRightCommand.NotifyCanExecuteChanged();
         ToggleKeepCutCommand.NotifyCanExecuteChanged();
         TrimSelectedToInOutCommand.NotifyCanExecuteChanged();
+        ExtractSelectedToInOutCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         CloseAllGapsCommand.NotifyCanExecuteChanged();
         MergeWithNextCommand.NotifyCanExecuteChanged();
@@ -335,6 +339,24 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         Timeline = TimelineEditorService.TrimSegmentToRange(Timeline, SelectedSegment.Id, inSeconds, outSeconds);
         await RefreshStateAndPreviewAsync();
         EditorHint = $"Izabrani segment je skracen na {InPointText} -> {OutPointText}";
+    }
+
+    private async Task ExtractSelectedToInOutAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return;
+        }
+
+        if (!TryParseTime(InPointText, out var inSeconds) || !TryParseTime(OutPointText, out var outSeconds))
+        {
+            EditorHint = "IN/OUT vreme nije u dobrom formatu za extract selected.";
+            return;
+        }
+
+        Timeline = TimelineEditorService.ExtractSegmentToRange(Timeline, SelectedSegment.Id, inSeconds, outSeconds);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = $"Izabrani segment je izdvojen na {InPointText} -> {OutPointText}";
     }
 
     private async Task DuplicateSelectedAsync()
