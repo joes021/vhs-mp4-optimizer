@@ -201,19 +201,36 @@
 
                     <Border Grid.Row="3" Classes="panel-muted">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Classes="transport" Content="START" Command="{Binding GoToStartCommand}" />
-                                <Button Classes="transport" Content="&lt;&lt;&lt;" Command="{Binding Back250FramesCommand}" />
-                                <Button Classes="transport" Content="&lt;&lt;" Command="{Binding Back25FramesCommand}" />
-                                <Button Classes="transport" Content="&lt;" Command="{Binding BackFrameCommand}" />
-                                <Button Classes="transport" Content="Play" Command="{Binding PlayCommand}" />
-                                <Button Classes="transport" Content="Pause" Command="{Binding PauseCommand}" />
-                                <Button Classes="transport" Content="&gt;" Command="{Binding ForwardFrameCommand}" />
-                                <Button Classes="transport" Content="&gt;&gt;" Command="{Binding Forward25FramesCommand}" />
-                                <Button Classes="transport" Content="&gt;&gt;&gt;" Command="{Binding Forward250FramesCommand}" />
-                                <Button Classes="transport" Content="In" Command="{Binding SetInPointCommand}" />
-                                <Button Classes="transport" Content="Out" Command="{Binding SetOutPointCommand}" />
-                                <Button Classes="transport" Content="END" Command="{Binding GoToEndCommand}" />
+                            <StackPanel Orientation="Horizontal" Spacing="14">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Navigate" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="transport" Content="START" Command="{Binding GoToStartCommand}" />
+                                        <Button Classes="transport" Content="&lt;&lt;&lt;" Command="{Binding Back250FramesCommand}" />
+                                        <Button Classes="transport" Content="&lt;&lt;" Command="{Binding Back25FramesCommand}" />
+                                        <Button Classes="transport" Content="&lt;" Command="{Binding BackFrameCommand}" />
+                                        <Button Classes="transport" Content="&gt;" Command="{Binding ForwardFrameCommand}" />
+                                        <Button Classes="transport" Content="&gt;&gt;" Command="{Binding Forward25FramesCommand}" />
+                                        <Button Classes="transport" Content="&gt;&gt;&gt;" Command="{Binding Forward250FramesCommand}" />
+                                        <Button Classes="transport" Content="END" Command="{Binding GoToEndCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Playback" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="transport" Content="Play" Command="{Binding PlayCommand}" />
+                                        <Button Classes="transport" Content="Pause" Command="{Binding PauseCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="field-label" Text="Marks" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="transport" Content="In" Command="{Binding SetInPointCommand}" />
+                                        <Button Classes="transport" Content="Out" Command="{Binding SetOutPointCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
