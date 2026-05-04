@@ -240,4 +240,49 @@ public sealed class TimelineEditorServiceTests
         Assert.Equal(TimelineSegmentKind.Cut, toggledToCut.Segments[1].Kind);
         Assert.Equal(TimelineSegmentKind.Keep, toggledBackToKeep.Segments[1].Kind);
     }
+
+    [Fact]
+    public void Trim_segment_to_range_should_shorten_selected_segment_and_close_timeline()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            Container = "avi",
+            DurationSeconds = 100,
+            DurationText = "00:01:40",
+            SizeBytes = 1000,
+            SizeText = "1000 B",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 2500,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "pcm",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo",
+            AudioSummary = "pcm"
+        };
+
+        var timeline = TimelineEditorService.SplitAtPlayhead(TimelineEditorService.CreateInitial(mediaInfo), 40);
+        var trimmed = TimelineEditorService.TrimSegmentToRange(timeline, timeline.Segments[1].Id, 50, 80);
+
+        Assert.Equal(2, trimmed.Segments.Count);
+        Assert.Equal(0, trimmed.Segments[0].TimelineStartSeconds);
+        Assert.Equal(40, trimmed.Segments[1].TimelineStartSeconds);
+        Assert.Equal(50, trimmed.Segments[1].SourceStartSeconds);
+        Assert.Equal(80, trimmed.Segments[1].SourceEndSeconds);
+        Assert.Equal(70, TimelineEditorService.GetKeptDurationSeconds(trimmed));
+    }
 }

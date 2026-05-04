@@ -72,6 +72,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         CutSegmentCommand = new AsyncRelayCommand(ApplyCutSegmentAsync);
         SplitAtPlayheadCommand = new AsyncRelayCommand(SplitAtPlayheadAsync);
         ToggleKeepCutCommand = new AsyncRelayCommand(ToggleKeepCutAsync, CanModifySelectedSegment);
+        TrimSelectedToInOutCommand = new AsyncRelayCommand(TrimSelectedToInOutAsync, CanModifySelectedSegment);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -123,6 +124,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand SplitAtPlayheadCommand { get; }
 
     public IAsyncRelayCommand ToggleKeepCutCommand { get; }
+
+    public IAsyncRelayCommand TrimSelectedToInOutCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -244,6 +247,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         MoveLeftCommand.NotifyCanExecuteChanged();
         MoveRightCommand.NotifyCanExecuteChanged();
         ToggleKeepCutCommand.NotifyCanExecuteChanged();
+        TrimSelectedToInOutCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
     }
 
@@ -293,6 +297,24 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         Timeline = TimelineEditorService.ToggleSegmentKind(Timeline, SelectedSegment.Id);
         await RefreshStateAndPreviewAsync();
         EditorHint = $"Segment je prebacen na {SelectedSegment?.Kind}";
+    }
+
+    private async Task TrimSelectedToInOutAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return;
+        }
+
+        if (!TryParseTime(InPointText, out var inSeconds) || !TryParseTime(OutPointText, out var outSeconds))
+        {
+            EditorHint = "IN/OUT vreme nije u dobrom formatu za trim selected.";
+            return;
+        }
+
+        Timeline = TimelineEditorService.TrimSegmentToRange(Timeline, SelectedSegment.Id, inSeconds, outSeconds);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = $"Izabrani segment je skracen na {InPointText} -> {OutPointText}";
     }
 
     private async Task DeleteSegmentAsync()

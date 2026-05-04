@@ -203,6 +203,41 @@ public static class TimelineEditorService
         return Normalize(project, rebuilt, preserveSequence: true);
     }
 
+    public static TimelineProject TrimSegmentToRange(TimelineProject project, Guid segmentId, double sourceStartSeconds, double sourceEndSeconds)
+    {
+        var rebuilt = new List<TimelineSegment>(project.Segments.Count);
+        var trimmed = false;
+
+        foreach (var segment in project.Segments.OrderBy(segment => segment.TimelineStartSeconds))
+        {
+            if (segment.Id != segmentId)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            var start = Math.Clamp(Math.Min(sourceStartSeconds, sourceEndSeconds), segment.SourceStartSeconds, segment.SourceEndSeconds);
+            var end = Math.Clamp(Math.Max(sourceStartSeconds, sourceEndSeconds), segment.SourceStartSeconds, segment.SourceEndSeconds);
+            if (end - start <= 0.0001d)
+            {
+                rebuilt.Add(segment);
+                continue;
+            }
+
+            rebuilt.Add(new TimelineSegment
+            {
+                Id = segment.Id,
+                Kind = segment.Kind,
+                TimelineStartSeconds = segment.TimelineStartSeconds,
+                SourceStartSeconds = start,
+                SourceEndSeconds = end
+            });
+            trimmed = true;
+        }
+
+        return trimmed ? Normalize(project, rebuilt, preserveSequence: true) : project;
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 
