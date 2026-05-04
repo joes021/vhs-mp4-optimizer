@@ -238,6 +238,33 @@ public static class TimelineEditorService
         return trimmed ? Normalize(project, rebuilt, preserveSequence: true) : project;
     }
 
+    public static TimelineProject DuplicateSegment(TimelineProject project, Guid segmentId)
+    {
+        var rebuilt = new List<TimelineSegment>(project.Segments.Count + 1);
+        var duplicated = false;
+
+        foreach (var segment in project.Segments.OrderBy(segment => segment.TimelineStartSeconds))
+        {
+            rebuilt.Add(segment);
+            if (segment.Id != segmentId)
+            {
+                continue;
+            }
+
+            rebuilt.Add(new TimelineSegment
+            {
+                Id = Guid.NewGuid(),
+                Kind = segment.Kind,
+                TimelineStartSeconds = segment.TimelineStartSeconds + segment.DurationSeconds,
+                SourceStartSeconds = segment.SourceStartSeconds,
+                SourceEndSeconds = segment.SourceEndSeconds
+            });
+            duplicated = true;
+        }
+
+        return duplicated ? Normalize(project, rebuilt, preserveSequence: true) : project;
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 

@@ -73,6 +73,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SplitAtPlayheadCommand = new AsyncRelayCommand(SplitAtPlayheadAsync);
         ToggleKeepCutCommand = new AsyncRelayCommand(ToggleKeepCutAsync, CanModifySelectedSegment);
         TrimSelectedToInOutCommand = new AsyncRelayCommand(TrimSelectedToInOutAsync, CanModifySelectedSegment);
+        DuplicateSelectedCommand = new AsyncRelayCommand(DuplicateSelectedAsync, CanModifySelectedSegment);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -126,6 +127,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand ToggleKeepCutCommand { get; }
 
     public IAsyncRelayCommand TrimSelectedToInOutCommand { get; }
+
+    public IAsyncRelayCommand DuplicateSelectedCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -248,6 +251,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         MoveRightCommand.NotifyCanExecuteChanged();
         ToggleKeepCutCommand.NotifyCanExecuteChanged();
         TrimSelectedToInOutCommand.NotifyCanExecuteChanged();
+        DuplicateSelectedCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
     }
 
@@ -315,6 +319,18 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         Timeline = TimelineEditorService.TrimSegmentToRange(Timeline, SelectedSegment.Id, inSeconds, outSeconds);
         await RefreshStateAndPreviewAsync();
         EditorHint = $"Izabrani segment je skracen na {InPointText} -> {OutPointText}";
+    }
+
+    private async Task DuplicateSelectedAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return;
+        }
+
+        Timeline = TimelineEditorService.DuplicateSegment(Timeline, SelectedSegment.Id);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = "Izabrani segment je dupliran odmah iza originala.";
     }
 
     private async Task DeleteSegmentAsync()
