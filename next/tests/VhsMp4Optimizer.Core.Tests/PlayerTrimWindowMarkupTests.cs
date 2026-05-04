@@ -59,6 +59,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"Marks\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"V1\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"A1\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Video Lane\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Audio Lane\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TrackLaneSeparator\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Waveform\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Lock\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mute\"", markup, StringComparison.Ordinal);
