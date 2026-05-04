@@ -141,9 +141,19 @@
             <Border Grid.Column="1" Classes="panel">
                 <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="12">
                     <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="2">
-                            <TextBlock Classes="section-title" Text="Program Monitor" />
-                            <TextBlock Classes="section-meta" Text="Playback i precizan trim kadar" />
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Classes="panel-muted" Padding="10,6">
+                                    <TextBlock FontWeight="SemiBold" Text="Source" />
+                                </Border>
+                                <Border Classes="panel-muted" Padding="10,6" Background="#1E2A38" BorderBrush="#40617F">
+                                    <TextBlock FontWeight="SemiBold" Text="Program" />
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="section-title" Text="Program Monitor" />
+                                <TextBlock Classes="section-meta" Text="Playback i precizan trim kadar" />
+                            </StackPanel>
                         </StackPanel>
                         <Border Grid.Column="1" Classes="panel-muted" Padding="10,6">
                             <TextBlock Text="{Binding PreviewSourceTimeText}" FontWeight="SemiBold" />
@@ -217,7 +227,7 @@
 
                         <Border Classes="panel-muted">
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="field-label" Text="Selected clip" />
+                                <TextBlock Classes="field-label" Text="Timeline Info" />
                                 <TextBlock Text="{Binding TimelineSummary}" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding FileSummary}" TextWrapping="Wrap" />
                             </StackPanel>
@@ -232,7 +242,7 @@
 
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
-                        <TextBlock Classes="section-title" Text="Crop / Aspect" />
+                        <TextBlock Classes="section-title" Text="Transform" />
 
                         <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
                             <TextBlock VerticalAlignment="Center" Text="Aspect" />
@@ -263,7 +273,7 @@
 
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
-                        <TextBlock Classes="section-title" Text="Selected segment" />
+                        <TextBlock Classes="section-title" Text="Metadata" />
                         <ListBox ItemsSource="{Binding Segments}" SelectedItem="{Binding SelectedSegment}" Background="Transparent" BorderThickness="0">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="core:TimelineSegment">

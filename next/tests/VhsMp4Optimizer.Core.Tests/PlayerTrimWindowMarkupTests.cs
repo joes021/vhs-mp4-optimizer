@@ -23,6 +23,8 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"Inspector\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Timeline\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Tool Rail\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Source\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Program\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Select\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Blade\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Slip\"", markup, StringComparison.Ordinal);
@@ -32,6 +34,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"00:00\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"00:30\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"01:00\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Transform\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Timeline Info\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Metadata\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Edit Tools\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Split at Playhead\"", markup, StringComparison.Ordinal);
