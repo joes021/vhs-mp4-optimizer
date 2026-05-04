@@ -46,6 +46,10 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"100%\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Safe\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Proxy Off\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Monitor HUD\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"TC\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"SRC IN\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"SRC OUT\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Select\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Blade\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Slip\"", markup, StringComparison.Ordinal);
