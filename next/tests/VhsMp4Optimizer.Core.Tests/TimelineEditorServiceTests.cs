@@ -198,4 +198,46 @@ public sealed class TimelineEditorServiceTests
         Assert.Equal(40, split.Segments[0].SourceEndSeconds);
         Assert.Equal(40, split.Segments[1].SourceStartSeconds);
     }
+
+    [Fact]
+    public void Toggle_segment_kind_should_switch_between_keep_and_cut()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            Container = "avi",
+            DurationSeconds = 100,
+            DurationText = "00:01:40",
+            SizeBytes = 1000,
+            SizeText = "1000 B",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 2500,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "pcm",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo",
+            AudioSummary = "pcm"
+        };
+
+        var timeline = TimelineEditorService.SplitAtPlayhead(TimelineEditorService.CreateInitial(mediaInfo), 40);
+        var toggledToCut = TimelineEditorService.ToggleSegmentKind(timeline, timeline.Segments[1].Id);
+        var toggledBackToKeep = TimelineEditorService.ToggleSegmentKind(toggledToCut, toggledToCut.Segments[1].Id);
+
+        Assert.Equal(TimelineSegmentKind.Cut, toggledToCut.Segments[1].Kind);
+        Assert.Equal(TimelineSegmentKind.Keep, toggledBackToKeep.Segments[1].Kind);
+    }
 }

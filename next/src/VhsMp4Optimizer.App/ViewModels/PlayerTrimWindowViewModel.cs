@@ -71,6 +71,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         CutSegmentCommand = new AsyncRelayCommand(ApplyCutSegmentAsync);
         SplitAtPlayheadCommand = new AsyncRelayCommand(SplitAtPlayheadAsync);
+        ToggleKeepCutCommand = new AsyncRelayCommand(ToggleKeepCutAsync, CanModifySelectedSegment);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -120,6 +121,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand CutSegmentCommand { get; }
 
     public IAsyncRelayCommand SplitAtPlayheadCommand { get; }
+
+    public IAsyncRelayCommand ToggleKeepCutCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -240,6 +243,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         RippleDeleteCommand.NotifyCanExecuteChanged();
         MoveLeftCommand.NotifyCanExecuteChanged();
         MoveRightCommand.NotifyCanExecuteChanged();
+        ToggleKeepCutCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
     }
 
@@ -277,6 +281,18 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         Timeline = TimelineEditorService.SplitAtPlayhead(Timeline, PreviewVirtualSeconds);
         await RefreshStateAndPreviewAsync();
         EditorHint = $"Segment je podeljen na playhead-u | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
+    }
+
+    private async Task ToggleKeepCutAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return;
+        }
+
+        Timeline = TimelineEditorService.ToggleSegmentKind(Timeline, SelectedSegment.Id);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = $"Segment je prebacen na {SelectedSegment?.Kind}";
     }
 
     private async Task DeleteSegmentAsync()

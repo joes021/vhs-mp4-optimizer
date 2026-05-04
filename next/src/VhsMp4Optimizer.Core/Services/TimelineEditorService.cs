@@ -172,6 +172,37 @@ public static class TimelineEditorService
         return Normalize(project, ordered, preserveSequence: true);
     }
 
+    public static TimelineProject ToggleSegmentKind(TimelineProject project, Guid segmentId)
+    {
+        var rebuilt = project.Segments
+            .Select(segment =>
+            {
+                if (segment.Id != segmentId)
+                {
+                    return segment;
+                }
+
+                var toggledKind = segment.Kind switch
+                {
+                    TimelineSegmentKind.Keep => TimelineSegmentKind.Cut,
+                    TimelineSegmentKind.Cut => TimelineSegmentKind.Keep,
+                    _ => segment.Kind
+                };
+
+                return new TimelineSegment
+                {
+                    Id = segment.Id,
+                    Kind = toggledKind,
+                    TimelineStartSeconds = segment.TimelineStartSeconds,
+                    SourceStartSeconds = segment.SourceStartSeconds,
+                    SourceEndSeconds = segment.SourceEndSeconds
+                };
+            })
+            .ToList();
+
+        return Normalize(project, rebuilt, preserveSequence: true);
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 
