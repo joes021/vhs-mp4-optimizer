@@ -21,6 +21,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.DoesNotContain("<vlc:VideoView", markup, StringComparison.Ordinal);
         Assert.Contains("Background=\"#14181F\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Inspector\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Video\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Audio\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Effects\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Timeline\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Tool Rail\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Project\"", markup, StringComparison.Ordinal);
