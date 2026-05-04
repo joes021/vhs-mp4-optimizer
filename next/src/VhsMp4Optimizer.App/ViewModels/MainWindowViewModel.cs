@@ -287,6 +287,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        EncodeEngineHint = BuildEncodeEngineHint(EncodeEngine, value, _lastEncodeSupportReport);
         RefreshPlannedOutput();
     }
 
@@ -337,11 +338,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        EncodeEngineHint = string.Equals(value, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase)
-            ? _lastEncodeSupportReport is null
-                ? "Auto bira najbolji spreman engine na osnovu ffmpeg i GPU podrske."
-                : $"Auto trenutno koristi: {_lastEncodeSupportReport.PreferredEngine}"
-            : $"Rucno izabran engine: {value}";
+        EncodeEngineHint = BuildEncodeEngineHint(value, QualityMode, _lastEncodeSupportReport);
         RefreshPlannedOutput();
     }
 
@@ -778,11 +775,45 @@ public partial class MainWindowViewModel : ViewModelBase
             return settings;
         }
 
-        var preferred = string.IsNullOrWhiteSpace(report?.PreferredEngine)
-            ? CoreServices.EncodeEngines.Cpu
-            : report!.PreferredEngine;
+        var preferred = ResolveAutoPreferredEngine(settings.QualityMode, report);
 
         return settings with { EncodeEngine = preferred };
+    }
+
+    private static string ResolveAutoPreferredEngine(string qualityMode, EncodeSupportReport? report)
+    {
+        if (report is null)
+        {
+            return CoreServices.EncodeEngines.Cpu;
+        }
+
+        var wantsHevc = CoreServices.EncodingProfileService.Resolve(qualityMode).WantsHevc;
+        if (report.Engines.Count > 0)
+        {
+            return EncodeSupportInspectorService.ResolvePreferredEngine(report.Engines, wantsHevc);
+        }
+
+        return string.IsNullOrWhiteSpace(report.PreferredEngine)
+            ? CoreServices.EncodeEngines.Cpu
+            : report.PreferredEngine;
+    }
+
+    private static string BuildEncodeEngineHint(string selectedEngine, string qualityMode, EncodeSupportReport? report)
+    {
+        if (!string.Equals(selectedEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Rucno izabran engine: {selectedEngine}";
+        }
+
+        if (report is null)
+        {
+            return "Auto bira najbolji spreman engine na osnovu ffmpeg i GPU podrske.";
+        }
+
+        var wantsHevc = CoreServices.EncodingProfileService.Resolve(qualityMode).WantsHevc;
+        var codecLabel = wantsHevc ? "H.265/HEVC" : "H.264";
+        var preferred = ResolveAutoPreferredEngine(qualityMode, report);
+        return $"Auto trenutno koristi: {preferred} za {codecLabel}";
     }
 
     private void ApplyPreset(string presetName)
@@ -811,6 +842,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         StatusMessage = $"Preset aktivan: {preset.Name}";
+        EncodeEngineHint = BuildEncodeEngineHint(EncodeEngine, QualityMode, _lastEncodeSupportReport);
         RefreshCommandStates();
     }
 
@@ -1449,7 +1481,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         ResolvedFfmpegPath = Path.GetFullPath(ffmpegPath);
         _lastEncodeSupportReport = null;
-        EncodeEngineHint = "Auto bira najbolji spreman engine na osnovu ffmpeg i GPU podrske.";
+        EncodeEngineHint = BuildEncodeEngineHint(EncodeEngine, QualityMode, null);
         StatusMessage = $"ffmpeg putanja je postavljena: {ResolvedFfmpegPath}";
         LogMessage = $"FFmpeg: {ResolvedFfmpegPath}";
         SplitSelectedCopyCommand.NotifyCanExecuteChanged();
@@ -1477,9 +1509,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         _lastEncodeSupportReport = report;
-        EncodeEngineHint = string.Equals(EncodeEngine, CoreServices.EncodeEngines.Auto, StringComparison.OrdinalIgnoreCase)
-            ? $"Auto trenutno koristi: {report.PreferredEngine}"
-            : $"Rucno izabran engine: {EncodeEngine}";
+        EncodeEngineHint = BuildEncodeEngineHint(EncodeEngine, QualityMode, report);
         StatusMessage = report.Summary;
         var lines = new List<string>(report.Details);
         lines.AddRange(report.RepairActions.Select(action => $"Install / repair: {action.Label} -> {action.Target}"));

@@ -102,6 +102,52 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task StartConversionCommand_should_choose_hevc_capable_auto_engine_for_hevc_quality_mode()
+    {
+        var filePath = CreateFile("convert-auto-hevc.avi");
+        var scanner = new FakeSourceScanService(BuildQueueItem(filePath));
+        var conversionService = new FakeConversionService { CreateOutputFile = true };
+        var viewModel = new MainWindowViewModel(
+            scanner,
+            conversionService,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            inspectEncodeSupportAsync: _ => Task.FromResult(new EncodeSupportReport
+            {
+                Summary = "Encode support: NVIDIA H.264, Intel HEVC",
+                PreferredEngine = EncodeEngines.NvidiaNvenc,
+                PreferredEngineReason = "Generic preferred engine",
+                Engines =
+                [
+                    new EncodeEngineSupportStatus
+                    {
+                        EngineName = "NVIDIA NVENC",
+                        IsReady = true,
+                        Status = "ready",
+                        SupportsH264 = true,
+                        SupportsHevc = false
+                    },
+                    new EncodeEngineSupportStatus
+                    {
+                        EngineName = "Intel QSV",
+                        IsReady = true,
+                        Status = "ready",
+                        SupportsH264 = true,
+                        SupportsHevc = true
+                    }
+                ]
+            }));
+
+        await viewModel.UseSelectedFilesAsync([filePath]);
+        viewModel.QualityMode = QualityModes.HevcH265Smaller;
+        viewModel.EncodeEngine = EncodeEngines.Auto;
+        await viewModel.StartConversionCommand.ExecuteAsync(null);
+
+        Assert.Single(conversionService.Requests);
+        Assert.Equal(EncodeEngines.IntelQsv, conversionService.Requests[0].Settings.EncodeEngine);
+        Assert.Contains("H.265/HEVC", viewModel.EncodeEngineHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ApplySessionState_should_not_restore_input_and_output_paths_on_startup()
     {
         var viewModel = new MainWindowViewModel(ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe");

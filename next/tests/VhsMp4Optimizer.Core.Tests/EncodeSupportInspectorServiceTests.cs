@@ -52,6 +52,34 @@ public sealed class EncodeSupportInspectorServiceTests
         Assert.Equal(VhsMp4Optimizer.Core.Services.EncodeEngines.Cpu, report.PreferredEngine);
     }
 
+    [Fact]
+    public void ResolvePreferredEngine_should_choose_codec_ready_engine_for_hevc()
+    {
+        var engines = new[]
+        {
+            new EncodeEngineSupportStatus
+            {
+                EngineName = "NVIDIA NVENC",
+                IsReady = true,
+                Status = "ready",
+                SupportsH264 = true,
+                SupportsHevc = false
+            },
+            new EncodeEngineSupportStatus
+            {
+                EngineName = "Intel QSV",
+                IsReady = true,
+                Status = "ready",
+                SupportsH264 = true,
+                SupportsHevc = true
+            }
+        };
+
+        var preferred = EncodeSupportInspectorService.ResolvePreferredEngine(engines, wantsHevc: true);
+
+        Assert.Equal(VhsMp4Optimizer.Core.Services.EncodeEngines.IntelQsv, preferred);
+    }
+
     private static string CreateStubExecutable(string fileName)
     {
         var path = Path.Combine(Path.GetTempPath(), $"vhs-next-encode-support-{Guid.NewGuid():N}", fileName);

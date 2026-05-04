@@ -18,6 +18,8 @@ public sealed class EncodeEngineSupportStatus
     public required bool IsReady { get; init; }
     public required string Status { get; init; }
     public string? Details { get; init; }
+    public bool SupportsH264 { get; init; }
+    public bool SupportsHevc { get; init; }
 }
 
 public sealed class SupportRepairAction

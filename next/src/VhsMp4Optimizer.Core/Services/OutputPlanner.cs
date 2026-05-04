@@ -7,7 +7,7 @@ public static class OutputPlanner
 {
     public static OutputPlanSummary Build(MediaInfo mediaInfo, BatchSettings settings, ItemTransformSettings? transformSettings = null)
     {
-        var profile = ResolveProfile(settings);
+        var profile = EncodingProfileService.Resolve(settings.QualityMode);
         var crop = NormalizeCrop(transformSettings?.Crop, mediaInfo.Width, mediaInfo.Height);
         var croppedWidth = Math.Max(2, mediaInfo.Width - crop.Left - crop.Right);
         var croppedHeight = Math.Max(2, mediaInfo.Height - crop.Top - crop.Bottom);
@@ -151,20 +151,6 @@ public static class OutputPlanner
         return $"{width}:{height}";
     }
 
-    private static QualityProfile ResolveProfile(BatchSettings settings)
-    {
-        return settings.QualityMode switch
-        {
-            QualityModes.SmallMp4H264 or QualityModes.UsbSmallFile or QualityModes.Phone => new QualityProfile("H.264", 24, "slow", "128k", 3500),
-            QualityModes.HighQualityMp4H264 or QualityModes.ArchiveBetterQuality or QualityModes.YoutubeUpload => new QualityProfile("H.264", 20, "slow", "192k", 9000),
-            QualityModes.HevcH265Smaller or QualityModes.HevcForNewerDevices or QualityModes.Tablet => new QualityProfile("H.265", 26, "medium", "128k", 2800),
-            QualityModes.OldTv => new QualityProfile("H.264", 22, "medium", "160k", 4500),
-            QualityModes.LaptopPc => new QualityProfile("H.264", 22, "slow", "160k", 6000),
-            QualityModes.TvSmart => new QualityProfile("H.264", 21, "slow", "160k", 6500),
-            _ => new QualityProfile("H.264", 22, "slow", "160k", 5000)
-        };
-    }
-
     private static string ResolveEncodeEngineLabel(string encodeEngine, string codecLabel)
     {
         if (string.Equals(encodeEngine, EncodeEngines.NvidiaNvenc, StringComparison.OrdinalIgnoreCase))
@@ -185,7 +171,7 @@ public static class OutputPlanner
         return $"CPU / {codecLabel}";
     }
 
-    private static int ResolveVideoKbps(QualityProfile profile, string overrideBitrate)
+    private static int ResolveVideoKbps(EncodingProfile profile, string overrideBitrate)
     {
         var parsed = ParseKbps(overrideBitrate);
         return parsed > 0 ? parsed : profile.VideoKbps;
@@ -232,5 +218,4 @@ public static class OutputPlanner
         };
     }
 
-    private sealed record QualityProfile(string CodecLabel, int Crf, string Preset, string AudioBitrate, int VideoKbps);
 }

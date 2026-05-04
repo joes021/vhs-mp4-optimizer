@@ -36,16 +36,25 @@ public sealed class EncodeSupportInspectorService
         var hasIntelGpu = gpuNames.Any(name => name.Contains("Intel", StringComparison.OrdinalIgnoreCase));
         var hasAmdGpu = gpuNames.Any(name => name.Contains("AMD", StringComparison.OrdinalIgnoreCase) || name.Contains("Radeon", StringComparison.OrdinalIgnoreCase));
 
-        var hasNvenc = ContainsEncoder(encoderOutput, "h264_nvenc") || ContainsEncoder(encoderOutput, "hevc_nvenc");
-        var hasQsv = ContainsEncoder(encoderOutput, "h264_qsv") || ContainsEncoder(encoderOutput, "hevc_qsv");
-        var hasAmf = ContainsEncoder(encoderOutput, "h264_amf") || ContainsEncoder(encoderOutput, "hevc_amf");
+        var hasNvencH264 = ContainsEncoder(encoderOutput, "h264_nvenc");
+        var hasNvencHevc = ContainsEncoder(encoderOutput, "hevc_nvenc");
+        var hasQsvH264 = ContainsEncoder(encoderOutput, "h264_qsv");
+        var hasQsvHevc = ContainsEncoder(encoderOutput, "hevc_qsv");
+        var hasAmfH264 = ContainsEncoder(encoderOutput, "h264_amf");
+        var hasAmfHevc = ContainsEncoder(encoderOutput, "hevc_amf");
 
         var engines = new List<EncodeEngineSupportStatus>
         {
-            BuildStatus("CPU", ffmpegReady, ffmpegReady ? "ready" : "FFmpeg nije pronadjen", ffmpegReady ? "CPU encode je spreman cim postoji ffmpeg." : "Instaliraj ffmpeg da CPU encode proradi."),
-            BuildHardwareStatus("NVIDIA NVENC", hasNvidiaGpu, hasNvenc, "NVIDIA GPU nije detektovan", "NVIDIA GPU postoji, ali NVENC encode nije spreman"),
-            BuildHardwareStatus("Intel QSV", hasIntelGpu, hasQsv, "Intel GPU nije detektovan", "Intel GPU postoji, ali QSV encode nije spreman"),
-            BuildHardwareStatus("AMD AMF", hasAmdGpu, hasAmf, "AMD GPU nije detektovan", "AMD GPU postoji, ali AMF encode nije spreman")
+            BuildStatus(
+                "CPU",
+                ffmpegReady,
+                ffmpegReady ? "ready" : "FFmpeg nije pronadjen",
+                ffmpegReady ? "CPU encode je spreman cim postoji ffmpeg." : "Instaliraj ffmpeg da CPU encode proradi.",
+                supportsH264: ffmpegReady,
+                supportsHevc: ffmpegReady),
+            BuildHardwareStatus("NVIDIA NVENC", hasNvidiaGpu, hasNvencH264, hasNvencHevc, "NVIDIA GPU nije detektovan", "NVIDIA GPU postoji, ali NVENC encode nije spreman"),
+            BuildHardwareStatus("Intel QSV", hasIntelGpu, hasQsvH264, hasQsvHevc, "Intel GPU nije detektovan", "Intel GPU postoji, ali QSV encode nije spreman"),
+            BuildHardwareStatus("AMD AMF", hasAmdGpu, hasAmfH264, hasAmfHevc, "AMD GPU nije detektovan", "AMD GPU postoji, ali AMF encode nije spreman")
         };
 
         var repairActions = new List<SupportRepairAction>();
@@ -60,7 +69,7 @@ public sealed class EncodeSupportInspectorService
             });
         }
 
-        if (hasNvidiaGpu && !hasNvenc)
+        if (hasNvidiaGpu && !(hasNvencH264 || hasNvencHevc))
         {
             repairActions.Add(new SupportRepairAction
             {
@@ -71,7 +80,7 @@ public sealed class EncodeSupportInspectorService
             });
         }
 
-        if (hasIntelGpu && !hasQsv)
+        if (hasIntelGpu && !(hasQsvH264 || hasQsvHevc))
         {
             repairActions.Add(new SupportRepairAction
             {
@@ -82,7 +91,7 @@ public sealed class EncodeSupportInspectorService
             });
         }
 
-        if (hasAmdGpu && !hasAmf)
+        if (hasAmdGpu && !(hasAmfH264 || hasAmfHevc))
         {
             repairActions.Add(new SupportRepairAction
             {
@@ -98,8 +107,8 @@ public sealed class EncodeSupportInspectorService
             $"FFmpeg: {(ffmpegReady ? ffmpegPath : "nije pronadjen")}",
             gpuNames.Count > 0 ? $"GPU adapteri: {string.Join(", ", gpuNames)}" : "GPU adapteri: nisu detektovani"
         };
-        var preferredEngine = ResolvePreferredEngine(engines);
-        var preferredReason = BuildPreferredEngineReason(preferredEngine, engines);
+        var preferredEngine = ResolvePreferredEngine(engines, wantsHevc: false);
+        var preferredReason = BuildPreferredEngineReason(preferredEngine, engines, wantsHevc: false);
         details.AddRange(engines.Select(engine => $"{engine.EngineName}: {engine.Status}{(string.IsNullOrWhiteSpace(engine.Details) ? string.Empty : $" | {engine.Details}")}"));
         details.Add($"Recommended engine: {preferredEngine} | {preferredReason}");
         if (repairActions.Count > 0)
@@ -120,19 +129,19 @@ public sealed class EncodeSupportInspectorService
         };
     }
 
-    public static string ResolvePreferredEngine(IReadOnlyList<EncodeEngineSupportStatus> engines)
+    public static string ResolvePreferredEngine(IReadOnlyList<EncodeEngineSupportStatus> engines, bool wantsHevc)
     {
-        if (IsReady(engines, "NVIDIA NVENC"))
+        if (SupportsRequestedCodec(engines, "NVIDIA NVENC", wantsHevc))
         {
             return EncodeEngines.NvidiaNvenc;
         }
 
-        if (IsReady(engines, "Intel QSV"))
+        if (SupportsRequestedCodec(engines, "Intel QSV", wantsHevc))
         {
             return EncodeEngines.IntelQsv;
         }
 
-        if (IsReady(engines, "AMD AMF"))
+        if (SupportsRequestedCodec(engines, "AMD AMF", wantsHevc))
         {
             return EncodeEngines.AmdAmf;
         }
@@ -140,54 +149,63 @@ public sealed class EncodeSupportInspectorService
         return EncodeEngines.Cpu;
     }
 
-    private static bool IsReady(IReadOnlyList<EncodeEngineSupportStatus> engines, string engineName)
+    private static bool SupportsRequestedCodec(IReadOnlyList<EncodeEngineSupportStatus> engines, string engineName, bool wantsHevc)
         => engines.Any(engine =>
             string.Equals(engine.EngineName, engineName, StringComparison.OrdinalIgnoreCase)
-            && engine.IsReady);
+            && engine.IsReady
+            && (wantsHevc ? engine.SupportsHevc : engine.SupportsH264));
 
-    private static string BuildPreferredEngineReason(string preferredEngine, IReadOnlyList<EncodeEngineSupportStatus> engines)
+    private static string BuildPreferredEngineReason(string preferredEngine, IReadOnlyList<EncodeEngineSupportStatus> engines, bool wantsHevc)
     {
         var gpuReady = engines
             .Where(engine => !string.Equals(engine.EngineName, "CPU", StringComparison.OrdinalIgnoreCase) && engine.IsReady)
             .Select(engine => engine.EngineName)
             .ToList();
+        var codecLabel = wantsHevc ? "H.265/HEVC" : "H.264";
 
         return preferredEngine switch
         {
             var value when string.Equals(value, EncodeEngines.NvidiaNvenc, StringComparison.OrdinalIgnoreCase)
-                => "NVIDIA GPU i NVENC encoder su spremni.",
+                => $"NVIDIA GPU i NVENC encoder su spremni za {codecLabel}.",
             var value when string.Equals(value, EncodeEngines.IntelQsv, StringComparison.OrdinalIgnoreCase)
-                => "Intel GPU i QSV encoder su spremni.",
+                => $"Intel GPU i QSV encoder su spremni za {codecLabel}.",
             var value when string.Equals(value, EncodeEngines.AmdAmf, StringComparison.OrdinalIgnoreCase)
-                => "AMD GPU i AMF encoder su spremni.",
+                => $"AMD GPU i AMF encoder su spremni za {codecLabel}.",
             _ when gpuReady.Count > 0
-                => $"GPU encode nije stabilno spreman za: {string.Join(", ", gpuReady)}. Koristi se CPU fallback.",
-            _ => "GPU encode nije dostupan ili ffmpeg nije spreman. Koristi se CPU encode."
+                => $"GPU encode nije spreman za trazeni codec {codecLabel}. Koristi se CPU fallback.",
+            _ => $"GPU encode nije dostupan ili ffmpeg nije spreman za {codecLabel}. Koristi se CPU encode."
         };
     }
 
-    private static EncodeEngineSupportStatus BuildStatus(string engineName, bool isReady, string status, string details)
+    private static EncodeEngineSupportStatus BuildStatus(string engineName, bool isReady, string status, string details, bool supportsH264, bool supportsHevc)
         => new()
         {
             EngineName = engineName,
             IsReady = isReady,
             Status = status,
-            Details = details
+            Details = details,
+            SupportsH264 = supportsH264,
+            SupportsHevc = supportsHevc
         };
 
-    private static EncodeEngineSupportStatus BuildHardwareStatus(string engineName, bool gpuDetected, bool encoderReady, string missingGpuMessage, string missingEncoderMessage)
+    private static EncodeEngineSupportStatus BuildHardwareStatus(string engineName, bool gpuDetected, bool supportsH264, bool supportsHevc, string missingGpuMessage, string missingEncoderMessage)
     {
         if (!gpuDetected)
         {
-            return BuildStatus(engineName, false, "not available", missingGpuMessage);
+            return BuildStatus(engineName, false, "not available", missingGpuMessage, supportsH264: false, supportsHevc: false);
         }
 
-        if (encoderReady)
+        if (supportsH264 || supportsHevc)
         {
-            return BuildStatus(engineName, true, "ready", "GPU i ffmpeg encoder su dostupni.");
+            var codecSupport = supportsH264 && supportsHevc
+                ? "H.264 i H.265"
+                : supportsHevc
+                    ? "H.265"
+                    : "H.264";
+            return BuildStatus(engineName, true, "ready", $"GPU i ffmpeg encoder su dostupni ({codecSupport}).", supportsH264, supportsHevc);
         }
 
-        return BuildStatus(engineName, false, "not ready", missingEncoderMessage);
+        return BuildStatus(engineName, false, "not ready", missingEncoderMessage, supportsH264: false, supportsHevc: false);
     }
 
     private static bool ContainsEncoder(string? encoderOutput, string encoderName)

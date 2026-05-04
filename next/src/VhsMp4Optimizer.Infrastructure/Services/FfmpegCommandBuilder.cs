@@ -20,7 +20,7 @@ public static class FfmpegCommandBuilder
             || keepRanges[0].EndSeconds < request.MediaInfo.DurationSeconds
             || needsVideoFilters;
 
-        var profile = ResolveProfile(request.Settings.QualityMode);
+        var profile = EncodingProfileService.Resolve(request.Settings.QualityMode);
         var videoEncoder = ResolveVideoEncoder(request.Settings.EncodeEngine, profile.VideoCodec);
 
         if (useFilterComplex)
@@ -122,17 +122,6 @@ public static class FfmpegCommandBuilder
     }
 
     private static string FormatSeconds(double seconds) => seconds.ToString("0.###", CultureInfo.InvariantCulture);
-
-    private static (string VideoCodec, int Crf, string Preset, string AudioBitrate) ResolveProfile(string qualityMode)
-    {
-        return qualityMode switch
-        {
-            QualityModes.HevcH265Smaller or QualityModes.HevcForNewerDevices => ("libx265", 26, "medium", "128k"),
-            QualityModes.SmallMp4H264 or QualityModes.UsbSmallFile or QualityModes.Phone => ("libx264", 24, "slow", "128k"),
-            QualityModes.HighQualityMp4H264 or QualityModes.ArchiveBetterQuality or QualityModes.YoutubeUpload => ("libx264", 20, "slow", "192k"),
-            _ => ("libx264", 22, "slow", "160k")
-        };
-    }
 
     private static bool HasVideoFilters(BatchSettings settings, bool hasCrop, int outputWidth, int outputHeight, MediaInfo mediaInfo)
     {
