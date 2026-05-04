@@ -358,6 +358,33 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task CloseAllGapsCommand_should_remove_gap_segments_and_pack_timeline()
+    {
+        var queueItem = BuildQueueItem();
+        TimelineProject? savedTimeline = null;
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (timeline, _) => savedTimeline = timeline,
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 180d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.SelectedSegment = viewModel.Segments[1];
+        await viewModel.DeleteSegmentCommand.ExecuteAsync(null);
+        await viewModel.CloseAllGapsCommand.ExecuteAsync(null);
+        viewModel.SaveToQueueCommand.Execute(null);
+
+        Assert.NotNull(savedTimeline);
+        Assert.Equal(2, savedTimeline!.Segments.Count);
+        Assert.DoesNotContain(savedTimeline.Segments, segment => segment.Kind == TimelineSegmentKind.Gap);
+        Assert.Equal(180d, savedTimeline.Segments[1].SourceStartSeconds, 3);
+        Assert.Equal(120d, savedTimeline.Segments[1].TimelineStartSeconds, 3);
+    }
+
+    [Fact]
     public async Task PrepareForDisplayAsync_should_render_preview_for_large_dv_avi_when_file_is_available()
     {
         const string sourcePath = @"F:\Veliki avi\1996 -1 -6 - .avi";

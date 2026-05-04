@@ -333,4 +333,51 @@ public sealed class TimelineEditorServiceTests
         Assert.Equal(100, duplicated.Segments[2].SourceEndSeconds);
         Assert.Equal(160, TimelineEditorService.GetKeptDurationSeconds(duplicated));
     }
+
+    [Fact]
+    public void Close_all_gaps_should_remove_gap_segments_and_pack_remaining_timeline()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            Container = "avi",
+            DurationSeconds = 100,
+            DurationText = "00:01:40",
+            SizeBytes = 1000,
+            SizeText = "1000 B",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 2500,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "pcm",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo",
+            AudioSummary = "pcm"
+        };
+
+        var timeline = TimelineEditorService.SplitAtPlayhead(TimelineEditorService.CreateInitial(mediaInfo), 40);
+        timeline = TimelineEditorService.SplitAtPlayhead(timeline, 70);
+        var withGap = TimelineEditorService.DeleteSegment(timeline, timeline.Segments[1].Id);
+        var closed = TimelineEditorService.CloseAllGaps(withGap);
+
+        Assert.Equal(2, closed.Segments.Count);
+        Assert.DoesNotContain(closed.Segments, segment => segment.Kind == TimelineSegmentKind.Gap);
+        Assert.Equal(0, closed.Segments[0].TimelineStartSeconds);
+        Assert.Equal(40, closed.Segments[1].TimelineStartSeconds);
+        Assert.Equal(70, closed.Segments[1].SourceStartSeconds);
+        Assert.Equal(100, closed.Segments[1].SourceEndSeconds);
+    }
 }

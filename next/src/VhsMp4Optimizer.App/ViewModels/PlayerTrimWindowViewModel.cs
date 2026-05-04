@@ -74,6 +74,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         ToggleKeepCutCommand = new AsyncRelayCommand(ToggleKeepCutAsync, CanModifySelectedSegment);
         TrimSelectedToInOutCommand = new AsyncRelayCommand(TrimSelectedToInOutAsync, CanModifySelectedSegment);
         DuplicateSelectedCommand = new AsyncRelayCommand(DuplicateSelectedAsync, CanModifySelectedSegment);
+        CloseAllGapsCommand = new AsyncRelayCommand(CloseAllGapsAsync, HasGapSegments);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -129,6 +130,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand TrimSelectedToInOutCommand { get; }
 
     public IAsyncRelayCommand DuplicateSelectedCommand { get; }
+
+    public IAsyncRelayCommand CloseAllGapsCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -252,6 +255,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         ToggleKeepCutCommand.NotifyCanExecuteChanged();
         TrimSelectedToInOutCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
+        CloseAllGapsCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
     }
 
@@ -333,6 +337,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = "Izabrani segment je dupliran odmah iza originala.";
     }
 
+    private async Task CloseAllGapsAsync()
+    {
+        Timeline = TimelineEditorService.CloseAllGaps(Timeline);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = "Sve rupe na timeline-u su zatvorene.";
+    }
+
     private async Task DeleteSegmentAsync()
     {
         if (SelectedSegment is null)
@@ -380,6 +391,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private void SaveToQueue() => _saveAction(Timeline, BuildTransformSettings());
 
     private bool CanModifySelectedSegment() => SelectedSegment is not null;
+
+    private bool HasGapSegments() => Timeline.Segments.Any(segment => segment.Kind == TimelineSegmentKind.Gap);
 
     private async Task GoToStartAsync()
     {

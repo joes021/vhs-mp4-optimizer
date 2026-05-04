@@ -265,6 +265,16 @@ public static class TimelineEditorService
         return duplicated ? Normalize(project, rebuilt, preserveSequence: true) : project;
     }
 
+    public static TimelineProject CloseAllGaps(TimelineProject project)
+    {
+        var rebuilt = project.Segments
+            .Where(segment => segment.Kind != TimelineSegmentKind.Gap)
+            .OrderBy(segment => segment.TimelineStartSeconds)
+            .ToList();
+
+        return Normalize(project, rebuilt, preserveSequence: true);
+    }
+
     public static double GetKeptDurationSeconds(TimelineProject project)
         => project.Segments.Where(segment => segment.Kind == TimelineSegmentKind.Keep).Sum(segment => segment.DurationSeconds);
 
