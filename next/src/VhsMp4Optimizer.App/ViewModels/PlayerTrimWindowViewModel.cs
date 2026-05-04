@@ -109,6 +109,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SetOutPointCommand = new RelayCommand(SetOutPointFromCurrent);
         PlayCommand = new RelayCommand(StartPlayback, CanStartPlayback);
         PauseCommand = new RelayCommand(PausePlayback, CanPausePlayback);
+        SelectModeCommand = new RelayCommand<string?>(SelectMode);
+        SelectWorkspaceDockCommand = new RelayCommand<string?>(SelectWorkspaceDock);
+        SelectMonitorTabCommand = new RelayCommand<string?>(SelectMonitorTab);
+        SelectInspectorTabCommand = new RelayCommand<string?>(SelectInspectorTab);
+        SelectToolCommand = new RelayCommand<string?>(SelectTool);
+        ToggleTrackLockCommand = new RelayCommand(ToggleTrackLock);
+        ToggleTrackMuteCommand = new RelayCommand(ToggleTrackMute);
+        ToggleTrackSoloCommand = new RelayCommand(ToggleTrackSolo);
 
         _playbackTimer = new DispatcherTimer
         {
@@ -206,6 +214,22 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public IRelayCommand PauseCommand { get; }
 
+    public IRelayCommand<string?> SelectModeCommand { get; }
+
+    public IRelayCommand<string?> SelectWorkspaceDockCommand { get; }
+
+    public IRelayCommand<string?> SelectMonitorTabCommand { get; }
+
+    public IRelayCommand<string?> SelectInspectorTabCommand { get; }
+
+    public IRelayCommand<string?> SelectToolCommand { get; }
+
+    public IRelayCommand ToggleTrackLockCommand { get; }
+
+    public IRelayCommand ToggleTrackMuteCommand { get; }
+
+    public IRelayCommand ToggleTrackSoloCommand { get; }
+
     [ObservableProperty]
     private MediaPlayer? _playbackMediaPlayerBinding;
 
@@ -275,6 +299,51 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isPreviewImageVisible = true;
 
+    [ObservableProperty]
+    private string _activeMode = "Cut";
+
+    [ObservableProperty]
+    private string _activeWorkspaceDock = "Media Pool";
+
+    [ObservableProperty]
+    private string _activeMonitorTab = "Program";
+
+    [ObservableProperty]
+    private string _activeInspectorTab = "Video";
+
+    [ObservableProperty]
+    private string _activeTool = "Select";
+
+    [ObservableProperty]
+    private bool _isTrackLocked;
+
+    [ObservableProperty]
+    private bool _isTrackMuted;
+
+    [ObservableProperty]
+    private bool _isTrackSolo;
+
+    public bool IsCutModeActive => string.Equals(ActiveMode, "Cut", StringComparison.Ordinal);
+    public bool IsEditModeActive => string.Equals(ActiveMode, "Edit", StringComparison.Ordinal);
+    public bool IsColorModeActive => string.Equals(ActiveMode, "Color", StringComparison.Ordinal);
+    public bool IsDeliverModeActive => string.Equals(ActiveMode, "Deliver", StringComparison.Ordinal);
+    public bool IsMediaPoolActive => string.Equals(ActiveWorkspaceDock, "Media Pool", StringComparison.Ordinal);
+    public bool IsEffectsLibraryActive => string.Equals(ActiveWorkspaceDock, "Effects Library", StringComparison.Ordinal);
+    public bool IsEditIndexActive => string.Equals(ActiveWorkspaceDock, "Edit Index", StringComparison.Ordinal);
+    public bool IsMixerActive => string.Equals(ActiveWorkspaceDock, "Mixer", StringComparison.Ordinal);
+    public bool IsSourceMonitorActive => string.Equals(ActiveMonitorTab, "Source", StringComparison.Ordinal);
+    public bool IsProgramMonitorActive => string.Equals(ActiveMonitorTab, "Program", StringComparison.Ordinal);
+    public bool IsVideoInspectorActive => string.Equals(ActiveInspectorTab, "Video", StringComparison.Ordinal);
+    public bool IsAudioInspectorActive => string.Equals(ActiveInspectorTab, "Audio", StringComparison.Ordinal);
+    public bool IsEffectsInspectorActive => string.Equals(ActiveInspectorTab, "Effects", StringComparison.Ordinal);
+    public bool IsSelectToolActive => string.Equals(ActiveTool, "Select", StringComparison.Ordinal);
+    public bool IsBladeToolActive => string.Equals(ActiveTool, "Blade", StringComparison.Ordinal);
+    public bool IsSlipToolActive => string.Equals(ActiveTool, "Slip", StringComparison.Ordinal);
+    public bool IsRollToolActive => string.Equals(ActiveTool, "Roll", StringComparison.Ordinal);
+    public bool IsTrackLockActive => IsTrackLocked;
+    public bool IsTrackMuteActive => IsTrackMuted;
+    public bool IsTrackSoloActive => IsTrackSolo;
+
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
     {
         DeleteSegmentCommand.NotifyCanExecuteChanged();
@@ -312,6 +381,22 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         PlayCommand.NotifyCanExecuteChanged();
         PauseCommand.NotifyCanExecuteChanged();
     }
+
+    partial void OnActiveModeChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnActiveWorkspaceDockChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnActiveMonitorTabChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnActiveInspectorTabChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnActiveToolChanged(string value) => NotifyEditorChromeStateChanged();
+
+    partial void OnIsTrackLockedChanged(bool value) => NotifyEditorChromeStateChanged();
+
+    partial void OnIsTrackMutedChanged(bool value) => NotifyEditorChromeStateChanged();
+
+    partial void OnIsTrackSoloChanged(bool value) => NotifyEditorChromeStateChanged();
 
     private async Task ApplyCutSegmentAsync()
     {
@@ -601,6 +686,79 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     private bool CanPausePlayback() => IsPlaying;
 
+    private void SelectMode(string? mode)
+    {
+        if (string.IsNullOrWhiteSpace(mode))
+        {
+            return;
+        }
+
+        ActiveMode = mode;
+        EditorHint = $"Editor mode aktivan: {mode}.";
+    }
+
+    private void SelectWorkspaceDock(string? dock)
+    {
+        if (string.IsNullOrWhiteSpace(dock))
+        {
+            return;
+        }
+
+        ActiveWorkspaceDock = dock;
+        EditorHint = $"Workspace panel aktivan: {dock}.";
+    }
+
+    private void SelectMonitorTab(string? tab)
+    {
+        if (string.IsNullOrWhiteSpace(tab))
+        {
+            return;
+        }
+
+        ActiveMonitorTab = tab;
+        EditorHint = $"{tab} monitor je aktivan.";
+    }
+
+    private void SelectInspectorTab(string? tab)
+    {
+        if (string.IsNullOrWhiteSpace(tab))
+        {
+            return;
+        }
+
+        ActiveInspectorTab = tab;
+        EditorHint = $"Inspector tab aktivan: {tab}.";
+    }
+
+    private void SelectTool(string? tool)
+    {
+        if (string.IsNullOrWhiteSpace(tool))
+        {
+            return;
+        }
+
+        ActiveTool = tool;
+        EditorHint = $"Aktivna alatka: {tool}.";
+    }
+
+    private void ToggleTrackLock()
+    {
+        IsTrackLocked = !IsTrackLocked;
+        EditorHint = IsTrackLocked ? "V1 track je zakljucan." : "V1 track je otkljucan.";
+    }
+
+    private void ToggleTrackMute()
+    {
+        IsTrackMuted = !IsTrackMuted;
+        EditorHint = IsTrackMuted ? "V1 track je mutiran." : "V1 track je vracen sa mute.";
+    }
+
+    private void ToggleTrackSolo()
+    {
+        IsTrackSolo = !IsTrackSolo;
+        EditorHint = IsTrackSolo ? "V1 track je u solo rezimu." : "V1 track je izasao iz solo rezima.";
+    }
+
     private void StartPlayback()
     {
         if (IsPlaying || _previewBusy || !EnsurePlaybackReady())
@@ -751,6 +909,30 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
         UpdatePreviewTimeTexts();
+    }
+
+    private void NotifyEditorChromeStateChanged()
+    {
+        OnPropertyChanged(nameof(IsCutModeActive));
+        OnPropertyChanged(nameof(IsEditModeActive));
+        OnPropertyChanged(nameof(IsColorModeActive));
+        OnPropertyChanged(nameof(IsDeliverModeActive));
+        OnPropertyChanged(nameof(IsMediaPoolActive));
+        OnPropertyChanged(nameof(IsEffectsLibraryActive));
+        OnPropertyChanged(nameof(IsEditIndexActive));
+        OnPropertyChanged(nameof(IsMixerActive));
+        OnPropertyChanged(nameof(IsSourceMonitorActive));
+        OnPropertyChanged(nameof(IsProgramMonitorActive));
+        OnPropertyChanged(nameof(IsVideoInspectorActive));
+        OnPropertyChanged(nameof(IsAudioInspectorActive));
+        OnPropertyChanged(nameof(IsEffectsInspectorActive));
+        OnPropertyChanged(nameof(IsSelectToolActive));
+        OnPropertyChanged(nameof(IsBladeToolActive));
+        OnPropertyChanged(nameof(IsSlipToolActive));
+        OnPropertyChanged(nameof(IsRollToolActive));
+        OnPropertyChanged(nameof(IsTrackLockActive));
+        OnPropertyChanged(nameof(IsTrackMuteActive));
+        OnPropertyChanged(nameof(IsTrackSoloActive));
     }
 
     private void SelectTimelineBlock(TimelineBlockItemViewModel? block)

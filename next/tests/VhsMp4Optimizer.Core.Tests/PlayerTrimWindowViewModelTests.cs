@@ -99,6 +99,49 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ChromeSelectionCommands_should_update_active_editor_states_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectModeCommand.Execute("Edit");
+        viewModel.SelectWorkspaceDockCommand.Execute("Mixer");
+        viewModel.SelectMonitorTabCommand.Execute("Source");
+        viewModel.SelectInspectorTabCommand.Execute("Audio");
+        viewModel.SelectToolCommand.Execute("Blade");
+
+        Assert.True(viewModel.IsEditModeActive);
+        Assert.True(viewModel.IsMixerActive);
+        Assert.True(viewModel.IsSourceMonitorActive);
+        Assert.True(viewModel.IsAudioInspectorActive);
+        Assert.True(viewModel.IsBladeToolActive);
+        Assert.Contains("Blade", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TrackHeaderToggleCommands_should_toggle_lane_states()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.ToggleTrackLockCommand.Execute(null);
+        viewModel.ToggleTrackMuteCommand.Execute(null);
+        viewModel.ToggleTrackSoloCommand.Execute(null);
+
+        Assert.True(viewModel.IsTrackLockActive);
+        Assert.True(viewModel.IsTrackMuteActive);
+        Assert.True(viewModel.IsTrackSoloActive);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();

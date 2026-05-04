@@ -60,6 +60,33 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Background" Value="#283240" />
             <Setter Property="Foreground" Value="#EEF4FB" />
+            <Setter Property="BorderBrush" Value="#314055" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <Style Selector="Button.transport:pointerover">
+            <Setter Property="Background" Value="#314155" />
+            <Setter Property="BorderBrush" Value="#5B728D" />
+        </Style>
+
+        <Style Selector="Button.transport:pressed">
+            <Setter Property="Background" Value="#0E7490" />
+            <Setter Property="BorderBrush" Value="#22D3EE" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.transport:disabled">
+            <Setter Property="Background" Value="#1A2430" />
+            <Setter Property="BorderBrush" Value="#263240" />
+            <Setter Property="Foreground" Value="#607086" />
+            <Setter Property="Opacity" Value="0.82" />
+        </Style>
+
+        <Style Selector="Button.transport.active-chip">
+            <Setter Property="Background" Value="#1E2A38" />
+            <Setter Property="BorderBrush" Value="#40617F" />
+            <Setter Property="Foreground" Value="#F5FAFF" />
         </Style>
 
         <Style Selector="Button.primary">
@@ -93,18 +120,26 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Classes="panel-muted" Padding="10,6" Background="#1E2A38" BorderBrush="#40617F">
-                            <TextBlock FontWeight="SemiBold" Text="Cut" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Edit" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Color" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Deliver" />
-                        </Border>
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsCutModeActive}"
+                                Content="Cut"
+                                Command="{Binding SelectModeCommand}"
+                                CommandParameter="Cut" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsEditModeActive}"
+                                Content="Edit"
+                                Command="{Binding SelectModeCommand}"
+                                CommandParameter="Edit" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsColorModeActive}"
+                                Content="Color"
+                                Command="{Binding SelectModeCommand}"
+                                CommandParameter="Color" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsDeliverModeActive}"
+                                Content="Deliver"
+                                Command="{Binding SelectModeCommand}"
+                                CommandParameter="Deliver" />
                     </StackPanel>
                 </StackPanel>
 
@@ -129,18 +164,26 @@
             <Border Classes="panel-muted" Padding="12,10">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Media Pool" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Effects Library" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Edit Index" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Mixer" />
-                        </Border>
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsMediaPoolActive}"
+                                Content="Media Pool"
+                                Command="{Binding SelectWorkspaceDockCommand}"
+                                CommandParameter="Media Pool" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsEffectsLibraryActive}"
+                                Content="Effects Library"
+                                Command="{Binding SelectWorkspaceDockCommand}"
+                                CommandParameter="Effects Library" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsEditIndexActive}"
+                                Content="Edit Index"
+                                Command="{Binding SelectWorkspaceDockCommand}"
+                                CommandParameter="Edit Index" />
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsMixerActive}"
+                                Content="Mixer"
+                                Command="{Binding SelectWorkspaceDockCommand}"
+                                CommandParameter="Mixer" />
                     </StackPanel>
 
                     <TextBlock Grid.Column="1"
@@ -171,33 +214,49 @@
                                FontSize="12"
                                Text="Tool Rail" />
 
-                    <Border Classes="panel-muted" Padding="8">
+                    <Button Classes="transport"
+                            Classes.active-chip="{Binding IsSelectToolActive}"
+                            Padding="8"
+                            Command="{Binding SelectToolCommand}"
+                            CommandParameter="Select">
                         <StackPanel Spacing="4">
                             <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Select" />
                             <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Pointer" />
                         </StackPanel>
-                    </Border>
+                    </Button>
 
-                    <Border Classes="panel-muted" Padding="8">
+                    <Button Classes="transport"
+                            Classes.active-chip="{Binding IsBladeToolActive}"
+                            Padding="8"
+                            Command="{Binding SelectToolCommand}"
+                            CommandParameter="Blade">
                         <StackPanel Spacing="4">
                             <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Blade" />
                             <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Cut" />
                         </StackPanel>
-                    </Border>
+                    </Button>
 
-                    <Border Classes="panel-muted" Padding="8">
+                    <Button Classes="transport"
+                            Classes.active-chip="{Binding IsSlipToolActive}"
+                            Padding="8"
+                            Command="{Binding SelectToolCommand}"
+                            CommandParameter="Slip">
                         <StackPanel Spacing="4">
                             <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Slip" />
                             <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Shift" />
                         </StackPanel>
-                    </Border>
+                    </Button>
 
-                    <Border Classes="panel-muted" Padding="8">
+                    <Button Classes="transport"
+                            Classes.active-chip="{Binding IsRollToolActive}"
+                            Padding="8"
+                            Command="{Binding SelectToolCommand}"
+                            CommandParameter="Roll">
                         <StackPanel Spacing="4">
                             <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Roll" />
                             <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Edge" />
                         </StackPanel>
-                    </Border>
+                    </Button>
                 </StackPanel>
             </Border>
 
@@ -206,12 +265,16 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Border Classes="panel-muted" Padding="10,6">
-                                    <TextBlock FontWeight="SemiBold" Text="Source" />
-                                </Border>
-                                <Border Classes="panel-muted" Padding="10,6" Background="#1E2A38" BorderBrush="#40617F">
-                                    <TextBlock FontWeight="SemiBold" Text="Program" />
-                                </Border>
+                                <Button Classes="transport"
+                                        Classes.active-chip="{Binding IsSourceMonitorActive}"
+                                        Content="Source"
+                                        Command="{Binding SelectMonitorTabCommand}"
+                                        CommandParameter="Source" />
+                                <Button Classes="transport"
+                                        Classes.active-chip="{Binding IsProgramMonitorActive}"
+                                        Content="Program"
+                                        Command="{Binding SelectMonitorTabCommand}"
+                                        CommandParameter="Program" />
                                 <Border Classes="panel-muted" Padding="10,6">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBlock Text="Fit" />
@@ -314,15 +377,21 @@
                         <TextBlock Classes="section-meta" Text="Odabrani segment, crop i timeline komande" />
 
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Border Classes="panel-muted" Padding="10,6" Background="#1E2A38" BorderBrush="#40617F">
-                                <TextBlock FontWeight="SemiBold" Text="Video" />
-                            </Border>
-                            <Border Classes="panel-muted" Padding="10,6">
-                                <TextBlock FontWeight="SemiBold" Text="Audio" />
-                            </Border>
-                            <Border Classes="panel-muted" Padding="10,6">
-                                <TextBlock FontWeight="SemiBold" Text="Effects" />
-                            </Border>
+                            <Button Classes="transport"
+                                    Classes.active-chip="{Binding IsVideoInspectorActive}"
+                                    Content="Video"
+                                    Command="{Binding SelectInspectorTabCommand}"
+                                    CommandParameter="Video" />
+                            <Button Classes="transport"
+                                    Classes.active-chip="{Binding IsAudioInspectorActive}"
+                                    Content="Audio"
+                                    Command="{Binding SelectInspectorTabCommand}"
+                                    CommandParameter="Audio" />
+                            <Button Classes="transport"
+                                    Classes.active-chip="{Binding IsEffectsInspectorActive}"
+                                    Content="Effects"
+                                    Command="{Binding SelectInspectorTabCommand}"
+                                    CommandParameter="Effects" />
                         </StackPanel>
 
                         <Border Classes="panel-muted">
@@ -426,7 +495,7 @@
                 </Grid>
 
                 <Border Grid.Row="1" Classes="panel-muted" Padding="10,8">
-                    <Grid ColumnDefinitions="74,*" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="8"
                                 CornerRadius="6"
@@ -453,7 +522,7 @@
                 </Border>
 
                 <Border Grid.Row="2" Classes="panel-muted">
-                    <Grid ColumnDefinitions="74,*" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="8"
                                 CornerRadius="6"
@@ -483,7 +552,7 @@
                 </Border>
 
                 <Border Grid.Row="3" Classes="panel-muted">
-                    <Grid ColumnDefinitions="74,*" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="8"
                                 CornerRadius="6"
@@ -493,15 +562,24 @@
                                 <TextBlock FontWeight="Bold" HorizontalAlignment="Center" Text="V1" />
                                 <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Track" />
                                 <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
-                                    <Border Classes="panel-muted" Padding="6,3" CornerRadius="4">
-                                        <TextBlock FontSize="10" FontWeight="SemiBold" Text="Lock" />
-                                    </Border>
-                                    <Border Classes="panel-muted" Padding="6,3" CornerRadius="4">
-                                        <TextBlock FontSize="10" FontWeight="SemiBold" Text="Mute" />
-                                    </Border>
-                                    <Border Classes="panel-muted" Padding="6,3" CornerRadius="4">
-                                        <TextBlock FontSize="10" FontWeight="SemiBold" Text="Solo" />
-                                    </Border>
+                                    <Button Classes="transport"
+                                            Classes.active-chip="{Binding IsTrackLockActive}"
+                                            Padding="6,3"
+                                            MinWidth="0"
+                                            Command="{Binding ToggleTrackLockCommand}"
+                                            Content="Lock" />
+                                    <Button Classes="transport"
+                                            Classes.active-chip="{Binding IsTrackMuteActive}"
+                                            Padding="6,3"
+                                            MinWidth="0"
+                                            Command="{Binding ToggleTrackMuteCommand}"
+                                            Content="Mute" />
+                                    <Button Classes="transport"
+                                            Classes.active-chip="{Binding IsTrackSoloActive}"
+                                            Padding="6,3"
+                                            MinWidth="0"
+                                            Command="{Binding ToggleTrackSoloCommand}"
+                                            Content="Solo" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
