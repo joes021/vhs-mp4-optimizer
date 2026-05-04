@@ -38,6 +38,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private bool _previewRefreshQueued;
     private bool _unmuteWhenPlaybackFrameArrives;
     private double _lastRequestedSourceSeconds;
+    private readonly Stack<TimelineProject> _undoStack = new();
+    private readonly Stack<TimelineProject> _redoStack = new();
 
     public PlayerTrimWindowViewModel(
         QueueItemSummary item,
@@ -82,6 +84,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         InsertGapAtPlayheadCommand = new AsyncRelayCommand(InsertGapAtPlayheadAsync);
         SlipLeftCommand = new AsyncRelayCommand(() => SlipSelectedAsync(-1), CanSlipSelected);
         SlipRightCommand = new AsyncRelayCommand(() => SlipSelectedAsync(1), CanSlipSelected);
+        UndoCommand = new AsyncRelayCommand(UndoAsync, CanUndo);
+        RedoCommand = new AsyncRelayCommand(RedoAsync, CanRedo);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
         RippleDeleteCommand = new AsyncRelayCommand(RippleDeleteSegmentAsync, CanModifySelectedSegment);
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
@@ -153,6 +157,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand SlipLeftCommand { get; }
 
     public IAsyncRelayCommand SlipRightCommand { get; }
+
+    public IAsyncRelayCommand UndoCommand { get; }
+
+    public IAsyncRelayCommand RedoCommand { get; }
 
     public IAsyncRelayCommand DeleteSegmentCommand { get; }
 
@@ -283,6 +291,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         RollRightCommand.NotifyCanExecuteChanged();
         SlipLeftCommand.NotifyCanExecuteChanged();
         SlipRightCommand.NotifyCanExecuteChanged();
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
     }
 
@@ -311,14 +321,16 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.CutSegment(Timeline, inSeconds, outSeconds);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.CutSegment(timeline, inSeconds, outSeconds),
+            refreshHint: null);
     }
 
     private async Task SplitAtPlayheadAsync()
     {
-        Timeline = TimelineEditorService.SplitAtPlayhead(Timeline, PreviewVirtualSeconds);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.SplitAtPlayhead(timeline, PreviewVirtualSeconds),
+            refreshHint: null);
         EditorHint = $"Segment je podeljen na playhead-u | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}";
     }
 
@@ -329,8 +341,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.ToggleSegmentKind(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.ToggleSegmentKind(timeline, SelectedSegment.Id),
+            refreshHint: null);
         EditorHint = $"Segment je prebacen na {SelectedSegment?.Kind}";
     }
 
@@ -347,8 +360,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.TrimSegmentToRange(Timeline, SelectedSegment.Id, inSeconds, outSeconds);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.TrimSegmentToRange(timeline, SelectedSegment.Id, inSeconds, outSeconds),
+            refreshHint: null);
         EditorHint = $"Izabrani segment je skracen na {InPointText} -> {OutPointText}";
     }
 
@@ -365,8 +379,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.ExtractSegmentToRange(Timeline, SelectedSegment.Id, inSeconds, outSeconds);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.ExtractSegmentToRange(timeline, SelectedSegment.Id, inSeconds, outSeconds),
+            refreshHint: null);
         EditorHint = $"Izabrani segment je izdvojen na {InPointText} -> {OutPointText}";
     }
 
@@ -377,15 +392,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.DuplicateSegment(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.DuplicateSegment(timeline, SelectedSegment.Id),
+            refreshHint: null);
         EditorHint = "Izabrani segment je dupliran odmah iza originala.";
     }
 
     private async Task CloseAllGapsAsync()
     {
-        Timeline = TimelineEditorService.CloseAllGaps(Timeline);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            TimelineEditorService.CloseAllGaps,
+            refreshHint: null);
         EditorHint = "Sve rupe na timeline-u su zatvorene.";
     }
 
@@ -396,8 +413,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.MergeSegmentWithNext(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.MergeSegmentWithNext(timeline, SelectedSegment.Id),
+            refreshHint: null);
         EditorHint = "Izabrani segment je spojen sa narednim.";
     }
 
@@ -409,15 +427,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         var frameRate = Math.Max(1d, Item.MediaInfo.FrameRate);
-        Timeline = TimelineEditorService.RollBoundaryWithNext(Timeline, SelectedSegment.Id, frameDelta / frameRate);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.RollBoundaryWithNext(timeline, SelectedSegment.Id, frameDelta / frameRate),
+            refreshHint: null);
         EditorHint = $"Granica izmedju izabranog i sledeceg segmenta je pomerena za {frameDelta} frejm.";
     }
 
     private async Task InsertGapAtPlayheadAsync()
     {
-        Timeline = TimelineEditorService.InsertGapAtPlayhead(Timeline, PreviewVirtualSeconds, 1d);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.InsertGapAtPlayhead(timeline, PreviewVirtualSeconds, 1d),
+            refreshHint: null);
         EditorHint = $"Ubacena je rupa od 1s na {PreviewVirtualTimeText}.";
     }
 
@@ -429,8 +449,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         var frameRate = Math.Max(1d, Item.MediaInfo.FrameRate);
-        Timeline = TimelineEditorService.SlipSegment(Timeline, SelectedSegment.Id, frameDelta / frameRate, Item.MediaInfo.DurationSeconds);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.SlipSegment(timeline, SelectedSegment.Id, frameDelta / frameRate, Item.MediaInfo.DurationSeconds),
+            refreshHint: null);
         EditorHint = $"Izabrani segment je slipovan za {frameDelta} frejm.";
     }
 
@@ -441,8 +462,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.DeleteSegment(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.DeleteSegment(timeline, SelectedSegment.Id),
+            refreshHint: null);
     }
 
     private async Task RippleDeleteSegmentAsync()
@@ -452,8 +474,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.RippleDeleteSegment(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.RippleDeleteSegment(timeline, SelectedSegment.Id),
+            refreshHint: null);
     }
 
     private async Task MoveLeftAsync()
@@ -463,8 +486,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.MoveSegmentLeft(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.MoveSegmentLeft(timeline, SelectedSegment.Id),
+            refreshHint: null);
     }
 
     private async Task MoveRightAsync()
@@ -474,8 +498,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Timeline = TimelineEditorService.MoveSegmentRight(Timeline, SelectedSegment.Id);
-        await RefreshStateAndPreviewAsync();
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.MoveSegmentRight(timeline, SelectedSegment.Id),
+            refreshHint: null);
     }
 
     private void SaveToQueue() => _saveAction(Timeline, BuildTransformSettings());
@@ -504,6 +529,36 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     }
 
     private bool CanSlipSelected() => SelectedSegment is not null && SelectedSegment.Kind != TimelineSegmentKind.Gap;
+
+    private bool CanUndo() => _undoStack.Count > 0;
+
+    private bool CanRedo() => _redoStack.Count > 0;
+
+    private async Task UndoAsync()
+    {
+        if (_undoStack.Count == 0)
+        {
+            return;
+        }
+
+        _redoStack.Push(Timeline);
+        Timeline = _undoStack.Pop();
+        await RefreshStateAndPreviewAsync();
+        EditorHint = "Vracena je prethodna izmena timeline-a.";
+    }
+
+    private async Task RedoAsync()
+    {
+        if (_redoStack.Count == 0)
+        {
+            return;
+        }
+
+        _undoStack.Push(Timeline);
+        Timeline = _redoStack.Pop();
+        await RefreshStateAndPreviewAsync();
+        EditorHint = "Vracena je sledeca izmena timeline-a.";
+    }
 
     private bool CanRollSelectedWithNext()
     {
@@ -610,6 +665,50 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         RefreshState();
         SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum));
         await LoadPreviewAsync();
+    }
+
+    private async Task ApplyTimelineMutationAsync(Func<TimelineProject, TimelineProject> mutation, string? refreshHint)
+    {
+        var previous = Timeline;
+        var updated = mutation(previous);
+        if (ReferenceEquals(previous, updated) || AreTimelineProjectsEquivalent(previous, updated))
+        {
+            return;
+        }
+
+        _undoStack.Push(previous);
+        _redoStack.Clear();
+        Timeline = updated;
+        await RefreshStateAndPreviewAsync();
+        if (!string.IsNullOrWhiteSpace(refreshHint))
+        {
+            EditorHint = refreshHint;
+        }
+    }
+
+    private static bool AreTimelineProjectsEquivalent(TimelineProject left, TimelineProject right)
+    {
+        if (!string.Equals(left.SourcePath, right.SourcePath, StringComparison.OrdinalIgnoreCase)
+            || left.Segments.Count != right.Segments.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Segments.Count; i++)
+        {
+            var a = left.Segments[i];
+            var b = right.Segments[i];
+            if (a.Id != b.Id
+                || a.Kind != b.Kind
+                || Math.Abs(a.TimelineStartSeconds - b.TimelineStartSeconds) > 0.0001d
+                || Math.Abs(a.SourceStartSeconds - b.SourceStartSeconds) > 0.0001d
+                || Math.Abs(a.SourceEndSeconds - b.SourceEndSeconds) > 0.0001d)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public async Task PrepareForDisplayAsync()
