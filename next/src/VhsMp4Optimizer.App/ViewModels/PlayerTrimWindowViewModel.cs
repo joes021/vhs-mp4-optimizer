@@ -367,6 +367,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public bool IsTrackLockActive => IsTrackLocked;
     public bool IsTrackMuteActive => IsTrackMuted;
     public bool IsTrackSoloActive => IsTrackSolo;
+    public double TimelinePreferredWidth => ActiveZoomPreset switch
+    {
+        "1s" => 2200,
+        "5s" => 1600,
+        "10s" => 1200,
+        _ => 960
+    };
 
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
     {
@@ -778,6 +785,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         ActiveZoomPreset = preset;
+        RefreshState();
         EditorHint = $"Timeline zoom preset aktivan: {preset}.";
     }
 
@@ -941,7 +949,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         var selectedBlockId = TimelineBlocks.FirstOrDefault(block => block.IsSelected)?.SegmentId ?? selectedId;
         TimelineBlocks.Clear();
-        foreach (var block in TimelineStripService.BuildBlocks(Timeline))
+        foreach (var block in TimelineStripService.BuildBlocks(Timeline, TimelinePreferredWidth))
         {
             TimelineBlocks.Add(new TimelineBlockItemViewModel
             {

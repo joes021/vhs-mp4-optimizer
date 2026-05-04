@@ -176,6 +176,28 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void SelectZoomPresetCommand_should_rebuild_timeline_block_widths()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        var initialWidth = viewModel.TimelineBlocks[0].WidthPixels;
+
+        viewModel.SelectZoomPresetCommand.Execute("1s");
+        var zoomedInWidth = viewModel.TimelineBlocks[0].WidthPixels;
+
+        viewModel.SelectZoomPresetCommand.Execute("10s");
+        var zoomedMidWidth = viewModel.TimelineBlocks[0].WidthPixels;
+
+        Assert.True(zoomedInWidth > initialWidth);
+        Assert.True(zoomedMidWidth < zoomedInWidth);
+    }
+
+    [Fact]
     public void PlayCommand_should_keep_media_instance_alive_for_real_playback()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
