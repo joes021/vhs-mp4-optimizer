@@ -450,9 +450,20 @@
                                 CornerRadius="6"
                                 Background="#0D131A"
                                 BorderBrush="#314055">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
                                 <TextBlock FontWeight="Bold" HorizontalAlignment="Center" Text="V1" />
                                 <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Track" />
+                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                    <Border Classes="panel-muted" Padding="6,3" CornerRadius="4">
+                                        <TextBlock FontSize="10" FontWeight="SemiBold" Text="Lock" />
+                                    </Border>
+                                    <Border Classes="panel-muted" Padding="6,3" CornerRadius="4">
+                                        <TextBlock FontSize="10" FontWeight="SemiBold" Text="Mute" />
+                                    </Border>
+                                    <Border Classes="panel-muted" Padding="6,3" CornerRadius="4">
+                                        <TextBlock FontSize="10" FontWeight="SemiBold" Text="Solo" />
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
