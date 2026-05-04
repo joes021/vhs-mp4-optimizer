@@ -517,4 +517,49 @@ public sealed class TimelineEditorServiceTests
         Assert.Equal(30, extracted.Segments[2].SourceStartSeconds);
         Assert.Equal(100, extracted.Segments[2].SourceEndSeconds);
     }
+
+    [Fact]
+    public void Roll_boundary_with_next_should_move_edit_point_between_adjacent_segments()
+    {
+        var mediaInfo = new MediaInfo
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            Container = "avi",
+            DurationSeconds = 100,
+            DurationText = "00:01:40",
+            SizeBytes = 1000,
+            SizeText = "1000 B",
+            OverallBitrateKbps = 9000,
+            OverallBitrateText = "9000 kbps",
+            VideoCodec = "dvvideo",
+            Width = 720,
+            Height = 576,
+            Resolution = "720x576",
+            DisplayAspectRatio = "4:3",
+            SampleAspectRatio = "16:15",
+            FrameRate = 25,
+            FrameRateText = "25 fps",
+            FrameCount = 2500,
+            VideoBitrateKbps = 8000,
+            VideoBitrateText = "8000 kbps",
+            AudioCodec = "pcm",
+            AudioChannels = 2,
+            AudioSampleRateHz = 48000,
+            AudioBitrateKbps = 1536,
+            AudioBitrateText = "1536 kbps",
+            VideoSummary = "dvvideo",
+            AudioSummary = "pcm"
+        };
+
+        var timeline = TimelineEditorService.SplitAtPlayhead(TimelineEditorService.CreateInitial(mediaInfo), 40);
+        var rolled = TimelineEditorService.RollBoundaryWithNext(timeline, timeline.Segments[0].Id, 10);
+
+        Assert.Equal(2, rolled.Segments.Count);
+        Assert.Equal(0, rolled.Segments[0].TimelineStartSeconds);
+        Assert.Equal(50, rolled.Segments[0].SourceEndSeconds);
+        Assert.Equal(50, rolled.Segments[1].TimelineStartSeconds);
+        Assert.Equal(50, rolled.Segments[1].SourceStartSeconds);
+        Assert.Equal(100, rolled.Segments[1].SourceEndSeconds);
+    }
 }

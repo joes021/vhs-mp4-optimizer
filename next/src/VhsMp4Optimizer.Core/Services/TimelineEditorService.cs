@@ -306,6 +306,51 @@ public static class TimelineEditorService
         return Normalize(project, ordered, preserveSequence: true);
     }
 
+    public static TimelineProject RollBoundaryWithNext(TimelineProject project, Guid segmentId, double deltaSeconds)
+    {
+        var ordered = project.Segments.OrderBy(segment => segment.TimelineStartSeconds).ToList();
+        var index = ordered.FindIndex(segment => segment.Id == segmentId);
+        if (index < 0 || index >= ordered.Count - 1)
+        {
+            return project;
+        }
+
+        var current = ordered[index];
+        var next = ordered[index + 1];
+        if (current.Kind == TimelineSegmentKind.Gap || next.Kind == TimelineSegmentKind.Gap)
+        {
+            return project;
+        }
+
+        var maxRight = Math.Max(0, Math.Min(next.DurationSeconds - 0.0001d, project.SourceDurationSeconds - current.SourceEndSeconds));
+        var maxLeft = Math.Max(0, Math.Min(current.DurationSeconds - 0.0001d, next.SourceStartSeconds));
+        var appliedDelta = Math.Clamp(deltaSeconds, -maxLeft, maxRight);
+        if (Math.Abs(appliedDelta) <= 0.0001d)
+        {
+            return project;
+        }
+
+        ordered[index] = new TimelineSegment
+        {
+            Id = current.Id,
+            Kind = current.Kind,
+            TimelineStartSeconds = current.TimelineStartSeconds,
+            SourceStartSeconds = current.SourceStartSeconds,
+            SourceEndSeconds = current.SourceEndSeconds + appliedDelta
+        };
+
+        ordered[index + 1] = new TimelineSegment
+        {
+            Id = next.Id,
+            Kind = next.Kind,
+            TimelineStartSeconds = next.TimelineStartSeconds,
+            SourceStartSeconds = next.SourceStartSeconds + appliedDelta,
+            SourceEndSeconds = next.SourceEndSeconds
+        };
+
+        return Normalize(project, ordered, preserveSequence: true);
+    }
+
     public static TimelineProject SlipSegment(TimelineProject project, Guid segmentId, double deltaSeconds, double sourceDurationSeconds)
     {
         var rebuilt = new List<TimelineSegment>(project.Segments.Count);

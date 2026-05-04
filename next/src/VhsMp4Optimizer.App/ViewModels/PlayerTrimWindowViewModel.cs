@@ -77,6 +77,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         DuplicateSelectedCommand = new AsyncRelayCommand(DuplicateSelectedAsync, CanModifySelectedSegment);
         CloseAllGapsCommand = new AsyncRelayCommand(CloseAllGapsAsync, HasGapSegments);
         MergeWithNextCommand = new AsyncRelayCommand(MergeWithNextAsync, CanMergeSelectedWithNext);
+        RollLeftCommand = new AsyncRelayCommand(() => RollSelectedAsync(-1), CanRollSelectedWithNext);
+        RollRightCommand = new AsyncRelayCommand(() => RollSelectedAsync(1), CanRollSelectedWithNext);
         SlipLeftCommand = new AsyncRelayCommand(() => SlipSelectedAsync(-1), CanSlipSelected);
         SlipRightCommand = new AsyncRelayCommand(() => SlipSelectedAsync(1), CanSlipSelected);
         DeleteSegmentCommand = new AsyncRelayCommand(DeleteSegmentAsync, CanModifySelectedSegment);
@@ -140,6 +142,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand CloseAllGapsCommand { get; }
 
     public IAsyncRelayCommand MergeWithNextCommand { get; }
+
+    public IAsyncRelayCommand RollLeftCommand { get; }
+
+    public IAsyncRelayCommand RollRightCommand { get; }
 
     public IAsyncRelayCommand SlipLeftCommand { get; }
 
@@ -270,6 +276,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         CloseAllGapsCommand.NotifyCanExecuteChanged();
         MergeWithNextCommand.NotifyCanExecuteChanged();
+        RollLeftCommand.NotifyCanExecuteChanged();
+        RollRightCommand.NotifyCanExecuteChanged();
         SlipLeftCommand.NotifyCanExecuteChanged();
         SlipRightCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
@@ -390,6 +398,19 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = "Izabrani segment je spojen sa narednim.";
     }
 
+    private async Task RollSelectedAsync(int frameDelta)
+    {
+        if (SelectedSegment is null || Item.MediaInfo is null)
+        {
+            return;
+        }
+
+        var frameRate = Math.Max(1d, Item.MediaInfo.FrameRate);
+        Timeline = TimelineEditorService.RollBoundaryWithNext(Timeline, SelectedSegment.Id, frameDelta / frameRate);
+        await RefreshStateAndPreviewAsync();
+        EditorHint = $"Granica izmedju izabranog i sledeceg segmenta je pomerena za {frameDelta} frejm.";
+    }
+
     private async Task SlipSelectedAsync(int frameDelta)
     {
         if (SelectedSegment is null || Item.MediaInfo is null)
@@ -473,6 +494,23 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     }
 
     private bool CanSlipSelected() => SelectedSegment is not null && SelectedSegment.Kind != TimelineSegmentKind.Gap;
+
+    private bool CanRollSelectedWithNext()
+    {
+        if (SelectedSegment is null || SelectedSegment.Kind == TimelineSegmentKind.Gap)
+        {
+            return false;
+        }
+
+        var ordered = Timeline.Segments.OrderBy(segment => segment.TimelineStartSeconds).ToList();
+        var index = ordered.FindIndex(segment => segment.Id == SelectedSegment.Id);
+        if (index < 0 || index >= ordered.Count - 1)
+        {
+            return false;
+        }
+
+        return ordered[index + 1].Kind != TimelineSegmentKind.Gap;
+    }
 
     private async Task GoToStartAsync()
     {
