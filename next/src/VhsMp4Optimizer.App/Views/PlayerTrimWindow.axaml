@@ -103,7 +103,7 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*,280" Margin="14">
+    <Grid RowDefinitions="Auto,*,280,Auto" Margin="14">
         <StackPanel Spacing="12" Margin="0,0,0,14">
             <Border Classes="panel-muted" Padding="10,8">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -1303,6 +1303,28 @@
                         </Grid>
                     </Grid>
                 </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3"
+                Margin="0,12,0,0"
+                Classes="panel-muted"
+                Padding="12,8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <TextBlock Classes="field-label"
+                           VerticalAlignment="Center"
+                           Text="Page Switcher" />
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                    <Button Classes="transport" Content="Media" />
+                    <Button Classes="transport active-chip" Content="Cut" />
+                    <Button Classes="transport" Content="Edit" />
+                    <Button Classes="transport" Content="Fusion" />
+                    <Button Classes="transport" Content="Color" />
+                    <Button Classes="transport" Content="Fairlight" />
+                    <Button Classes="transport" Content="Deliver" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

@@ -309,6 +309,21 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_bottom_page_switcher()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Page Switcher\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Media\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Cut\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Edit\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Fusion\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Color\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Fairlight\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Deliver\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
