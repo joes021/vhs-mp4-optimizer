@@ -813,7 +813,7 @@
                                         <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
                                             <Button Width="{Binding WidthPixels}"
                                                     MinWidth="96"
-                                                    Height="92"
+                                                    Height="108"
                                                     Padding="0"
                                                     Command="{Binding DataContext.SelectTimelineBlockCommand, ElementName=RootWindow}"
                                                     CommandParameter="{Binding .}"
@@ -821,7 +821,18 @@
                                                     Foreground="{Binding ForegroundBrush}"
                                                     BorderBrush="{Binding BorderBrush}"
                                                     BorderThickness="{Binding BorderThickness}">
-                                                <Grid ColumnDefinitions="10,*,10">
+                                                <Grid RowDefinitions="Auto,*">
+                                                    <Border x:Name="SelectedClipTitleBar"
+                                                            Background="{Binding TitleBarBackgroundBrush}"
+                                                            BorderBrush="{Binding TitleBarBorderBrush}"
+                                                            BorderThickness="0,0,0,1"
+                                                            CornerRadius="6,6,0,0"
+                                                            Padding="8,5">
+                                                        <TextBlock FontSize="10"
+                                                                   FontWeight="Bold"
+                                                                   Text="{Binding SelectedTitleText}" />
+                                                    </Border>
+                                                    <Grid Grid.Row="1" ColumnDefinitions="10,*,10">
                                                     <Border x:Name="ClipHandleGripLeft"
                                                             Width="6"
                                                             Margin="2,8,0,8"
@@ -875,6 +886,7 @@
                                                             VerticalAlignment="Stretch"
                                                             Background="#9FB6CC"
                                                             CornerRadius="3" />
+                                                    </Grid>
                                                 </Grid>
                                             </Button>
                                         </DataTemplate>

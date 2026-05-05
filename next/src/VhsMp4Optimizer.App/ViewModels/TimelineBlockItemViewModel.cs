@@ -36,17 +36,30 @@ public partial class TimelineBlockItemViewModel : ObservableObject
         ? Brush.Parse("#F59E0B")
         : Brush.Parse("#64748B");
 
+    public IBrush TitleBarBackgroundBrush => IsSelected
+        ? Brush.Parse("#C2410C")
+        : Brush.Parse("#1E293B");
+
+    public IBrush TitleBarBorderBrush => IsSelected
+        ? Brush.Parse("#FDBA74")
+        : Brush.Parse("#475569");
+
     public Thickness BorderThickness => IsSelected
         ? new Thickness(3)
         : new Thickness(1);
 
     public string SelectionBadgeText => IsSelected ? "SELECTED" : "CLIP";
 
+    public string SelectedTitleText => IsSelected ? "ACTIVE CLIP" : "CLIP FOCUS";
+
     partial void OnIsSelectedChanged(bool value)
     {
         OnPropertyChanged(nameof(BorderBrush));
         OnPropertyChanged(nameof(AccentBrush));
+        OnPropertyChanged(nameof(TitleBarBackgroundBrush));
+        OnPropertyChanged(nameof(TitleBarBorderBrush));
         OnPropertyChanged(nameof(BorderThickness));
         OnPropertyChanged(nameof(SelectionBadgeText));
+        OnPropertyChanged(nameof(SelectedTitleText));
     }
 }
