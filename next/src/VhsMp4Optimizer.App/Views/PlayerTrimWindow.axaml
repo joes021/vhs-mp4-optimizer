@@ -78,10 +78,10 @@
         </Style>
 
         <Style Selector="Button.transport:disabled">
-            <Setter Property="Background" Value="#1A2430" />
-            <Setter Property="BorderBrush" Value="#263240" />
-            <Setter Property="Foreground" Value="#607086" />
-            <Setter Property="Opacity" Value="0.82" />
+            <Setter Property="Background" Value="#202B37" />
+            <Setter Property="BorderBrush" Value="#3B4D61" />
+            <Setter Property="Foreground" Value="#8EA3BA" />
+            <Setter Property="Opacity" Value="1" />
         </Style>
 
         <Style Selector="Button.transport.active-chip">
@@ -114,6 +114,13 @@
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
+        <Style Selector="Button.transport.functional:disabled">
+            <Setter Property="Background" Value="#143322" />
+            <Setter Property="BorderBrush" Value="#2E6E48" />
+            <Setter Property="Foreground" Value="#90C7A6" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
         <Style Selector="Button.primary">
             <Setter Property="Background" Value="#0E7490" />
             <Setter Property="Foreground" Value="White" />
@@ -128,7 +135,7 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*,320,Auto" Margin="14">
+    <Grid RowDefinitions="Auto,*,360,Auto" Margin="14">
         <StackPanel Spacing="10" Margin="0,0,0,12">
             <Border Classes="panel-muted" Padding="10,8">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -425,7 +432,7 @@
                                 CommandParameter="Blade">
                             <StackPanel Spacing="4">
                                 <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Blade" />
-                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Cut" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Razor" />
                             </StackPanel>
                         </Button>
 
@@ -506,7 +513,7 @@
 
                     <Border x:Name="PrimaryProgramMonitor"
                             Grid.Row="2"
-                            MinHeight="460"
+                            MinHeight="400"
                             Background="#05080D"
                             BorderBrush="#293445"
                             BorderThickness="1"
@@ -517,9 +524,9 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     MaxWidth="1120"
-                                    MaxHeight="430"
+                                    MaxHeight="360"
                                     Width="1120"
-                                    Height="430"
+                                    Height="360"
                                     Background="#05080D"
                                     BorderBrush="#293445"
                                     BorderThickness="1"
@@ -606,7 +613,7 @@
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding PreviewSourceTimeText}" />
                     </Grid>
 
-                    <Border Grid.Row="4" Classes="panel-muted">
+                    <Border Grid.Row="4" Classes="panel-muted" Margin="0,8,0,0">
                         <StackPanel Spacing="10">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Classes="field-label" VerticalAlignment="Center" Text="Monitor Transport" />
@@ -1304,7 +1311,7 @@
                     <TextBlock Classes="field-label" Text="Edit Tools" />
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="transport functional" Content="Split at Playhead" Command="{Binding SplitAtPlayheadCommand}" />
+                        <Button Classes="transport functional" Content="Razor at Playhead" Command="{Binding SplitAtPlayheadCommand}" />
                         <Button Classes="transport functional" Content="Toggle Keep/Cut" Command="{Binding ToggleKeepCutCommand}" />
                         <Button Classes="transport functional" Content="Trim Selected" Command="{Binding TrimSelectedToInOutCommand}" />
                         <Button Classes="transport functional" Content="Extract Selected" Command="{Binding ExtractSelectedToInOutCommand}" />

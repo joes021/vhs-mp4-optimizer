@@ -131,7 +131,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Command=\"{Binding ToggleTrackSoloCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ToggleSnapCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Back to Queue\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Split at Playhead\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Razor at Playhead\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Toggle Keep/Cut\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Trim Selected\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Duplicate Selected\"", markup, StringComparison.Ordinal);
@@ -330,12 +330,13 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
+        Assert.Contains("RowDefinitions=\"Auto,*,360,Auto\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"EditorMainContentGrid\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"220,*,320\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PrimaryProgramMonitor\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ProgramMonitorViewport\"", markup, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"460\"", markup, StringComparison.Ordinal);
-        Assert.Contains("MaxHeight=\"430\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"400\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"360\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -352,6 +353,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Selector=\"Button.transport.functional\"", markup, StringComparison.Ordinal);
         Assert.Contains("Value=\"#1F8B4C\"", markup, StringComparison.Ordinal);
         Assert.Contains("Value=\"#58E293\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Button.transport.functional:disabled\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#143322\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#90C7A6\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -390,6 +394,16 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Command=\"{Binding SetInPointCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mark Out\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding SetOutPointCommand}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_surface_razor_action_for_v1_cutting()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Razor\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Razor at Playhead\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SplitAtPlayheadCommand}\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
