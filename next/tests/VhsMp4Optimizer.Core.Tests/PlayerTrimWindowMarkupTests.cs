@@ -336,6 +336,18 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_editor_title_status_strip()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Session Status\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Edited\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Auto Save\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Timeline 01\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Record Monitor\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
