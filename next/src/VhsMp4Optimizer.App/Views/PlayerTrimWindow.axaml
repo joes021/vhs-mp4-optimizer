@@ -784,23 +784,47 @@
                                                     Foreground="{Binding ForegroundBrush}"
                                                     BorderBrush="{Binding BorderBrush}"
                                                     BorderThickness="{Binding BorderThickness}">
-                                                <StackPanel Margin="8" Spacing="4">
-                                                    <Grid ColumnDefinitions="Auto,*">
-                                                        <Border Background="{Binding AccentBrush}" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4" Padding="6,2">
-                                                            <TextBlock FontSize="10" FontWeight="Bold" Text="{Binding SelectionBadgeText}" />
-                                                        </Border>
-                                                        <TextBlock Grid.Column="1"
-                                                                   Margin="8,0,0,0"
-                                                                   FontWeight="Bold"
-                                                                   VerticalAlignment="Center"
-                                                                   Text="{Binding Label}" />
-                                                    </Grid>
-                                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{Binding Summary}" />
-                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                                        <TextBlock FontSize="10" FontWeight="Bold" Text="DUR" />
-                                                        <TextBlock Grid.Column="1" FontSize="10" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
-                                                    </Grid>
-                                                </StackPanel>
+                                                <Grid ColumnDefinitions="10,*,10">
+                                                    <Border x:Name="ClipHandleGripLeft"
+                                                            Width="6"
+                                                            Margin="2,8,0,8"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Stretch"
+                                                            Background="#9FB6CC"
+                                                            CornerRadius="3" />
+                                                    <StackPanel Grid.Column="1" Margin="8" Spacing="4">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                                            <Border Background="{Binding AccentBrush}" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                                                                <TextBlock FontSize="10" FontWeight="Bold" Text="{Binding SelectionBadgeText}" />
+                                                            </Border>
+                                                            <TextBlock Grid.Column="1"
+                                                                       FontWeight="Bold"
+                                                                       VerticalAlignment="Center"
+                                                                       Text="{Binding Label}" />
+                                                            <Border Grid.Column="2"
+                                                                    Background="#132334"
+                                                                    BorderBrush="#6A88A6"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="4"
+                                                                    Padding="5,2">
+                                                                <TextBlock FontSize="10" FontWeight="Bold" Text="SRC" />
+                                                            </Border>
+                                                        </Grid>
+                                                        <TextBlock FontSize="11" TextWrapping="Wrap" Text="{Binding Summary}" />
+                                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                            <TextBlock FontSize="10" FontWeight="Bold" Text="DUR" />
+                                                            <TextBlock Grid.Column="1" FontSize="10" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                    <Border x:Name="ClipHandleGripRight"
+                                                            Grid.Column="2"
+                                                            Width="6"
+                                                            Margin="0,8,2,8"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Stretch"
+                                                            Background="#9FB6CC"
+                                                            CornerRadius="3" />
+                                                </Grid>
                                             </Button>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

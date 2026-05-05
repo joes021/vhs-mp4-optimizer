@@ -85,6 +85,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("x:Name=\"SnapGuideRight\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding PreviewVirtualTimeText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"DUR\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ClipHandleGripLeft\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ClipHandleGripRight\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"SRC\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding SelectionBadgeText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Selected Clip\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Marker Rail\"", markup, StringComparison.Ordinal);
