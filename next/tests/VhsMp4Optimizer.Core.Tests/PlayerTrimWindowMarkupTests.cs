@@ -92,10 +92,10 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"{Binding SelectionBadgeText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Selected Clip\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Marker Rail\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Mark In\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Mark Out\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Prev Cut\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Next Cut\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Mark In\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Mark Out\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Prev Cut\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Next Cut\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Transform\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Cropping\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Composite\"", markup, StringComparison.Ordinal);
@@ -333,7 +333,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("x:Name=\"EditorMainContentGrid\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"220,*,320\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PrimaryProgramMonitor\"", markup, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"520\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ProgramMonitorViewport\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"460\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"430\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -342,12 +344,14 @@ public sealed class PlayerTrimWindowMarkupTests
         var markup = ReadPlayerTrimMarkup();
 
         Assert.Contains("Selector=\"Button.transport:pointerover\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#344255\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#5A728E\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#364556\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#7C96B2\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport:pressed\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#3B4B61\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#6C87A7\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#425366\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#A1B7CF\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#1F8B4C\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#58E293\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -359,6 +363,33 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Classes.active-chip=\"{Binding IsCutModeActive}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding PlayCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding SaveToQueueCommand}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_use_focus_timeline_layout_without_secondary_lane_overlap()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("x:Name=\"CompactTimeRuler\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"A1LaneRow\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"V2LaneRow\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"A2LaneRow\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelineBottomDockRow\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelineNavigatorRow\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ClipThumbnailStrip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Height=\"72\"", markup, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"False\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_wire_marker_in_and_out_actions()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Content=\"Mark In\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SetInPointCommand}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Mark Out\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SetOutPointCommand}\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
