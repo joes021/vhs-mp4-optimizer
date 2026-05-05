@@ -297,6 +297,18 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_inspector_toolbar_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Inspector Stack\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Bypass\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Reset All\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Copy\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Paste\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
