@@ -555,6 +555,14 @@
 
                         <Border Classes="panel-muted">
                             <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Classes="panel-muted" Padding="8,4">
+                                        <TextBlock FontWeight="SemiBold" Text="Transform Reset" />
+                                    </Border>
+                                    <Border Classes="panel-muted" Padding="8,4">
+                                        <TextBlock FontWeight="SemiBold" Text="Keyframe" />
+                                    </Border>
+                                </StackPanel>
                                 <Grid ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8">
                                     <TextBlock VerticalAlignment="Center" Text="Zoom X" />
                                     <TextBox Grid.Column="1" Text="1.000" />
@@ -571,6 +579,14 @@
                         </Border>
 
                         <TextBlock Classes="field-label" Text="Cropping" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Classes="panel-muted" Padding="8,4">
+                                <TextBlock Text="Reset" />
+                            </Border>
+                            <Border Classes="panel-muted" Padding="8,4">
+                                <TextBlock Text="Keyframe" />
+                            </Border>
+                        </StackPanel>
                         <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
                             <TextBlock VerticalAlignment="Center" Text="Aspect" />
                             <ComboBox Grid.Column="1" ItemsSource="{Binding AspectModes}" SelectedItem="{Binding SelectedAspectMode}" />
