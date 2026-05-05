@@ -9,10 +9,10 @@
         x:Name="RootWindow"
         x:Class="VhsMp4Optimizer.App.Views.PlayerTrimWindow"
         x:DataType="vm:PlayerTrimWindowViewModel"
-        Width="1440"
-        Height="940"
+        Width="1560"
+        Height="1020"
         MinWidth="1200"
-        MinHeight="780"
+        MinHeight="820"
         WindowStartupLocation="CenterOwner"
         Title="{Binding WindowTitle}"
         Background="#14181F"
@@ -66,13 +66,14 @@
         </Style>
 
         <Style Selector="Button.transport:pointerover">
-            <Setter Property="Background" Value="#314155" />
-            <Setter Property="BorderBrush" Value="#5B728D" />
+            <Setter Property="Background" Value="#344255" />
+            <Setter Property="BorderBrush" Value="#5A728E" />
+            <Setter Property="Foreground" Value="#F4F8FD" />
         </Style>
 
         <Style Selector="Button.transport:pressed">
-            <Setter Property="Background" Value="#0E7490" />
-            <Setter Property="BorderBrush" Value="#22D3EE" />
+            <Setter Property="Background" Value="#3B4B61" />
+            <Setter Property="BorderBrush" Value="#6C87A7" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
@@ -84,9 +85,33 @@
         </Style>
 
         <Style Selector="Button.transport.active-chip">
-            <Setter Property="Background" Value="#1E2A38" />
-            <Setter Property="BorderBrush" Value="#40617F" />
+            <Setter Property="Background" Value="#31445B" />
+            <Setter Property="BorderBrush" Value="#6483A8" />
             <Setter Property="Foreground" Value="#F5FAFF" />
+        </Style>
+
+        <Style Selector="Button.transport.functional">
+            <Setter Property="Background" Value="#29415B" />
+            <Setter Property="BorderBrush" Value="#5E7DA6" />
+            <Setter Property="Foreground" Value="#F2F7FF" />
+        </Style>
+
+        <Style Selector="Button.transport.functional:pointerover">
+            <Setter Property="Background" Value="#32506F" />
+            <Setter Property="BorderBrush" Value="#7A9BC5" />
+            <Setter Property="Foreground" Value="#FBFDFF" />
+        </Style>
+
+        <Style Selector="Button.transport.functional:pressed">
+            <Setter Property="Background" Value="#3C5C7D" />
+            <Setter Property="BorderBrush" Value="#96B4D8" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.transport.functional.active-chip">
+            <Setter Property="Background" Value="#385776" />
+            <Setter Property="BorderBrush" Value="#8EAFD7" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.primary">
@@ -103,8 +128,8 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*,280,Auto" Margin="14">
-        <StackPanel Spacing="12" Margin="0,0,0,14">
+    <Grid RowDefinitions="Auto,*,320,Auto" Margin="14">
+        <StackPanel Spacing="10" Margin="0,0,0,12">
             <Border Classes="panel-muted" Padding="10,8">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <TextBlock Classes="field-label"
@@ -127,149 +152,147 @@
                 </Grid>
             </Border>
 
-            <Border Classes="panel-muted" Padding="10,8">
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <TextBlock Classes="field-label"
-                               VerticalAlignment="Center"
-                               Text="Session Status" />
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="8"
-                                HorizontalAlignment="Center">
-                        <TextBlock FontWeight="SemiBold" Text="Timeline 01" />
-                        <TextBlock Classes="section-meta" Text="|" />
-                        <TextBlock Text="Record Monitor" />
+            <Border Classes="panel-muted" Padding="12,10">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+                    <StackPanel Spacing="8">
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="Player / Trim" />
+                        <TextBlock Classes="field-label" Text="Session Status" />
+                        <TextBlock Classes="section-meta" Text="Non-linear editor mode" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <TextBlock FontWeight="SemiBold" Text="Project" />
+                            </Border>
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <TextBlock FontWeight="SemiBold" Text="Sequence 01" />
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Spacing="8"
+                                HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Center">
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsCutModeActive}"
+                                    Content="Cut"
+                                    Command="{Binding SelectModeCommand}"
+                                    CommandParameter="Cut" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsEditModeActive}"
+                                    Content="Edit"
+                                    Command="{Binding SelectModeCommand}"
+                                    CommandParameter="Edit" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsColorModeActive}"
+                                    Content="Color"
+                                    Command="{Binding SelectModeCommand}"
+                                    CommandParameter="Color" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsDeliverModeActive}"
+                                    Content="Deliver"
+                                    Command="{Binding SelectModeCommand}"
+                                    CommandParameter="Deliver" />
+                        </StackPanel>
+
+                        <Border Classes="panel-muted"
+                                Padding="12,8"
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="8"
+                                            HorizontalAlignment="Center">
+                                    <TextBlock FontWeight="SemiBold" Text="Timeline 01" />
+                                    <TextBlock Classes="section-meta" Text="|" />
+                                    <TextBlock Text="Record Monitor" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding FileSummary}"
+                                           TextTrimming="CharacterEllipsis"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto"
+                              ColumnSpacing="12">
+                            <TextBlock Classes="field-label"
+                                       VerticalAlignment="Center"
+                                       Text="Timeline View" />
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="8">
+                                <Button Classes="transport active-chip" Content="Single Viewer" />
+                                <Button Classes="transport" Content="Dual Viewer" />
+                                <Button Classes="transport" Content="Inspector Right" />
+                                <Button Classes="transport" Content="Mixer Right" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Classes="section-meta"
+                                       Text="Workspace chrome / dock status" />
+                            <StackPanel Grid.Column="3"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        HorizontalAlignment="Right">
+                                <Border Classes="panel-muted" Padding="10,6">
+                                    <TextBlock FontWeight="SemiBold" Text="25 fps" />
+                                </Border>
+                                <Button Classes="transport functional"
+                                        Classes.active-chip="{Binding IsSnapEnabled}"
+                                        Content="{Binding SnapStatusText}"
+                                        Command="{Binding ToggleSnapCommand}" />
+                                <Border Classes="panel-muted" Padding="10,6">
+                                    <TextBlock FontWeight="SemiBold" Text="Linked Selection" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Center">
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsMediaPoolActive}"
+                                    Content="Media Pool"
+                                    Command="{Binding SelectWorkspaceDockCommand}"
+                                    CommandParameter="Media Pool" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsEffectsLibraryActive}"
+                                    Content="Effects Library"
+                                    Command="{Binding SelectWorkspaceDockCommand}"
+                                    CommandParameter="Effects Library" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsEditIndexActive}"
+                                    Content="Edit Index"
+                                    Command="{Binding SelectWorkspaceDockCommand}"
+                                    CommandParameter="Edit Index" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsMixerActive}"
+                                    Content="Mixer"
+                                    Command="{Binding SelectWorkspaceDockCommand}"
+                                    CommandParameter="Mixer" />
+                        </StackPanel>
+                    </StackPanel>
+
                     <StackPanel Grid.Column="2"
-                                Orientation="Horizontal"
                                 Spacing="8"
                                 HorizontalAlignment="Right">
-                        <Button Classes="transport active-chip" Content="Edited" />
-                        <Button Classes="transport" Content="Auto Save" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Border Classes="panel-muted" Padding="10,8">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                    <TextBlock Classes="field-label"
-                               VerticalAlignment="Center"
-                               Text="Timeline View" />
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="8">
-                        <Button Classes="transport active-chip" Content="Single Viewer" />
-                        <Button Classes="transport" Content="Dual Viewer" />
-                        <Button Classes="transport" Content="Inspector Right" />
-                        <Button Classes="transport" Content="Mixer Right" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <StackPanel Spacing="8">
-                    <TextBlock FontSize="22" FontWeight="SemiBold" Text="Player / Trim" />
-                    <TextBlock Classes="section-meta" Text="Non-linear editor mode" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Project" />
-                        </Border>
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Sequence 01" />
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsCutModeActive}"
-                                Content="Cut"
-                                Command="{Binding SelectModeCommand}"
-                                CommandParameter="Cut" />
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsEditModeActive}"
-                                Content="Edit"
-                                Command="{Binding SelectModeCommand}"
-                                CommandParameter="Edit" />
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsColorModeActive}"
-                                Content="Color"
-                                Command="{Binding SelectModeCommand}"
-                                CommandParameter="Color" />
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsDeliverModeActive}"
-                                Content="Deliver"
-                                Command="{Binding SelectModeCommand}"
-                                CommandParameter="Deliver" />
-                    </StackPanel>
-                </StackPanel>
-
-                <Border Grid.Column="1"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Classes="panel-muted"
-                        Padding="12,8"
-                        MinWidth="520">
-                    <TextBlock Text="{Binding FileSummary}"
-                               TextTrimming="CharacterEllipsis"
-                               HorizontalAlignment="Center" />
-                </Border>
-
-                <Button Grid.Column="2"
-                        Classes="transport"
-                        VerticalAlignment="Top"
-                        Content="Back to Queue"
-                        Click="ClosePlayerTrimClick" />
-            </Grid>
-
-            <Border Classes="panel-muted" Padding="12,10">
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsMediaPoolActive}"
-                                Content="Media Pool"
-                                Command="{Binding SelectWorkspaceDockCommand}"
-                                CommandParameter="Media Pool" />
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsEffectsLibraryActive}"
-                                Content="Effects Library"
-                                Command="{Binding SelectWorkspaceDockCommand}"
-                                CommandParameter="Effects Library" />
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsEditIndexActive}"
-                                Content="Edit Index"
-                                Command="{Binding SelectWorkspaceDockCommand}"
-                                CommandParameter="Edit Index" />
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsMixerActive}"
-                                Content="Mixer"
-                                Command="{Binding SelectWorkspaceDockCommand}"
-                                CommandParameter="Mixer" />
-                    </StackPanel>
-
-                    <TextBlock Grid.Column="1"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center"
-                               Classes="section-meta"
-                               Text="Workspace chrome / dock status" />
-
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="25 fps" />
-                        </Border>
-                        <Button Classes="transport"
-                                Classes.active-chip="{Binding IsSnapEnabled}"
-                                Content="{Binding SnapStatusText}"
-                                Command="{Binding ToggleSnapCommand}" />
-                        <Border Classes="panel-muted" Padding="10,6">
-                            <TextBlock FontWeight="SemiBold" Text="Linked Selection" />
-                        </Border>
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Right">
+                            <Button Classes="transport active-chip" Content="Edited" />
+                            <Button Classes="transport" Content="Auto Save" />
+                        </StackPanel>
+                        <Button Classes="transport functional"
+                                HorizontalAlignment="Right"
+                                Content="Back to Queue"
+                                Click="ClosePlayerTrimClick" />
                     </StackPanel>
                 </Grid>
             </Border>
         </StackPanel>
 
-        <Grid Grid.Row="1" ColumnDefinitions="268,*,360" ColumnSpacing="14">
+        <Grid x:Name="EditorMainContentGrid" Grid.Row="1" ColumnDefinitions="220,*,320" ColumnSpacing="14">
             <Grid RowDefinitions="Auto,*" RowSpacing="12">
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
@@ -384,7 +407,7 @@
                                    FontSize="12"
                                    Text="Tool Rail" />
 
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsSelectToolActive}"
                                 Padding="8"
                                 Command="{Binding SelectToolCommand}"
@@ -395,7 +418,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsBladeToolActive}"
                                 Padding="8"
                                 Command="{Binding SelectToolCommand}"
@@ -406,7 +429,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsSlipToolActive}"
                                 Padding="8"
                                 Command="{Binding SelectToolCommand}"
@@ -417,7 +440,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsRollToolActive}"
                                 Padding="8"
                                 Command="{Binding SelectToolCommand}"
@@ -432,51 +455,58 @@
             </Grid>
 
             <Border Grid.Column="1" Classes="panel">
-                <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" RowSpacing="12">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Classes="transport"
-                                        Classes.active-chip="{Binding IsSourceMonitorActive}"
-                                        Content="Source"
-                                        Command="{Binding SelectMonitorTabCommand}"
-                                        CommandParameter="Source" />
-                                <Button Classes="transport"
-                                        Classes.active-chip="{Binding IsProgramMonitorActive}"
-                                        Content="Program"
-                                        Command="{Binding SelectMonitorTabCommand}"
-                                        CommandParameter="Program" />
-                                <Border Classes="panel-muted" Padding="10,6">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Fit" />
-                                        <TextBlock Text="100%" />
-                                        <TextBlock Text="Safe" />
-                                        <TextBlock Text="Proxy Off" />
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
+                <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="12">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsSourceMonitorActive}"
+                                    Content="Source"
+                                    Command="{Binding SelectMonitorTabCommand}"
+                                    CommandParameter="Source" />
+                            <Button Classes="transport functional"
+                                    Classes.active-chip="{Binding IsProgramMonitorActive}"
+                                    Content="Program"
+                                    Command="{Binding SelectMonitorTabCommand}"
+                                    CommandParameter="Program" />
                             <Border Classes="panel-muted" Padding="10,6">
-                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock FontWeight="SemiBold" Text="Monitor Timecode" />
-                                    <TextBlock Grid.Column="1" Text="Source TC" />
-                                    <TextBlock Grid.Column="2"
-                                               HorizontalAlignment="Center"
-                                               Text="Record TC" />
-                                    <TextBlock Grid.Column="3" Text="Safe Area On" />
-                                    <TextBlock Grid.Column="4" Text="Proxy: Off" />
-                                </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Fit" />
+                                    <TextBlock Text="100%" />
+                                    <TextBlock Text="Safe" />
+                                    <TextBlock Text="Proxy Off" />
+                                </StackPanel>
                             </Border>
-                            <StackPanel Spacing="2">
-                                <TextBlock Classes="section-title" Text="Program Monitor" />
-                                <TextBlock Classes="section-meta" Text="Playback i precizan trim kadar" />
-                            </StackPanel>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="panel-muted" Padding="10,6">
+                        <StackPanel Grid.Column="1"
+                                    Spacing="2"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Classes="section-title"
+                                       HorizontalAlignment="Center"
+                                       Text="Program Monitor" />
+                            <TextBlock Classes="section-meta"
+                                       HorizontalAlignment="Center"
+                                       Text="Playback i precizan trim kadar" />
+                        </StackPanel>
+                        <Border Grid.Column="2" Classes="panel-muted" Padding="10,6">
                             <TextBlock Text="{Binding PreviewSourceTimeText}" FontWeight="SemiBold" />
                         </Border>
                     </Grid>
 
-                    <Border Grid.Row="1"
+                    <Border Grid.Row="1" Classes="panel-muted" Padding="10,6">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10">
+                            <TextBlock FontWeight="SemiBold" Text="Monitor Timecode" />
+                            <TextBlock Grid.Column="1" Text="Source TC" />
+                            <TextBlock Grid.Column="2"
+                                       HorizontalAlignment="Center"
+                                       Text="Record TC" />
+                            <TextBlock Grid.Column="3" Text="Safe Area On" />
+                            <TextBlock Grid.Column="4" Text="Proxy: Off" />
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="PrimaryProgramMonitor"
+                            Grid.Row="2"
+                            MinHeight="520"
                             Background="#05080D"
                             BorderBrush="#293445"
                             BorderThickness="1"
@@ -547,7 +577,7 @@
                         </Grid>
                     </Border>
 
-                    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+                    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
                         <TextBlock VerticalAlignment="Center" Classes="field-label" Text="Virtual" />
                         <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding PreviewVirtualTimeText}" />
                         <Slider Grid.Column="2"
@@ -559,60 +589,60 @@
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding PreviewSourceTimeText}" />
                     </Grid>
 
-                    <Border Grid.Row="3" Classes="panel-muted">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Classes="field-label" VerticalAlignment="Center" Text="Monitor Transport" />
-                            <Button Classes="transport" Content="Shuttle -" />
-                            <Button Classes="transport" Content="Stop" Command="{Binding PauseCommand}" />
-                            <Button Classes="transport" Content="Loop"
-                                    Classes.active-chip="{Binding IsLoopPlaybackEnabled}"
-                                    Command="{Binding ToggleLoopPlaybackCommand}" />
-                            <Button Classes="transport" Content="Shuttle +" />
+                    <Border Grid.Row="4" Classes="panel-muted">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Classes="field-label" VerticalAlignment="Center" Text="Monitor Transport" />
+                                <Button Classes="transport" Content="Shuttle -" />
+                                <Button Classes="transport functional" Content="Stop" Command="{Binding PauseCommand}" />
+                                <Button Classes="transport functional" Content="Loop"
+                                        Classes.active-chip="{Binding IsLoopPlaybackEnabled}"
+                                        Command="{Binding ToggleLoopPlaybackCommand}" />
+                                <Button Classes="transport" Content="Shuttle +" />
+                            </StackPanel>
+
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <StackPanel Orientation="Horizontal" Spacing="14">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="field-label" Text="Navigate" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="transport functional" Content="START" Command="{Binding GoToStartCommand}" />
+                                            <Button Classes="transport functional" Content="&lt;&lt;&lt;" Command="{Binding Back250FramesCommand}" />
+                                            <Button Classes="transport functional" Content="&lt;&lt;" Command="{Binding Back25FramesCommand}" />
+                                            <Button Classes="transport functional" Content="&lt;" Command="{Binding BackFrameCommand}" />
+                                            <Button Classes="transport functional" Content="&gt;" Command="{Binding ForwardFrameCommand}" />
+                                            <Button Classes="transport functional" Content="&gt;&gt;" Command="{Binding Forward25FramesCommand}" />
+                                            <Button Classes="transport functional" Content="&gt;&gt;&gt;" Command="{Binding Forward250FramesCommand}" />
+                                            <Button Classes="transport functional" Content="END" Command="{Binding GoToEndCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="field-label" Text="Playback" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="transport functional" Content="Play" Command="{Binding PlayCommand}" />
+                                            <Button Classes="transport functional" Content="Pause" Command="{Binding PauseCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="field-label" Text="Marks" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="transport functional" Content="In" Command="{Binding SetInPointCommand}" />
+                                            <Button Classes="transport functional" Content="Out" Command="{Binding SetOutPointCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="10">
+                                <TextBlock VerticalAlignment="Center" Text="IN Point" />
+                                <TextBox Grid.Column="1" Text="{Binding InPointText}" />
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="OUT Point" />
+                                <TextBox Grid.Column="3" Text="{Binding OutPointText}" />
+                            </Grid>
                         </StackPanel>
                     </Border>
-
-                    <Border Grid.Row="4" Classes="panel-muted">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                            <StackPanel Orientation="Horizontal" Spacing="14">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Classes="field-label" Text="Navigate" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="transport" Content="START" Command="{Binding GoToStartCommand}" />
-                                        <Button Classes="transport" Content="&lt;&lt;&lt;" Command="{Binding Back250FramesCommand}" />
-                                        <Button Classes="transport" Content="&lt;&lt;" Command="{Binding Back25FramesCommand}" />
-                                        <Button Classes="transport" Content="&lt;" Command="{Binding BackFrameCommand}" />
-                                        <Button Classes="transport" Content="&gt;" Command="{Binding ForwardFrameCommand}" />
-                                        <Button Classes="transport" Content="&gt;&gt;" Command="{Binding Forward25FramesCommand}" />
-                                        <Button Classes="transport" Content="&gt;&gt;&gt;" Command="{Binding Forward250FramesCommand}" />
-                                        <Button Classes="transport" Content="END" Command="{Binding GoToEndCommand}" />
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <StackPanel Spacing="4">
-                                    <TextBlock Classes="field-label" Text="Playback" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="transport" Content="Play" Command="{Binding PlayCommand}" />
-                                        <Button Classes="transport" Content="Pause" Command="{Binding PauseCommand}" />
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <StackPanel Spacing="4">
-                                    <TextBlock Classes="field-label" Text="Marks" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="transport" Content="In" Command="{Binding SetInPointCommand}" />
-                                        <Button Classes="transport" Content="Out" Command="{Binding SetOutPointCommand}" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Border>
-
-                    <Grid Grid.Row="5" ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="10">
-                        <TextBlock VerticalAlignment="Center" Text="IN Point" />
-                        <TextBox Grid.Column="1" Text="{Binding InPointText}" />
-                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="OUT Point" />
-                        <TextBox Grid.Column="3" Text="{Binding OutPointText}" />
-                    </Grid>
                 </Grid>
             </Border>
 
@@ -650,17 +680,17 @@
                         </Grid>
 
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Classes="transport"
+                            <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsVideoInspectorActive}"
                                     Content="Video"
                                     Command="{Binding SelectInspectorTabCommand}"
                                     CommandParameter="Video" />
-                            <Button Classes="transport"
+                            <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsAudioInspectorActive}"
                                     Content="Audio"
                                     Command="{Binding SelectInspectorTabCommand}"
                                     CommandParameter="Audio" />
-                            <Button Classes="transport"
+                            <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsEffectsInspectorActive}"
                                     Content="Effects"
                                     Command="{Binding SelectInspectorTabCommand}"
@@ -676,8 +706,8 @@
                         </Border>
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <Button Grid.Column="0" Classes="transport" Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
-                            <Button Grid.Column="1" Classes="transport" Content="Close All Gaps" Command="{Binding CloseAllGapsCommand}" />
+                            <Button Grid.Column="0" Classes="transport functional" Content="Save to Queue" Command="{Binding SaveToQueueCommand}" />
+                            <Button Grid.Column="1" Classes="transport functional" Content="Close All Gaps" Command="{Binding CloseAllGapsCommand}" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -740,9 +770,9 @@
                         </Grid>
 
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                            <Button Grid.Column="0" Classes="transport" Content="Detect Crop" Command="{Binding DetectCropCommand}" />
-                            <Button Grid.Column="1" Classes="transport" Content="Auto Crop" Command="{Binding AutoCropCommand}" />
-                            <Button Grid.Column="2" Classes="transport" Content="Clear Crop" Command="{Binding ClearCropCommand}" />
+                            <Button Grid.Column="0" Classes="transport functional" Content="Detect Crop" Command="{Binding DetectCropCommand}" />
+                            <Button Grid.Column="1" Classes="transport functional" Content="Auto Crop" Command="{Binding AutoCropCommand}" />
+                            <Button Grid.Column="2" Classes="transport functional" Content="Clear Crop" Command="{Binding ClearCropCommand}" />
                         </Grid>
 
                         <TextBlock Classes="field-label" Text="Composite" />
@@ -808,26 +838,26 @@
                         <Border Classes="panel-muted" Padding="10,6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock FontWeight="SemiBold" Text="Timeline Controls" />
-                                <Button Classes="transport"
+                                <Button Classes="transport functional"
                                         Classes.active-chip="{Binding IsSnapEnabled}"
                                         Command="{Binding ToggleSnapCommand}"
                                         Content="Magnet" />
-                                <Button Classes="transport"
+                                <Button Classes="transport functional"
                                         Classes.active-chip="{Binding IsV1LaneTargetActive}"
                                         Command="{Binding SelectLaneTargetCommand}"
                                         CommandParameter="V1"
                                         Content="V1 Target" />
-                                <Button Classes="transport"
+                                <Button Classes="transport functional"
                                         Classes.active-chip="{Binding IsV2LaneTargetActive}"
                                         Command="{Binding SelectLaneTargetCommand}"
                                         CommandParameter="V2"
                                         Content="V2 Target" />
-                                <Button Classes="transport"
+                                <Button Classes="transport functional"
                                         Classes.active-chip="{Binding IsA1LaneTargetActive}"
                                         Command="{Binding SelectLaneTargetCommand}"
                                         CommandParameter="A1"
                                         Content="A1 Target" />
-                                <Button Classes="transport"
+                                <Button Classes="transport functional"
                                         Classes.active-chip="{Binding IsA2LaneTargetActive}"
                                         Command="{Binding SelectLaneTargetCommand}"
                                         CommandParameter="A2"
@@ -835,12 +865,12 @@
                                 <Border Classes="panel-muted" Padding="8,4">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBlock FontWeight="SemiBold" Text="Timeline Mini Toolbar" />
-                                        <Button Classes="transport"
+                                        <Button Classes="transport functional"
                                                 Classes.active-chip="{Binding IsSelectToolActive}"
                                                 Command="{Binding SelectToolCommand}"
                                                 CommandParameter="Select"
                                                 Content="Selection" />
-                                        <Button Classes="transport"
+                                        <Button Classes="transport functional"
                                                 Classes.active-chip="{Binding IsLinkedSelectionEnabled}"
                                                 Command="{Binding ToggleLinkedSelectionCommand}"
                                                 Content="Linked" />
@@ -994,19 +1024,19 @@
                                 <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Video Lane" />
                                 <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Track" />
                                 <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
-                                    <Button Classes="transport"
+                                    <Button Classes="transport functional"
                                             Classes.active-chip="{Binding IsTrackLockActive}"
                                             Padding="6,3"
                                             MinWidth="0"
                                             Command="{Binding ToggleTrackLockCommand}"
                                             Content="Lock" />
-                                    <Button Classes="transport"
+                                    <Button Classes="transport functional"
                                             Classes.active-chip="{Binding IsTrackMuteActive}"
                                             Padding="6,3"
                                             MinWidth="0"
                                             Command="{Binding ToggleTrackMuteCommand}"
                                             Content="Mute" />
-                                    <Button Classes="transport"
+                                    <Button Classes="transport functional"
                                             Classes.active-chip="{Binding IsTrackSoloActive}"
                                             Padding="6,3"
                                             MinWidth="0"
@@ -1264,51 +1294,51 @@
                     <TextBlock Classes="field-label" Text="Edit Tools" />
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="transport" Content="Split at Playhead" Command="{Binding SplitAtPlayheadCommand}" />
-                        <Button Classes="transport" Content="Toggle Keep/Cut" Command="{Binding ToggleKeepCutCommand}" />
-                        <Button Classes="transport" Content="Trim Selected" Command="{Binding TrimSelectedToInOutCommand}" />
-                        <Button Classes="transport" Content="Extract Selected" Command="{Binding ExtractSelectedToInOutCommand}" />
-                        <Button Classes="transport" Content="Duplicate Selected" Command="{Binding DuplicateSelectedCommand}" />
-                        <Button Classes="transport" Content="Merge With Next" Command="{Binding MergeWithNextCommand}" />
-                        <Button Classes="transport" Content="Roll &lt;" Command="{Binding RollLeftCommand}" />
-                        <Button Classes="transport" Content="Roll &gt;" Command="{Binding RollRightCommand}" />
-                        <Button Classes="transport" Content="Insert 1s Gap" Command="{Binding InsertGapAtPlayheadCommand}" />
-                        <Button Classes="transport" Content="Undo" Command="{Binding UndoCommand}" />
-                        <Button Classes="transport" Content="Redo" Command="{Binding RedoCommand}" />
-                        <Button Classes="transport" Content="Slip &lt;" Command="{Binding SlipLeftCommand}" />
-                        <Button Classes="transport" Content="Slip &gt;" Command="{Binding SlipRightCommand}" />
-                        <Button Classes="transport" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
-                        <Button Classes="transport" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
-                        <Button Classes="transport" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
-                        <Button Classes="transport" Content="Move Left" Command="{Binding MoveLeftCommand}" />
-                        <Button Classes="transport" Content="Move Right" Command="{Binding MoveRightCommand}" />
+                        <Button Classes="transport functional" Content="Split at Playhead" Command="{Binding SplitAtPlayheadCommand}" />
+                        <Button Classes="transport functional" Content="Toggle Keep/Cut" Command="{Binding ToggleKeepCutCommand}" />
+                        <Button Classes="transport functional" Content="Trim Selected" Command="{Binding TrimSelectedToInOutCommand}" />
+                        <Button Classes="transport functional" Content="Extract Selected" Command="{Binding ExtractSelectedToInOutCommand}" />
+                        <Button Classes="transport functional" Content="Duplicate Selected" Command="{Binding DuplicateSelectedCommand}" />
+                        <Button Classes="transport functional" Content="Merge With Next" Command="{Binding MergeWithNextCommand}" />
+                        <Button Classes="transport functional" Content="Roll &lt;" Command="{Binding RollLeftCommand}" />
+                        <Button Classes="transport functional" Content="Roll &gt;" Command="{Binding RollRightCommand}" />
+                        <Button Classes="transport functional" Content="Insert 1s Gap" Command="{Binding InsertGapAtPlayheadCommand}" />
+                        <Button Classes="transport functional" Content="Undo" Command="{Binding UndoCommand}" />
+                        <Button Classes="transport functional" Content="Redo" Command="{Binding RedoCommand}" />
+                        <Button Classes="transport functional" Content="Slip &lt;" Command="{Binding SlipLeftCommand}" />
+                        <Button Classes="transport functional" Content="Slip &gt;" Command="{Binding SlipRightCommand}" />
+                        <Button Classes="transport functional" Content="Cut Segment" Command="{Binding CutSegmentCommand}" />
+                        <Button Classes="transport functional" Content="Delete" Command="{Binding DeleteSegmentCommand}" />
+                        <Button Classes="transport functional" Content="Ripple Delete" Command="{Binding RippleDeleteCommand}" />
+                        <Button Classes="transport functional" Content="Move Left" Command="{Binding MoveLeftCommand}" />
+                        <Button Classes="transport functional" Content="Move Right" Command="{Binding MoveRightCommand}" />
                         </StackPanel>
                     </ScrollViewer>
                 </StackPanel>
 
                 <Border Grid.Row="9" Classes="panel-muted">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsTimelineBottomDockActive}"
                                 Command="{Binding SelectBottomDockCommand}"
                                 CommandParameter="Timeline"
                                 Content="Timeline" />
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsMixerBottomDockActive}"
                                 Command="{Binding SelectBottomDockCommand}"
                                 CommandParameter="Mixer"
                                 Content="Mixer" />
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsMetadataBottomDockActive}"
                                 Command="{Binding SelectBottomDockCommand}"
                                 CommandParameter="Metadata"
                                 Content="Metadata" />
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsMarkersBottomDockActive}"
                                 Command="{Binding SelectBottomDockCommand}"
                                 CommandParameter="Markers"
                                 Content="Markers" />
-                        <Button Classes="transport"
+                        <Button Classes="transport functional"
                                 Classes.active-chip="{Binding IsScopesBottomDockActive}"
                                 Command="{Binding SelectBottomDockCommand}"
                                 CommandParameter="Scopes"
@@ -1416,10 +1446,12 @@
                     <Button Classes="transport" Content="Media" />
                     <Button Classes="transport active-chip" Content="Cut" />
                     <Button Classes="transport" Content="Edit" />
-                    <Button Classes="transport" Content="Fusion" />
                     <Button Classes="transport" Content="Color" />
-                    <Button Classes="transport" Content="Fairlight" />
-                    <Button Classes="transport" Content="Deliver" />
+                    <Button x:Name="FooterDeliverButton"
+                            Classes="transport functional"
+                            Content="Deliver"
+                            Command="{Binding SaveToQueueCommand}"
+                            Click="ClosePlayerTrimClick" />
                 </StackPanel>
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"

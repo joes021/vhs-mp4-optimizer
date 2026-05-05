@@ -317,10 +317,48 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"Media\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Cut\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Edit\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Fusion\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Color\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Fairlight\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Deliver\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Fusion\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Fairlight\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FooterDeliverButton\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SaveToQueueCommand}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Click=\"ClosePlayerTrimClick\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_give_program_monitor_large_central_layout()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("x:Name=\"EditorMainContentGrid\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"220,*,320\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PrimaryProgramMonitor\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"520\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_define_subtle_transport_hover_and_pressed_states()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Selector=\"Button.transport:pointerover\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#344255\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#5A728E\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Button.transport:pressed\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#3B4B61\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#6C87A7\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Button.transport.functional\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_mark_wired_buttons_with_functional_class()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Classes=\"transport functional\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Classes.active-chip=\"{Binding IsCutModeActive}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding PlayCommand}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SaveToQueueCommand}\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
