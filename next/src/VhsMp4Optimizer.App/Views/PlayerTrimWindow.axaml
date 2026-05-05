@@ -852,6 +852,20 @@
                                                             <TextBlock FontSize="10" FontWeight="Bold" Text="DUR" />
                                                             <TextBlock Grid.Column="1" FontSize="10" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
                                                         </Grid>
+                                                        <StackPanel x:Name="ClipThumbnailStrip" Spacing="4">
+                                                            <TextBlock FontSize="9"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="#D7E3F1"
+                                                                       Text="THUMBNAILS" />
+                                                            <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="4">
+                                                                <Border Background="#2B5BAE" BorderBrush="#8DB6FF" BorderThickness="1" CornerRadius="3" Height="16" />
+                                                                <Border Grid.Column="1" Background="#254E96" BorderBrush="#8DB6FF" BorderThickness="1" CornerRadius="3" Height="16" />
+                                                                <Border Grid.Column="2" Background="#315FBA" BorderBrush="#8DB6FF" BorderThickness="1" CornerRadius="3" Height="16" />
+                                                                <Border Grid.Column="3" Background="#28539F" BorderBrush="#8DB6FF" BorderThickness="1" CornerRadius="3" Height="16" />
+                                                                <Border Grid.Column="4" Background="#3465C4" BorderBrush="#8DB6FF" BorderThickness="1" CornerRadius="3" Height="16" />
+                                                                <Border Grid.Column="5" Background="#29539D" BorderBrush="#8DB6FF" BorderThickness="1" CornerRadius="3" Height="16" />
+                                                            </Grid>
+                                                        </StackPanel>
                                                     </StackPanel>
                                                     <Border x:Name="ClipHandleGripRight"
                                                             Grid.Column="2"

@@ -159,6 +159,58 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_clip_thumbnail_strip_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("x:Name=\"ClipThumbnailStrip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"THUMBNAILS\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_stronger_selected_clip_title_bar()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("x:Name=\"SelectedClipTitleBar\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding SelectedTitleText}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_lane_targeting_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Content=\"V1 Target\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"V2 Target\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"A1 Target\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"A2 Target\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SelectLaneTargetCommand}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_timeline_mini_toolbar()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Timeline Mini Toolbar\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Selection\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Linked\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ToggleLinkedSelectionCommand}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_bottom_left_timecode_status_cluster()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Record TC\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Lane Target\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Tool\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ActiveLaneTarget}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
@@ -243,5 +295,19 @@ public sealed class PlayerTrimWindowMarkupTests
         }
 
         throw new DirectoryNotFoundException("Project root for Avalonia app nije pronadjen.");
+    }
+
+    private static string ReadPlayerTrimMarkup()
+    {
+        var projectRoot = FindProjectRoot();
+        var markupPath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "Views",
+            "PlayerTrimWindow.axaml");
+
+        return File.ReadAllText(markupPath);
     }
 }

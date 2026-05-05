@@ -176,6 +176,39 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void SelectLaneTargetCommand_should_update_active_lane_target_state_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectLaneTargetCommand.Execute("A2");
+
+        Assert.True(viewModel.IsA2LaneTargetActive);
+        Assert.False(viewModel.IsV1LaneTargetActive);
+        Assert.Contains("A2", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ToggleLinkedSelectionCommand_should_update_linked_selection_state_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.ToggleLinkedSelectionCommand.Execute(null);
+
+        Assert.False(viewModel.IsLinkedSelectionEnabled);
+        Assert.Contains("linked", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SelectZoomPresetCommand_should_rebuild_timeline_block_widths()
     {
         var queueItem = BuildQueueItem();
