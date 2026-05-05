@@ -53,10 +53,10 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"Monitor HUD\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PreviewScrubBar\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding PreviewVirtualTimeText}\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Select\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Razor\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Slip\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Roll\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Select\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Razor\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Slip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Roll\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Navigate\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Playback\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Marks\"", markup, StringComparison.Ordinal);
@@ -228,7 +228,7 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
-        Assert.Contains("Text=\"Monitor Transport\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Playback Controls\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Shuttle -\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Stop\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Loop\"", markup, StringComparison.Ordinal);
@@ -332,13 +332,14 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
-        Assert.Contains("RowDefinitions=\"Auto,*,360,Auto\"", markup, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"EditorMainContentGrid\"", markup, StringComparison.Ordinal);
-        Assert.Contains("ColumnDefinitions=\"240,*,320\"", markup, StringComparison.Ordinal);
+        Assert.Contains("RowDefinitions=\"Auto,*\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"EditorMockupGrid\"", markup, StringComparison.Ordinal);
+        Assert.Contains("RowDefinitions=\"*,Auto,Auto,*\"", markup, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"250,*,320\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PrimaryProgramMonitor\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ProgramMonitorViewport\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Height=\"216\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Height=\"184\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Height=\"420\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Height=\"360\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Monitor Timecode\"", markup, StringComparison.Ordinal);
     }
 
@@ -348,17 +349,17 @@ public sealed class PlayerTrimWindowMarkupTests
         var markup = ReadPlayerTrimMarkup();
 
         Assert.Contains("Selector=\"Button.transport:pointerover\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#1E3326\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#6CB987\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#25543A\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#6DB087\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport:pressed\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#16271D\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#95E0AF\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#1A412C\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#98D6AF\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#1D6B36\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#7EE49D\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#1E6F3D\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#8BE0A6\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional:disabled\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#365445\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#F3FFF6\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#2B3A4D\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#A7BDD4\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport:disabled /template/ ContentPresenter\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional:disabled /template/ ContentPresenter\"", markup, StringComparison.Ordinal);
     }
@@ -379,15 +380,13 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
+        Assert.Contains("x:Name=\"TracksWorkspacePanel\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"CompactTimeRuler\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"A1LaneRow\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelineNavigatorRow\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"V2LaneRow\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"A2LaneRow\"", markup, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"TimelineBottomDockRow\"", markup, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"TimelineNavigatorRow\"", markup, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ClipThumbnailStrip\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Height=\"84\"", markup, StringComparison.Ordinal);
-        Assert.Contains("IsVisible=\"False\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"120\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PreviewScrubBar\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"MonitorTransportBand\"", markup, StringComparison.Ordinal);
     }
@@ -475,18 +474,20 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
-    public void PlayerTrimWindow_should_render_compact_tool_rail_grid_with_all_primary_tools_visible()
+    public void PlayerTrimWindow_should_render_horizontal_track_tool_bar_with_all_primary_tools_visible()
     {
         var markup = ReadPlayerTrimMarkup();
 
-        Assert.Contains("RowDefinitions=\"*,Auto\"", markup, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ToolRailGrid\"", markup, StringComparison.Ordinal);
-        Assert.Contains("RowDefinitions=\"Auto,Auto,Auto,Auto\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Tool Rail\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TrackToolsBar\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"ToolRailGrid\"", markup, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Select\"", markup, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Blade\"", markup, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Slip\"", markup, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Roll\"", markup, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"56\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Razor\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Magnet\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Linked\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -540,7 +541,7 @@ public sealed class PlayerTrimWindowMarkupTests
 
         Assert.DoesNotContain("Text=\"Monitor Timecode\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Program Monitor\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Playback i precizan trim kadar\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"VIDEO\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Monitor HUD\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Proxy Off\"", markup, StringComparison.Ordinal);
     }
