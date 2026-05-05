@@ -208,58 +208,133 @@
             </Border>
         </StackPanel>
 
-        <Grid Grid.Row="1" ColumnDefinitions="92,*,360" ColumnSpacing="14">
-            <Border Classes="panel">
-                <StackPanel Spacing="10">
-                    <TextBlock Classes="section-title"
-                               FontSize="12"
-                               Text="Tool Rail" />
-
-                    <Button Classes="transport"
-                            Classes.active-chip="{Binding IsSelectToolActive}"
-                            Padding="8"
-                            Command="{Binding SelectToolCommand}"
-                            CommandParameter="Select">
-                        <StackPanel Spacing="4">
-                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Select" />
-                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Pointer" />
+        <Grid Grid.Row="1" ColumnDefinitions="268,*,360" ColumnSpacing="14">
+            <Grid RowDefinitions="Auto,*" RowSpacing="12">
+                <Border Classes="panel">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="section-title" Text="Media Pool" />
+                            <TextBlock Classes="section-meta" Text="Bins i source klipovi" />
                         </StackPanel>
-                    </Button>
 
-                    <Button Classes="transport"
-                            Classes.active-chip="{Binding IsBladeToolActive}"
-                            Padding="8"
-                            Command="{Binding SelectToolCommand}"
-                            CommandParameter="Blade">
-                        <StackPanel Spacing="4">
-                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Blade" />
-                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Cut" />
-                        </StackPanel>
-                    </Button>
+                        <Grid ColumnDefinitions="92,*" ColumnSpacing="10">
+                            <Border Classes="panel-muted"
+                                    Padding="10"
+                                    CornerRadius="8"
+                                    Background="#121A24">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="field-label" Text="Bins" />
+                                    <Border Background="#1A2430"
+                                            BorderBrush="#324153"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="Master" />
+                                    </Border>
+                                    <Border Background="#101822"
+                                            BorderBrush="#2A394D"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="8,6">
+                                        <TextBlock Text="Smart Bins" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
 
-                    <Button Classes="transport"
-                            Classes.active-chip="{Binding IsSlipToolActive}"
-                            Padding="8"
-                            Command="{Binding SelectToolCommand}"
-                            CommandParameter="Slip">
-                        <StackPanel Spacing="4">
-                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Slip" />
-                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Shift" />
-                        </StackPanel>
-                    </Button>
+                            <StackPanel Grid.Column="1" Spacing="8">
+                                <TextBlock Classes="field-label" Text="Clips" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Classes="panel-muted"
+                                            Width="104"
+                                            Padding="8"
+                                            Background="#181F29"
+                                            BorderBrush="#395170">
+                                        <StackPanel Spacing="6">
+                                            <Border Height="46"
+                                                    CornerRadius="6"
+                                                    Background="#2B394A"
+                                                    BorderBrush="#4F6B87"
+                                                    BorderThickness="1" />
+                                            <TextBlock FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding Item.SourceFile}" />
+                                            <TextBlock Classes="section-meta" Text="Source Clip" />
+                                        </StackPanel>
+                                    </Border>
 
-                    <Button Classes="transport"
-                            Classes.active-chip="{Binding IsRollToolActive}"
-                            Padding="8"
-                            Command="{Binding SelectToolCommand}"
-                            CommandParameter="Roll">
-                        <StackPanel Spacing="4">
-                            <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Roll" />
-                            <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Edge" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Border>
+                                    <Border Classes="panel-muted"
+                                            Width="104"
+                                            Padding="8"
+                                            Background="#181F29"
+                                            BorderBrush="#395170">
+                                        <StackPanel Spacing="6">
+                                            <Border Height="46"
+                                                    CornerRadius="6"
+                                                    Background="#253142"
+                                                    BorderBrush="#4F6B87"
+                                                    BorderThickness="1" />
+                                            <TextBlock FontWeight="SemiBold" Text="Timeline 01" />
+                                            <TextBlock Classes="section-meta" Text="Sequence" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" Classes="panel">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="section-title"
+                                   FontSize="12"
+                                   Text="Tool Rail" />
+
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsSelectToolActive}"
+                                Padding="8"
+                                Command="{Binding SelectToolCommand}"
+                                CommandParameter="Select">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Select" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Pointer" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsBladeToolActive}"
+                                Padding="8"
+                                Command="{Binding SelectToolCommand}"
+                                CommandParameter="Blade">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Blade" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Cut" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsSlipToolActive}"
+                                Padding="8"
+                                Command="{Binding SelectToolCommand}"
+                                CommandParameter="Slip">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Slip" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Shift" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="transport"
+                                Classes.active-chip="{Binding IsRollToolActive}"
+                                Padding="8"
+                                Command="{Binding SelectToolCommand}"
+                                CommandParameter="Roll">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" HorizontalAlignment="Center" Text="Roll" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Edge" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <Border Grid.Column="1" Classes="panel">
                 <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="12">

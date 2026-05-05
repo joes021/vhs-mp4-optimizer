@@ -33,6 +33,10 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"Effects Library\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Edit Index\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mixer\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Bins\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Clips\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Master\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Timeline 01\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"25 fps\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"{Binding SnapStatusText}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Linked Selection\"", markup, StringComparison.Ordinal);

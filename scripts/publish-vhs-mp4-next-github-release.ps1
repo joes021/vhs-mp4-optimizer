@@ -38,6 +38,38 @@ function ConvertTo-ProcessArgumentString {
     return ($quoted -join " ")
 }
 
+function Invoke-ResolvedCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $resolved = (Get-Command $Name -ErrorAction Stop).Source
+    $outputLines = @()
+
+    if ($resolved.EndsWith(".cmd", [System.StringComparison]::OrdinalIgnoreCase)) {
+        $directory = [System.IO.Path]::GetDirectoryName($resolved)
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($resolved)
+        $mockScript = Join-Path $directory ($baseName + "-mock.ps1")
+        if (Test-Path -LiteralPath $mockScript) {
+            $powershellExecutable = Join-Path $PSHOME "powershell.exe"
+            $outputLines = @(& $powershellExecutable -NoProfile -ExecutionPolicy Bypass -File $mockScript @Arguments 2>&1)
+            return [pscustomobject]@{
+                ExitCode = $LASTEXITCODE
+                Output = $outputLines
+            }
+        }
+    }
+
+    $outputLines = @(& $resolved @Arguments 2>&1)
+    return [pscustomobject]@{
+        ExitCode = $LASTEXITCODE
+        Output = $outputLines
+    }
+}
+
 function Invoke-Gh {
     param(
         [Parameter(Mandatory = $true)]
@@ -45,20 +77,10 @@ function Invoke-Gh {
         [switch]$Quiet
     )
 
-    $stdoutPath = [System.IO.Path]::GetTempFileName()
-    $stderrPath = [System.IO.Path]::GetTempFileName()
-
     try {
-        $argumentString = ConvertTo-ProcessArgumentString -Arguments $Arguments
-        $process = Start-Process -FilePath "gh" -ArgumentList $argumentString -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
-        $exitCode = $process.ExitCode
-        $outputLines = @()
-        if (Test-Path -LiteralPath $stdoutPath) {
-            $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
-        }
-        if (Test-Path -LiteralPath $stderrPath) {
-            $outputLines += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
-        }
+        $result = Invoke-ResolvedCommand -Name "gh" -Arguments $Arguments
+        $outputLines = @($result.Output)
+        $exitCode = [int]$result.ExitCode
 
         if (-not $Quiet -and $null -ne $outputLines) {
             foreach ($line in @($outputLines)) {
@@ -70,9 +92,7 @@ function Invoke-Gh {
 
         return [int]$exitCode
     }
-    finally {
-        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
-    }
+    finally { }
 }
 
 function Invoke-Git {
@@ -82,20 +102,10 @@ function Invoke-Git {
         [switch]$Quiet
     )
 
-    $stdoutPath = [System.IO.Path]::GetTempFileName()
-    $stderrPath = [System.IO.Path]::GetTempFileName()
-
     try {
-        $argumentString = ConvertTo-ProcessArgumentString -Arguments $Arguments
-        $process = Start-Process -FilePath "git" -ArgumentList $argumentString -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
-        $exitCode = $process.ExitCode
-        $outputLines = @()
-        if (Test-Path -LiteralPath $stdoutPath) {
-            $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
-        }
-        if (Test-Path -LiteralPath $stderrPath) {
-            $outputLines += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
-        }
+        $result = Invoke-ResolvedCommand -Name "git" -Arguments $Arguments
+        $outputLines = @($result.Output)
+        $exitCode = [int]$result.ExitCode
 
         if (-not $Quiet -and $null -ne $outputLines) {
             foreach ($line in @($outputLines)) {
@@ -107,9 +117,7 @@ function Invoke-Git {
 
         return [int]$exitCode
     }
-    finally {
-        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
-    }
+    finally { }
 }
 
 function Test-GhReleaseExists {
