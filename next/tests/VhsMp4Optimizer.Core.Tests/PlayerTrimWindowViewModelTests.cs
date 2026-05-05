@@ -525,6 +525,29 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task PreviousCutCommand_and_NextCutCommand_should_jump_between_timeline_boundaries()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 240d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 200d;
+
+        await viewModel.PreviousCutCommand.ExecuteAsync(null);
+        Assert.Equal(120d, viewModel.PreviewVirtualSeconds, 3);
+
+        await viewModel.NextCutCommand.ExecuteAsync(null);
+        Assert.Equal(240d, viewModel.PreviewVirtualSeconds, 3);
+    }
+
+    [Fact]
     public async Task ToggleKeepCutCommand_should_switch_selected_segment_to_cut()
     {
         var queueItem = BuildQueueItem();

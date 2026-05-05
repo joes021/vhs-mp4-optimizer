@@ -108,6 +108,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         ClearCropCommand = new AsyncRelayCommand(ClearCropAsync);
         SetInPointCommand = new RelayCommand(SetInPointFromCurrent);
         SetOutPointCommand = new RelayCommand(SetOutPointFromCurrent);
+        PreviousCutCommand = new AsyncRelayCommand(GoToPreviousCutAsync, CanJumpToPreviousCut);
+        NextCutCommand = new AsyncRelayCommand(GoToNextCutAsync, CanJumpToNextCut);
         PlayCommand = new RelayCommand(StartPlayback, CanStartPlayback);
         PauseCommand = new RelayCommand(PausePlayback, CanPausePlayback);
         SelectModeCommand = new RelayCommand<string?>(SelectMode);
@@ -218,6 +220,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IRelayCommand SetInPointCommand { get; }
 
     public IRelayCommand SetOutPointCommand { get; }
+
+    public IAsyncRelayCommand PreviousCutCommand { get; }
+
+    public IAsyncRelayCommand NextCutCommand { get; }
 
     public IRelayCommand PlayCommand { get; }
 
@@ -428,6 +434,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         RollRightCommand.NotifyCanExecuteChanged();
         SlipLeftCommand.NotifyCanExecuteChanged();
         SlipRightCommand.NotifyCanExecuteChanged();
+        PreviousCutCommand.NotifyCanExecuteChanged();
+        NextCutCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
         SyncSelectedTimelineBlock();
@@ -755,12 +763,66 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         await CommitPreviewSliderAsync();
     }
 
+    private bool CanJumpToPreviousCut() => GetPreviousCutSeconds().HasValue;
+
+    private bool CanJumpToNextCut() => GetNextCutSeconds().HasValue;
+
+    private async Task GoToPreviousCutAsync()
+    {
+        var previousCut = GetPreviousCutSeconds();
+        if (!previousCut.HasValue)
+        {
+            return;
+        }
+
+        SetPreviewVirtualSecondsSilently(previousCut.Value);
+        await CommitPreviewSliderAsync();
+        EditorHint = $"Skok na prethodni rez | virtual {PreviewVirtualTimeText}";
+    }
+
+    private async Task GoToNextCutAsync()
+    {
+        var nextCut = GetNextCutSeconds();
+        if (!nextCut.HasValue)
+        {
+            return;
+        }
+
+        SetPreviewVirtualSecondsSilently(nextCut.Value);
+        await CommitPreviewSliderAsync();
+        EditorHint = $"Skok na sledeci rez | virtual {PreviewVirtualTimeText}";
+    }
+
     private async Task StepFramesAsync(int frameDelta)
     {
         var frameRate = Math.Max(1d, Item.MediaInfo?.FrameRate ?? 25d);
         var stepSeconds = frameDelta / frameRate;
         SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum));
         await CommitPreviewSliderAsync();
+    }
+
+    private double? GetPreviousCutSeconds()
+    {
+        var previousCuts = GetCutBoundaries()
+            .Where(boundary => boundary < PreviewVirtualSeconds - 0.0001d)
+            .ToList();
+
+        return previousCuts.Count == 0 ? null : previousCuts[^1];
+    }
+
+    private double? GetNextCutSeconds()
+    {
+        return GetCutBoundaries()
+            .FirstOrDefault(boundary => boundary > PreviewVirtualSeconds + 0.0001d);
+    }
+
+    private IReadOnlyList<double> GetCutBoundaries()
+    {
+        return Timeline.Segments
+            .OrderBy(segment => segment.TimelineStartSeconds)
+            .Select(segment => Math.Max(0d, segment.TimelineStartSeconds))
+            .Distinct()
+            .ToList();
     }
 
     private bool CanStartPlayback() => !IsPlaying && PreviewVirtualMaximum > 0 && !_previewBusy;

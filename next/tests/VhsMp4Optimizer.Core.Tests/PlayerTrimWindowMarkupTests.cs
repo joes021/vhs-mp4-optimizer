@@ -402,6 +402,10 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Command=\"{Binding SetInPointCommand}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mark Out\"", markup, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding SetOutPointCommand}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Prev Cut\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding PreviousCutCommand}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Next Cut\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding NextCutCommand}\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
