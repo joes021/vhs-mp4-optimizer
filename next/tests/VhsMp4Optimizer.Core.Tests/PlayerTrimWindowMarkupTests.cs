@@ -383,6 +383,17 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_inspector_section_status_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Section Status\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Open\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Keyframed\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Bypassed\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
