@@ -209,6 +209,22 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ToggleLoopPlaybackCommand_should_update_loop_playback_state_and_hint()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.ToggleLoopPlaybackCommand.Execute(null);
+
+        Assert.True(viewModel.IsLoopPlaybackEnabled);
+        Assert.Contains("loop", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SelectZoomPresetCommand_should_rebuild_timeline_block_widths()
     {
         var queueItem = BuildQueueItem();

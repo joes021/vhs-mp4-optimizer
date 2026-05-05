@@ -119,6 +119,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SelectLaneTargetCommand = new RelayCommand<string?>(SelectLaneTarget);
         ToggleSnapCommand = new RelayCommand(ToggleSnap);
         ToggleLinkedSelectionCommand = new RelayCommand(ToggleLinkedSelection);
+        ToggleLoopPlaybackCommand = new RelayCommand(ToggleLoopPlayback);
         ToggleTrackLockCommand = new RelayCommand(ToggleTrackLock);
         ToggleTrackMuteCommand = new RelayCommand(ToggleTrackMute);
         ToggleTrackSoloCommand = new RelayCommand(ToggleTrackSolo);
@@ -239,6 +240,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public IRelayCommand ToggleLinkedSelectionCommand { get; }
 
+    public IRelayCommand ToggleLoopPlaybackCommand { get; }
+
     public IRelayCommand ToggleTrackLockCommand { get; }
 
     public IRelayCommand ToggleTrackMuteCommand { get; }
@@ -346,6 +349,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _isLinkedSelectionEnabled = true;
+
+    [ObservableProperty]
+    private bool _isLoopPlaybackEnabled;
 
     [ObservableProperty]
     private bool _isTrackLocked;
@@ -460,6 +466,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     partial void OnIsSnapEnabledChanged(bool value) => NotifyEditorChromeStateChanged();
 
     partial void OnIsLinkedSelectionEnabledChanged(bool value) => NotifyEditorChromeStateChanged();
+
+    partial void OnIsLoopPlaybackEnabledChanged(bool value) => NotifyEditorChromeStateChanged();
 
     partial void OnIsTrackLockedChanged(bool value) => NotifyEditorChromeStateChanged();
 
@@ -858,6 +866,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = IsLinkedSelectionEnabled
             ? "Linked selection je ukljucen."
             : "Linked selection je iskljucen.";
+    }
+
+    private void ToggleLoopPlayback()
+    {
+        IsLoopPlaybackEnabled = !IsLoopPlaybackEnabled;
+        EditorHint = IsLoopPlaybackEnabled
+            ? "Loop playback je ukljucen."
+            : "Loop playback je iskljucen.";
     }
 
     private void ToggleTrackLock()
