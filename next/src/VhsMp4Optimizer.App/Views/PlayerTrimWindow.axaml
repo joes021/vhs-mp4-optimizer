@@ -1131,6 +1131,26 @@
                 <Border Grid.Row="10" Classes="panel-muted">
                     <Grid ColumnDefinitions="2.2*,1.2*,1*" ColumnSpacing="12">
                         <StackPanel Spacing="4">
+                            <Border Classes="panel"
+                                    Padding="8,6"
+                                    CornerRadius="6"
+                                    Background="#16202B"
+                                    BorderBrush="#36506B">
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="field-label" Text="Record TC" />
+                                        <TextBlock Text="{Binding PreviewSourceTimeText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Classes="field-label" Text="Lane Target" />
+                                        <TextBlock Text="{Binding ActiveLaneTarget}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="2">
+                                        <TextBlock Classes="field-label" Text="Tool" />
+                                        <TextBlock Text="{Binding ActiveTool}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                             <TextBlock Classes="field-label" Text="Selection" />
                             <TextBlock Text="{Binding EditorHint}"
                                        TextWrapping="Wrap"
