@@ -374,6 +374,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public bool IsTrackLockActive => IsTrackLocked;
     public bool IsTrackMuteActive => IsTrackMuted;
     public bool IsTrackSoloActive => IsTrackSolo;
+    public string TimelineRulerLeftLabel => FormatTimelineRulerSeconds(0);
+    public string TimelineRulerCenterLabel => FormatTimelineRulerSeconds(GetTimelineRulerCenterSeconds());
+    public string TimelineRulerRightLabel => FormatTimelineRulerSeconds(GetTimelineRulerRightSeconds());
+    public string TimelineZoomSummary => $"View span {TimelineRulerLeftLabel} -> {TimelineRulerRightLabel}";
     public double TimelinePreferredWidth => ActiveZoomPreset switch
     {
         "1s" => 2200,
@@ -1020,6 +1024,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsTrackLockActive));
         OnPropertyChanged(nameof(IsTrackMuteActive));
         OnPropertyChanged(nameof(IsTrackSoloActive));
+        OnPropertyChanged(nameof(TimelineRulerLeftLabel));
+        OnPropertyChanged(nameof(TimelineRulerCenterLabel));
+        OnPropertyChanged(nameof(TimelineRulerRightLabel));
+        OnPropertyChanged(nameof(TimelineZoomSummary));
     }
 
     private void SelectTimelineBlock(TimelineBlockItemViewModel? block)
@@ -1040,6 +1048,24 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = $"{block.Label} segment selektovan | {block.Summary}";
         _ = CommitPreviewSliderAsync();
     }
+
+    private double GetTimelineRulerCenterSeconds() => ActiveZoomPreset switch
+    {
+        "1s" => 1d,
+        "5s" => 5d,
+        "10s" => 10d,
+        _ => Math.Max(0d, (Item.MediaInfo?.DurationSeconds ?? 0d) / 2d)
+    };
+
+    private double GetTimelineRulerRightSeconds() => ActiveZoomPreset switch
+    {
+        "1s" => 2d,
+        "5s" => 10d,
+        "10s" => 20d,
+        _ => Math.Max(0d, Item.MediaInfo?.DurationSeconds ?? 0d)
+    };
+
+    private static string FormatTimelineRulerSeconds(double seconds) => TimelineEditorService.FormatSeconds(Math.Max(0d, seconds));
 
     private async Task LoadPreviewAsync()
     {

@@ -620,6 +620,9 @@
                                 <TextBlock Text="Link" />
                                 <TextBlock Text="Zoom -" />
                                 <TextBlock Text="Zoom +" />
+                                <Border Classes="panel-muted" Padding="8,4">
+                                    <TextBlock Text="{Binding TimelineZoomSummary}" />
+                                </Border>
                                 <Button Classes="transport"
                                         Classes.active-chip="{Binding IsZoom1sActive}"
                                         Command="{Binding SelectZoomPresetCommand}"
@@ -688,13 +691,13 @@
                                     Opacity="0.75"
                                     IsVisible="{Binding IsSnapEnabled}" />
                             <Border Grid.Row="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,4">
-                                <TextBlock HorizontalAlignment="Left" Text="00:00" />
+                                <TextBlock HorizontalAlignment="Left" Text="{Binding TimelineRulerLeftLabel}" />
                             </Border>
                             <Border Grid.Row="1" Grid.Column="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,4">
-                                <TextBlock HorizontalAlignment="Center" Text="00:30" />
+                                <TextBlock HorizontalAlignment="Center" Text="{Binding TimelineRulerCenterLabel}" />
                             </Border>
                             <Border Grid.Row="1" Grid.Column="2" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,4">
-                                <TextBlock HorizontalAlignment="Right" Text="01:00" />
+                                <TextBlock HorizontalAlignment="Right" Text="{Binding TimelineRulerRightLabel}" />
                             </Border>
                         </Grid>
                     </Grid>

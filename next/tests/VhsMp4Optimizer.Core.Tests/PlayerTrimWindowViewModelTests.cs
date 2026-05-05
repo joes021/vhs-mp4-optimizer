@@ -198,6 +198,33 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void SelectZoomPresetCommand_should_update_timeline_ruler_labels_and_zoom_summary()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectZoomPresetCommand.Execute("1s");
+        var zoom1Center = viewModel.TimelineRulerCenterLabel;
+        var zoom1Right = viewModel.TimelineRulerRightLabel;
+
+        viewModel.SelectZoomPresetCommand.Execute("10s");
+        var zoom10Center = viewModel.TimelineRulerCenterLabel;
+        var zoom10Right = viewModel.TimelineRulerRightLabel;
+
+        viewModel.SelectZoomPresetCommand.Execute("Full");
+
+        Assert.Equal("00:00:00.00", viewModel.TimelineRulerLeftLabel);
+        Assert.NotEqual(zoom1Center, zoom10Center);
+        Assert.NotEqual(zoom1Right, zoom10Right);
+        Assert.Contains("View span", viewModel.TimelineZoomSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("05:00", viewModel.TimelineRulerRightLabel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ToggleSnapCommand_should_update_snap_state_and_hint()
     {
         var queueItem = BuildQueueItem();
