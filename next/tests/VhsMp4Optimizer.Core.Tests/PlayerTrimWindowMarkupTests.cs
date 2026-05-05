@@ -324,6 +324,18 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_timeline_options_bar()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Timeline Options\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Track Height\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Clip Color\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Retime\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Selection Follows Playhead\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
