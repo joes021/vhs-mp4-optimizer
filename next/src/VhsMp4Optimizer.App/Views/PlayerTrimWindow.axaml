@@ -1397,7 +1397,7 @@
                 Margin="0,12,0,0"
                 Classes="panel-muted"
                 Padding="12,8">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                 <TextBlock Classes="field-label"
                            VerticalAlignment="Center"
                            Text="Page Switcher" />
@@ -1411,6 +1411,18 @@
                     <Button Classes="transport" Content="Color" />
                     <Button Classes="transport" Content="Fairlight" />
                     <Button Classes="transport" Content="Deliver" />
+                </StackPanel>
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            HorizontalAlignment="Right">
+                    <TextBlock Classes="field-label"
+                               VerticalAlignment="Center"
+                               Text="Utility Status" />
+                    <Button Classes="transport" Content="Render Cache" />
+                    <Button Classes="transport" Content="Proxy" />
+                    <Button Classes="transport" Content="Snapping" />
+                    <Button Classes="transport" Content="Linked Select" />
                 </StackPanel>
             </Grid>
         </Border>
