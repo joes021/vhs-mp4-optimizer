@@ -47,8 +47,6 @@ function Invoke-ResolvedCommand {
     )
 
     $resolved = (Get-Command $Name -ErrorAction Stop).Source
-    $outputLines = @()
-
     if ($resolved.EndsWith(".cmd", [System.StringComparison]::OrdinalIgnoreCase)) {
         $directory = [System.IO.Path]::GetDirectoryName($resolved)
         $baseName = [System.IO.Path]::GetFileNameWithoutExtension($resolved)
@@ -56,17 +54,35 @@ function Invoke-ResolvedCommand {
         if (Test-Path -LiteralPath $mockScript) {
             $powershellExecutable = Join-Path $PSHOME "powershell.exe"
             $outputLines = @(& $powershellExecutable -NoProfile -ExecutionPolicy Bypass -File $mockScript @Arguments 2>&1)
+            $exitCode = $LASTEXITCODE
             return [pscustomobject]@{
-                ExitCode = $LASTEXITCODE
+                ExitCode = $exitCode
                 Output = $outputLines
             }
         }
     }
 
-    $outputLines = @(& $resolved @Arguments 2>&1)
-    return [pscustomobject]@{
-        ExitCode = $LASTEXITCODE
-        Output = $outputLines
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+
+    try {
+        $argumentString = ConvertTo-ProcessArgumentString -Arguments $Arguments
+        $process = Start-Process -FilePath $resolved -ArgumentList $argumentString -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $outputLines = @()
+        if (Test-Path -LiteralPath $stdoutPath) {
+            $outputLines += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+        }
+        if (Test-Path -LiteralPath $stderrPath) {
+            $outputLines += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+        }
+
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Output = $outputLines
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
 
