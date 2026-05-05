@@ -1301,6 +1301,20 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
                 }
 
                 return true;
+            case Key.Space:
+                if (IsPlaying)
+                {
+                    if (PauseCommand.CanExecute(null))
+                    {
+                        PauseCommand.Execute(null);
+                    }
+                }
+                else if (PlayCommand.CanExecute(null))
+                {
+                    PlayCommand.Execute(null);
+                }
+
+                return true;
             case Key.Q:
                 if (PreviousCutCommand.CanExecute(null))
                 {

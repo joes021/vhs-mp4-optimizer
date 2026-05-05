@@ -694,6 +694,30 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleEditorHotkeyAsync_should_toggle_playback_with_spacebar()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-space-hotkey.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.Space);
+        Assert.True(viewModel.IsPlaying);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.Space);
+        Assert.False(viewModel.IsPlaying);
+    }
+
+    [Fact]
     public async Task ToggleKeepCutCommand_should_switch_selected_segment_to_cut()
     {
         var queueItem = BuildQueueItem();

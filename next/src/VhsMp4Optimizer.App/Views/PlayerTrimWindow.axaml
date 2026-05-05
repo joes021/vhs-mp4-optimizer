@@ -1026,6 +1026,7 @@
                                     <TextBlock Classes="section-meta" Text="J Back 25" />
                                     <TextBlock Classes="section-meta" Text="K Pause" />
                                     <TextBlock Classes="section-meta" Text="L Fwd 25" />
+                                    <TextBlock Classes="section-meta" Text="Space Play/Pause" />
                                     <TextBlock Classes="section-meta" Text="Ctrl+Z Undo" />
                                     <TextBlock Classes="section-meta" Text="Ctrl+Y Redo" />
                                 </StackPanel>

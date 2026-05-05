@@ -437,6 +437,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"J Back 25\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"K Pause\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"L Fwd 25\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Space Play/Pause\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Ctrl+Z Undo\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Ctrl+Y Redo\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Margin=\"0,64,0,0\"", markup, StringComparison.Ordinal);
