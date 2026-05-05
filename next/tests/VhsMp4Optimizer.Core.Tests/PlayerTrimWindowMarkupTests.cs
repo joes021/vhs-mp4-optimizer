@@ -348,6 +348,18 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_top_timeline_view_toolbar()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Timeline View\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Single Viewer\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Dual Viewer\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Inspector Right\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Mixer Right\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
