@@ -406,6 +406,18 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_timeline_patch_panel()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Patch Panel\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Src V1\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Src A1\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Dst V1\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Dst A1\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
