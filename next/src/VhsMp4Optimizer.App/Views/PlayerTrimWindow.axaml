@@ -360,6 +360,19 @@
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
+                                <Border Classes="panel-muted"
+                                        Padding="8,6"
+                                        Background="#141C26"
+                                        BorderBrush="#395170">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="8">
+                                        <TextBlock Classes="field-label" Text="Clip Info" />
+                                        <TextBlock Grid.Column="1" Text="Date Shot" />
+                                        <TextBlock Grid.Column="2" Classes="field-label" Text="Reel Name" />
+                                        <TextBlock Grid.Column="3" Text="Master" />
+                                        <TextBlock Grid.Column="4" Classes="field-label" Text="Camera" />
+                                        <TextBlock Grid.Column="5" Text="DV Cam" />
+                                    </Grid>
+                                </Border>
                             </StackPanel>
                         </Grid>
                     </StackPanel>

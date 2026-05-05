@@ -372,6 +372,17 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_media_pool_clip_info_footer()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Clip Info\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Date Shot\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Reel Name\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Camera\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
