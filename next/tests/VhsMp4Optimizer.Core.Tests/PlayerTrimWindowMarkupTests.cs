@@ -283,6 +283,20 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_stronger_media_pool_browser_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Browser\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Clips\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Timelines\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Smart Bins\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Filter\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Scene\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Reel\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
