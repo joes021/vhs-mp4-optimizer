@@ -1148,51 +1148,86 @@
                 </Border>
 
                 <Border Grid.Row="10" Classes="panel-muted">
-                    <Grid ColumnDefinitions="2.2*,1.2*,1*" ColumnSpacing="12">
-                        <StackPanel Spacing="4">
-                            <Border Classes="panel"
-                                    Padding="8,6"
-                                    CornerRadius="6"
-                                    Background="#16202B"
-                                    BorderBrush="#36506B">
-                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="10">
+                        <Border Classes="panel"
+                                Padding="8,6"
+                                CornerRadius="6"
+                                Background="#16202B"
+                                BorderBrush="#36506B">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                <TextBlock FontWeight="SemiBold" VerticalAlignment="Center" Text="Timeline Navigator" />
+                                <Border Grid.Column="1"
+                                        Background="#0D131A"
+                                        BorderBrush="#33465C"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Height="18"
+                                        VerticalAlignment="Center">
+                                    <Grid>
+                                        <Border Background="#223246"
+                                                Margin="6,3"
+                                                CornerRadius="4"
+                                                Opacity="0.75" />
+                                        <Border x:Name="TimelineNavigatorThumb"
+                                                Width="160"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,2"
+                                                Background="#4F84C4"
+                                                BorderBrush="#C5DCF8"
+                                                BorderThickness="1"
+                                                CornerRadius="4" />
+                                    </Grid>
+                                </Border>
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Full Timeline" />
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="1" ColumnDefinitions="2.2*,1.2*,1*" ColumnSpacing="12">
+                            <StackPanel Spacing="4">
+                                <Border Classes="panel"
+                                        Padding="8,6"
+                                        CornerRadius="6"
+                                        Background="#16202B"
+                                        BorderBrush="#36506B">
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Classes="field-label" Text="Record TC" />
+                                            <TextBlock Text="{Binding PreviewSourceTimeText}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Classes="field-label" Text="Lane Target" />
+                                            <TextBlock Text="{Binding ActiveLaneTarget}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="2">
+                                            <TextBlock Classes="field-label" Text="Tool" />
+                                            <TextBlock Text="{Binding ActiveTool}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <TextBlock Classes="field-label" Text="Selection" />
+                                <TextBlock Text="{Binding EditorHint}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                                <Border Classes="panel"
+                                        Padding="8,6"
+                                        CornerRadius="6"
+                                        Background="#16202B"
+                                        BorderBrush="#36506B">
                                     <StackPanel Spacing="2">
-                                        <TextBlock Classes="field-label" Text="Record TC" />
-                                        <TextBlock Text="{Binding PreviewSourceTimeText}" />
+                                        <TextBlock Classes="field-label" Text="Selected Clip" />
+                                        <TextBlock Text="{Binding SelectedClipSummary}" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Spacing="2">
-                                        <TextBlock Classes="field-label" Text="Lane Target" />
-                                        <TextBlock Text="{Binding ActiveLaneTarget}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Spacing="2">
-                                        <TextBlock Classes="field-label" Text="Tool" />
-                                        <TextBlock Text="{Binding ActiveTool}" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                            <TextBlock Classes="field-label" Text="Selection" />
-                            <TextBlock Text="{Binding EditorHint}"
-                                       TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                            <Border Classes="panel"
-                                    Padding="8,6"
-                                    CornerRadius="6"
-                                    Background="#16202B"
-                                    BorderBrush="#36506B">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Classes="field-label" Text="Selected Clip" />
-                                    <TextBlock Text="{Binding SelectedClipSummary}" />
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="4">
-                            <TextBlock Classes="field-label" Text="Playhead" />
-                            <TextBlock Text="{Binding PreviewVirtualTimeText}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="4">
-                            <TextBlock Classes="field-label" Text="Mode" />
-                            <TextBlock Text="Trim / Timeline" />
-                        </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Classes="field-label" Text="Playhead" />
+                                <TextBlock Text="{Binding PreviewVirtualTimeText}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Classes="field-label" Text="Mode" />
+                                <TextBlock Text="Trim / Timeline" />
+                            </StackPanel>
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>
