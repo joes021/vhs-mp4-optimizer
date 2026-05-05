@@ -1266,6 +1266,41 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             case Key.O:
                 SetOutPointFromCurrent();
                 return true;
+            case Key.Home:
+                if (GoToStartCommand.CanExecute(null))
+                {
+                    await GoToStartCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            case Key.End:
+                if (GoToEndCommand.CanExecute(null))
+                {
+                    await GoToEndCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            case Key.J:
+                if (Back25FramesCommand.CanExecute(null))
+                {
+                    await Back25FramesCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            case Key.K:
+                if (PauseCommand.CanExecute(null))
+                {
+                    PauseCommand.Execute(null);
+                }
+
+                return true;
+            case Key.L:
+                if (Forward25FramesCommand.CanExecute(null))
+                {
+                    await Forward25FramesCommand.ExecuteAsync(null);
+                }
+
+                return true;
             case Key.Q:
                 if (PreviousCutCommand.CanExecute(null))
                 {

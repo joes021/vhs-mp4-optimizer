@@ -656,6 +656,44 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleEditorHotkeyAsync_should_support_home_and_end_navigation()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 90d;
+
+        await viewModel.HandleEditorHotkeyAsync(Key.Home);
+        Assert.Equal(0d, viewModel.PreviewVirtualSeconds, 3);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.End);
+        Assert.Equal(viewModel.PreviewVirtualMaximum, viewModel.PreviewVirtualSeconds, 3);
+    }
+
+    [Fact]
+    public async Task HandleEditorHotkeyAsync_should_support_jkl_transport_navigation()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 100d;
+
+        await viewModel.HandleEditorHotkeyAsync(Key.J);
+        Assert.Equal(99d, viewModel.PreviewVirtualSeconds, 3);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.L);
+        Assert.Equal(100d, viewModel.PreviewVirtualSeconds, 3);
+    }
+
+    [Fact]
     public async Task ToggleKeepCutCommand_should_switch_selected_segment_to_cut()
     {
         var queueItem = BuildQueueItem();
