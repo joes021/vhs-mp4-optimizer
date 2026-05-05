@@ -66,19 +66,19 @@
         </Style>
 
         <Style Selector="Button.transport:pointerover">
-            <Setter Property="Background" Value="#214E2E" />
-            <Setter Property="BorderBrush" Value="#7FD497" />
+            <Setter Property="Background" Value="#14532D" />
+            <Setter Property="BorderBrush" Value="#91E7AA" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:pressed">
-            <Setter Property="Background" Value="#163721" />
-            <Setter Property="BorderBrush" Value="#A4F0BE" />
+            <Setter Property="Background" Value="#0E3B20" />
+            <Setter Property="BorderBrush" Value="#C9F8D7" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:disabled">
-            <Setter Property="Background" Value="#284233" />
+            <Setter Property="Background" Value="#274533" />
             <Setter Property="BorderBrush" Value="#5C7B68" />
             <Setter Property="Foreground" Value="#F1FFF4" />
             <Setter Property="Opacity" Value="1" />
@@ -92,19 +92,19 @@
 
         <Style Selector="Button.transport.functional">
             <Setter Property="Background" Value="#1D6B36" />
-            <Setter Property="BorderBrush" Value="#73DA93" />
+            <Setter Property="BorderBrush" Value="#7EE49D" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional:pointerover">
-            <Setter Property="Background" Value="#214E2E" />
-            <Setter Property="BorderBrush" Value="#B1F1C4" />
+            <Setter Property="Background" Value="#14532D" />
+            <Setter Property="BorderBrush" Value="#B7F2C9" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional:pressed">
-            <Setter Property="Background" Value="#163721" />
-            <Setter Property="BorderBrush" Value="#D1F9DD" />
+            <Setter Property="Background" Value="#0E3B20" />
+            <Setter Property="BorderBrush" Value="#D8FAE2" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
@@ -115,7 +115,7 @@
         </Style>
 
         <Style Selector="Button.transport.functional:disabled">
-            <Setter Property="Background" Value="#284233" />
+            <Setter Property="Background" Value="#274533" />
             <Setter Property="BorderBrush" Value="#5C7B68" />
             <Setter Property="Foreground" Value="#F1FFF4" />
             <Setter Property="Opacity" Value="1" />
@@ -440,14 +440,13 @@
                                    Text="Tool Rail" />
 
                         <Grid x:Name="ToolRailGrid"
-                              ColumnDefinitions="*,*"
-                              RowDefinitions="Auto,Auto"
+                              ColumnDefinitions="*"
+                              RowDefinitions="Auto,Auto,Auto,Auto"
                               ColumnSpacing="8"
                               RowSpacing="8">
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsSelectToolActive}"
                                     Grid.Row="0"
-                                    Grid.Column="0"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Select">
@@ -459,8 +458,7 @@
 
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsBladeToolActive}"
-                                    Grid.Row="0"
-                                    Grid.Column="1"
+                                    Grid.Row="1"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Blade">
@@ -472,8 +470,7 @@
 
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsSlipToolActive}"
-                                    Grid.Row="1"
-                                    Grid.Column="0"
+                                    Grid.Row="2"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Slip">
@@ -485,8 +482,7 @@
 
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsRollToolActive}"
-                                    Grid.Row="1"
-                                    Grid.Column="1"
+                                    Grid.Row="3"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Roll">
@@ -501,7 +497,7 @@
             </Grid>
 
             <Border Grid.Column="1" Classes="panel">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="12">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Classes="transport functional"
@@ -544,21 +540,9 @@
                         </Border>
                     </Grid>
 
-                    <Border Grid.Row="1" Classes="panel-muted" Padding="10,6">
-                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10">
-                            <TextBlock FontWeight="SemiBold" Text="Monitor Timecode" />
-                            <TextBlock Grid.Column="1" Text="Source TC" />
-                            <TextBlock Grid.Column="2"
-                                       HorizontalAlignment="Center"
-                                       Text="Record TC" />
-                            <TextBlock Grid.Column="3" Text="Safe Area On" />
-                            <TextBlock Grid.Column="4" Text="Proxy: Off" />
-                        </Grid>
-                    </Border>
-
                     <Border x:Name="PrimaryProgramMonitor"
-                            Grid.Row="2"
-                            Height="248"
+                            Grid.Row="1"
+                            Height="240"
                             Background="#05080D"
                             BorderBrush="#293445"
                             BorderThickness="1"
@@ -569,9 +553,9 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     MaxWidth="1120"
-                                    MaxHeight="220"
+                                    MaxHeight="208"
                                     Width="1120"
-                                    Height="220"
+                                    Height="208"
                                     Background="#05080D"
                                     BorderBrush="#293445"
                                     BorderThickness="1"
@@ -589,39 +573,24 @@
                                            HorizontalAlignment="Stretch"
                                            VerticalAlignment="Stretch"
                                            Stretch="Uniform" />
-                                    <Border HorizontalAlignment="Right"
-                                            VerticalAlignment="Top"
-                                            Margin="12"
-                                            Background="#8C0B1220"
-                                            BorderBrush="#395170"
-                                            BorderThickness="1"
-                                            CornerRadius="6"
-                                            Padding="8,5">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock FontWeight="SemiBold" Text="TC" />
-                                            <TextBlock Text="{Binding PreviewSourceTimeText}" />
-                                        </StackPanel>
-                                    </Border>
                                 </Grid>
                             </Border>
                         </Grid>
                     </Border>
 
-                    <Border x:Name="PreviewScrubBar" Grid.Row="3" Classes="panel-muted" Padding="12,8">
-                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
-                        <TextBlock VerticalAlignment="Center" Classes="field-label" Text="Preview Timeline" />
-                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding PreviewVirtualTimeText}" />
-                        <Slider Grid.Column="2"
+                    <Border x:Name="PreviewScrubBar" Grid.Row="2" Classes="panel-muted" Padding="12,8">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding PreviewVirtualTimeText}" />
+                        <Slider Grid.Column="1"
                                 Minimum="0"
                                 Maximum="{Binding PreviewVirtualMaximum}"
                                 Value="{Binding PreviewVirtualSeconds, Mode=TwoWay}"
                                 PointerPressed="PreviewSliderPointerPressed"
                                 PointerReleased="PreviewSliderPointerReleased" />
-                        <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding PreviewDurationText}" />
                     </Grid>
                     </Border>
 
-                    <Border x:Name="MonitorTransportBand" Grid.Row="4" Classes="panel-muted" Margin="0,8,0,0" Padding="12,10">
+                    <Border x:Name="MonitorTransportBand" Grid.Row="3" Classes="panel-muted" Margin="0,16,0,0" Padding="12,10">
                         <StackPanel Spacing="10">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Classes="field-label" VerticalAlignment="Center" Text="Monitor Transport" />
@@ -971,7 +940,7 @@
                                 Background="#0D131A"
                                 BorderBrush="#314055">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-                                <TextBlock FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" Text="Time Ruler" />
+                                <TextBlock FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" Text="Time Ruler" />
                             </StackPanel>
                         </Border>
 
@@ -983,9 +952,9 @@
                                     BorderBrush="#22D3EE"
                                     BorderThickness="1"
                                     CornerRadius="8"
-                                    Padding="8,3"
+                                    Padding="8,2"
                                     Margin="0,0,0,4">
-                                <TextBlock FontSize="11"
+                                <TextBlock FontSize="10"
                                            FontWeight="SemiBold"
                                            Text="{Binding PreviewVirtualTimeText}" />
                             </Border>
@@ -1005,14 +974,14 @@
                                     Background="#4DD0E1"
                                     Opacity="0.75"
                                     IsVisible="False" />
-                            <Border Grid.Row="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,2">
-                                <TextBlock FontSize="11" HorizontalAlignment="Left" Text="{Binding TimelineRulerLeftLabel}" />
+                            <Border Grid.Row="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,1">
+                                <TextBlock FontSize="10" HorizontalAlignment="Left" Text="{Binding TimelineRulerLeftLabel}" />
                             </Border>
-                            <Border Grid.Row="1" Grid.Column="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,2">
-                                <TextBlock FontSize="11" HorizontalAlignment="Center" Text="{Binding TimelineRulerCenterLabel}" />
+                            <Border Grid.Row="1" Grid.Column="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,1">
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="{Binding TimelineRulerCenterLabel}" />
                             </Border>
-                            <Border Grid.Row="1" Grid.Column="2" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,2">
-                                <TextBlock FontSize="11" HorizontalAlignment="Right" Text="{Binding TimelineRulerRightLabel}" />
+                            <Border Grid.Row="1" Grid.Column="2" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,1">
+                                <TextBlock FontSize="10" HorizontalAlignment="Right" Text="{Binding TimelineRulerRightLabel}" />
                             </Border>
                         </Grid>
                     </Grid>
@@ -1086,7 +1055,7 @@
                                         <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
                                             <Button Width="{Binding WidthPixels}"
                                                     MinWidth="96"
-                                                    Height="72"
+                                                    Height="84"
                                                     Padding="0"
                                                     PointerPressed="TimelineBlockPointerPressed"
                                                     Background="{Binding BackgroundBrush}"

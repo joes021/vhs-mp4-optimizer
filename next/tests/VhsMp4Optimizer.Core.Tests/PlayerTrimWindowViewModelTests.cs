@@ -545,6 +545,25 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleTimelineBlockPointerAsync_should_scrub_without_split_when_select_tool_is_active()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        var firstBlock = viewModel.TimelineBlocks[0];
+        viewModel.SelectToolCommand.Execute("Select");
+
+        await viewModel.HandleTimelineBlockPointerAsync(firstBlock, 0.5d);
+
+        Assert.Single(viewModel.Timeline.Segments);
+        Assert.Equal(150d, viewModel.PreviewVirtualSeconds, 3);
+    }
+
+    [Fact]
     public async Task PreviousCutCommand_and_NextCutCommand_should_jump_between_timeline_boundaries()
     {
         var queueItem = BuildQueueItem();

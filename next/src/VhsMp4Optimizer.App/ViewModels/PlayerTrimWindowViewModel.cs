@@ -1273,8 +1273,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         {
             _previewBusy = true;
             IsPreviewLoading = true;
-            IsPreviewImageVisible = true;
-            IsVideoPlaybackVisible = false;
             PlayCommand.NotifyCanExecuteChanged();
             var previewPath = await _previewFrameService.RenderPreviewAsync(_ffmpegPath, Item.MediaInfo, sourceSeconds, BuildTransformSettings(), token);
             if (token.IsCancellationRequested)
@@ -1301,6 +1299,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
                 var previous = PreviewBitmap;
                 PreviewBitmap = bitmap;
                 previous?.Dispose();
+                DetachPlaybackSurface();
+                IsVideoPlaybackVisible = false;
+                IsPreviewImageVisible = true;
             });
         }
         catch (OperationCanceledException)
@@ -1639,9 +1640,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         _playbackTimer.Stop();
         _playbackMediaPlayer?.Pause();
         IsPlaying = false;
-        IsVideoPlaybackVisible = false;
-        IsPreviewImageVisible = true;
-        DetachPlaybackSurface();
         _awaitingPlaybackFrame = false;
         _unmuteWhenPlaybackFrameArrives = false;
         _pendingPlaybackSeekMilliseconds = null;
