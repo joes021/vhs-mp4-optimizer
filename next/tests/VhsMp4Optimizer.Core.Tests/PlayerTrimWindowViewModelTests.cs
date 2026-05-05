@@ -367,6 +367,32 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void PlaybackSurfaceBinding_should_attach_only_during_playback_and_detach_on_pause()
+    {
+        var ffmpegPath = FfmpegLocator.Resolve();
+        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+        {
+            return;
+        }
+
+        var sourcePath = CreateRealVideo("playback-surface-binding.avi", ffmpegPath);
+        var queueItem = BuildQueueItem(sourcePath);
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        Assert.Null(viewModel.PlaybackMediaPlayerBinding);
+
+        viewModel.PlayCommand.Execute(null);
+        Assert.NotNull(viewModel.PlaybackMediaPlayerBinding);
+
+        viewModel.PauseCommand.Execute(null);
+        Assert.Null(viewModel.PlaybackMediaPlayerBinding);
+    }
+
+    [Fact]
     public void BeginManualPreviewNavigation_should_leave_playback_mode_and_return_to_trim_preview()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
@@ -476,6 +502,26 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.Equal(2, savedTimeline!.Segments.Count);
         Assert.All(savedTimeline.Segments, segment => Assert.Equal(TimelineSegmentKind.Keep, segment.Kind));
         Assert.Equal(120d, savedTimeline.Segments[1].TimelineStartSeconds, 3);
+    }
+
+    [Fact]
+    public async Task TimelineBlockActionCommand_should_split_clip_at_playhead_when_razor_tool_is_active()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        var firstBlock = viewModel.TimelineBlocks[0];
+        viewModel.SelectToolCommand.Execute("Blade");
+        viewModel.PreviewVirtualSeconds = 120d;
+
+        await viewModel.TimelineBlockActionCommand.ExecuteAsync(firstBlock);
+
+        Assert.Equal(2, viewModel.Timeline.Segments.Count);
+        Assert.Equal(120d, viewModel.Timeline.Segments[1].TimelineStartSeconds, 3);
     }
 
     [Fact]

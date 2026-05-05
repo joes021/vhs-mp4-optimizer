@@ -35,6 +35,11 @@ public sealed class PreviewFrameService : IPreviewFrameService
             filters.Add($"crop=in_w-{crop.Left + crop.Right}:in_h-{crop.Top + crop.Bottom}:{crop.Left}:{crop.Top}");
         }
 
+        if (ShouldUsePreviewDeinterlace(mediaInfo))
+        {
+            filters.Add("yadif=0:-1:0");
+        }
+
         filters.Add("scale=960:-2");
         var args = new List<string>
         {
@@ -125,5 +130,15 @@ public sealed class PreviewFrameService : IPreviewFrameService
             ? "aspect-auto"
             : "aspect-" + SanitizePreviewCacheComponent(transformSettings.AspectMode);
         return $"{cropSuffix}-{aspectSuffix}";
+    }
+
+    internal static bool ShouldUsePreviewDeinterlace(MediaInfo mediaInfo)
+    {
+        if (string.Equals(mediaInfo.VideoCodec, "dvvideo", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(mediaInfo.Container, "avi", StringComparison.OrdinalIgnoreCase);
     }
 }

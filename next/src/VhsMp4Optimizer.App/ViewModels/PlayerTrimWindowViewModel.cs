@@ -91,7 +91,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         MoveLeftCommand = new AsyncRelayCommand(MoveLeftAsync, CanModifySelectedSegment);
         MoveRightCommand = new AsyncRelayCommand(MoveRightAsync, CanModifySelectedSegment);
         SaveToQueueCommand = new RelayCommand(SaveToQueue);
-        SelectTimelineBlockCommand = new RelayCommand<TimelineBlockItemViewModel?>(SelectTimelineBlock);
+        SelectTimelineBlockCommand = new RelayCommand<TimelineBlockItemViewModel?>(block => SelectTimelineBlock(block));
+        TimelineBlockActionCommand = new AsyncRelayCommand<TimelineBlockItemViewModel?>(HandleTimelineBlockActionAsync);
 
         GoToStartCommand = new AsyncRelayCommand(GoToStartAsync);
         GoToEndCommand = new AsyncRelayCommand(GoToEndAsync);
@@ -187,6 +188,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public IRelayCommand SaveToQueueCommand { get; }
 
     public IRelayCommand<TimelineBlockItemViewModel?> SelectTimelineBlockCommand { get; }
+
+    public IAsyncRelayCommand<TimelineBlockItemViewModel?> TimelineBlockActionCommand { get; }
 
     public IAsyncRelayCommand GoToStartCommand { get; }
 
@@ -400,6 +403,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public string TimelineRulerCenterLabel => FormatTimelineRulerSeconds(GetTimelineRulerCenterSeconds());
     public string TimelineRulerRightLabel => FormatTimelineRulerSeconds(GetTimelineRulerRightSeconds());
     public string TimelineZoomSummary => $"View span {TimelineRulerLeftLabel} -> {TimelineRulerRightLabel}";
+    public string PreviewDurationText => TimelineEditorService.FormatSeconds(Math.Max(0d, PreviewVirtualMaximum));
     public double TimelinePreferredWidth => ActiveZoomPreset switch
     {
         "1s" => 2200,
@@ -914,6 +918,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        AttachPlaybackSurface();
         var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
         _lastRequestedSourceSeconds = sourceSeconds;
         _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
@@ -1043,6 +1048,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         var keepDuration = TimelineEditorService.GetKeptDurationSeconds(Timeline);
         PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
+        OnPropertyChanged(nameof(PreviewDurationText));
         UpdatePreviewTimeTexts();
         UpdateSelectedClipSummary();
     }
@@ -1089,7 +1095,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(TimelineZoomSummary));
     }
 
-    private void SelectTimelineBlock(TimelineBlockItemViewModel? block)
+    private void SelectTimelineBlock(TimelineBlockItemViewModel? block, bool syncPlayhead = true)
     {
         if (block is null)
         {
@@ -1103,9 +1109,32 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         SelectedSegment = segment;
-        SetPreviewVirtualSecondsSilently(Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum));
         EditorHint = $"{block.Label} segment selektovan | {block.Summary}";
+
+        if (!syncPlayhead)
+        {
+            return;
+        }
+
+        SetPreviewVirtualSecondsSilently(Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum));
         _ = CommitPreviewSliderAsync();
+    }
+
+    private async Task HandleTimelineBlockActionAsync(TimelineBlockItemViewModel? block)
+    {
+        if (block is null)
+        {
+            return;
+        }
+
+        if (string.Equals(ActiveTool, "Blade", StringComparison.Ordinal))
+        {
+            SelectTimelineBlock(block, syncPlayhead: false);
+            await SplitAtPlayheadAsync();
+            return;
+        }
+
+        SelectTimelineBlock(block);
     }
 
     private double GetTimelineRulerCenterSeconds() => ActiveZoomPreset switch
@@ -1352,7 +1381,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             {
                 EnableHardwareDecoding = true
             };
-            PlaybackMediaPlayerBinding = _playbackMediaPlayer;
             EnsurePlaybackMediaLoaded();
         }
         catch (Exception ex)
@@ -1524,6 +1552,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         IsPlaying = false;
         IsVideoPlaybackVisible = false;
         IsPreviewImageVisible = true;
+        DetachPlaybackSurface();
         _awaitingPlaybackFrame = false;
         _unmuteWhenPlaybackFrameArrives = false;
         _pendingPlaybackSeekMilliseconds = null;
@@ -1553,10 +1582,27 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         _previewDebounceCts?.Dispose();
         _playbackTimer.Stop();
         _playbackTimer.Tick -= PlaybackTimerOnTick;
+        DetachPlaybackSurface();
         _playbackMediaPlayer?.Stop();
         _playbackMedia?.Dispose();
         _playbackMediaPlayer?.Dispose();
         _libVlc?.Dispose();
         PreviewBitmap?.Dispose();
+    }
+
+    private void AttachPlaybackSurface()
+    {
+        if (_playbackMediaPlayer is not null && !ReferenceEquals(PlaybackMediaPlayerBinding, _playbackMediaPlayer))
+        {
+            PlaybackMediaPlayerBinding = _playbackMediaPlayer;
+        }
+    }
+
+    private void DetachPlaybackSurface()
+    {
+        if (PlaybackMediaPlayerBinding is not null)
+        {
+            PlaybackMediaPlayerBinding = null;
+        }
     }
 }
