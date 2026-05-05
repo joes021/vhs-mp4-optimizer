@@ -541,6 +541,24 @@
                     <StackPanel Spacing="10">
                         <TextBlock Classes="section-title" Text="Transform" />
 
+                        <Border Classes="panel-muted">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Text="Zoom X" />
+                                    <TextBox Grid.Column="1" Text="1.000" />
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Zoom Y" />
+                                    <TextBox Grid.Column="3" Text="1.000" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,70,Auto,70" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Text="Position X" />
+                                    <TextBox Grid.Column="1" Text="0.000" />
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Position Y" />
+                                    <TextBox Grid.Column="3" Text="0.000" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Classes="field-label" Text="Cropping" />
                         <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
                             <TextBlock VerticalAlignment="Center" Text="Aspect" />
                             <ComboBox Grid.Column="1" ItemsSource="{Binding AspectModes}" SelectedItem="{Binding SelectedAspectMode}" />
@@ -565,6 +583,22 @@
                             <Button Grid.Column="1" Classes="transport" Content="Auto Crop" Command="{Binding AutoCropCommand}" />
                             <Button Grid.Column="2" Classes="transport" Content="Clear Crop" Command="{Binding ClearCropCommand}" />
                         </Grid>
+
+                        <TextBlock Classes="field-label" Text="Composite" />
+                        <Border Classes="panel-muted">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <TextBlock VerticalAlignment="Center" Text="Mode" />
+                                <TextBox Grid.Column="1" Text="Normal" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Classes="field-label" Text="Retime &amp; Scaling" />
+                        <Border Classes="panel-muted">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <TextBlock VerticalAlignment="Center" Text="Speed" />
+                                <TextBox Grid.Column="1" Text="100.00%" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Border>
 
