@@ -265,6 +265,24 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_resolve_like_top_menu_bar()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"DaVinci-like Menu\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"File\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Edit\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Trim\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Timeline\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Clip\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Mark\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"View\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Playback\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Workspace\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Help\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
