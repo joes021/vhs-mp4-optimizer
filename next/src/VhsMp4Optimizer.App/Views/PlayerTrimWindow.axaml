@@ -600,7 +600,7 @@
         </Grid>
 
         <Border Grid.Row="2" Classes="panel" Margin="0,14,0,0">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" RowSpacing="10">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" RowSpacing="10">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="2">
                         <TextBlock Classes="section-title" Text="Timeline" />
@@ -817,8 +817,54 @@
                     </Grid>
                 </Border>
 
+                <Border Grid.Row="4" Classes="panel-muted">
+                    <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
+                        <Border Classes="panel"
+                                Padding="8"
+                                CornerRadius="6"
+                                Background="#0D131A"
+                                BorderBrush="#314055">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
+                                <TextBlock FontWeight="Bold" HorizontalAlignment="Center" Text="V2" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Overlay Lane" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Video 2" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                Background="#101720"
+                                BorderBrush="#29384B"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="10,12">
+                            <Grid ColumnDefinitions="1.2*,0.9*,1.1*" ColumnSpacing="10">
+                                <Border Background="#192431"
+                                        BorderBrush="#42617F"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Height="58"
+                                        Opacity="0.8" />
+                                <Border Grid.Column="1"
+                                        Background="#15202C"
+                                        BorderBrush="#34506C"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Height="58"
+                                        Opacity="0.7" />
+                                <Border Grid.Column="2"
+                                        Background="#182634"
+                                        BorderBrush="#42617F"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Height="58"
+                                        Opacity="0.75" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
                 <Border x:Name="TrackLaneSeparator"
-                        Grid.Row="4"
+                        Grid.Row="5"
                         Background="#18222E"
                         BorderBrush="#304153"
                         BorderThickness="0,1,0,1"
@@ -829,7 +875,7 @@
                                Text="Track Separator" />
                 </Border>
 
-                <Border Grid.Row="5" Classes="panel-muted">
+                <Border Grid.Row="6" Classes="panel-muted">
                     <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="8"
@@ -859,8 +905,39 @@
                     </Grid>
                 </Border>
 
+                <Border Grid.Row="7" Classes="panel-muted">
+                    <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
+                        <Border Classes="panel"
+                                Padding="8"
+                                CornerRadius="6"
+                                Background="#0D131A"
+                                BorderBrush="#314055">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
+                                <TextBlock FontWeight="Bold" HorizontalAlignment="Center" Text="A2" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Audio Lane 2" />
+                                <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Waveform" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                Background="#0F151E"
+                                BorderBrush="#263444"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="10,14"
+                                Opacity="0.82">
+                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10" VerticalAlignment="Center">
+                                <Border Background="#27485F" Height="20" CornerRadius="4" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Background="#30576F" Height="30" CornerRadius="4" VerticalAlignment="Center" />
+                                <Border Grid.Column="2" Background="#27485F" Height="18" CornerRadius="4" VerticalAlignment="Center" />
+                                <Border Grid.Column="3" Background="#30576F" Height="24" CornerRadius="4" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
                 <Grid Grid.Row="3"
-                      Grid.RowSpan="3"
+                      Grid.RowSpan="5"
                       ColumnDefinitions="112,*"
                       IsHitTestVisible="False">
                     <Border x:Name="TimelineMasterPlayheadGuide"
@@ -874,7 +951,7 @@
                             Opacity="0.75" />
                 </Grid>
 
-                <StackPanel Grid.Row="6" Spacing="8">
+                <StackPanel Grid.Row="8" Spacing="8">
                     <TextBlock Classes="field-label" Text="Edit Tools" />
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -900,7 +977,7 @@
                     </ScrollViewer>
                 </StackPanel>
 
-                <Border Grid.Row="7" Classes="panel-muted">
+                <Border Grid.Row="9" Classes="panel-muted">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="transport"
                                 Classes.active-chip="{Binding IsTimelineBottomDockActive}"
@@ -930,7 +1007,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="8" Classes="panel-muted">
+                <Border Grid.Row="10" Classes="panel-muted">
                     <Grid ColumnDefinitions="2.2*,1.2*,1*" ColumnSpacing="12">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="field-label" Text="Selection" />
