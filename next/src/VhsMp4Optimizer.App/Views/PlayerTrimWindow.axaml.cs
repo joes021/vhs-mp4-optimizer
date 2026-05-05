@@ -57,12 +57,22 @@ public partial class PlayerTrimWindow : Window
         }
     }
 
-    private void OnKeyDown(object? sender, KeyEventArgs e)
+    private async void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
             Close();
             e.Handled = true;
+            return;
+        }
+
+        if (DataContext is PlayerTrimWindowViewModel viewModel)
+        {
+            var controlModifier = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            if (await viewModel.HandleEditorHotkeyAsync(e.Key, controlModifier))
+            {
+                e.Handled = true;
+            }
         }
     }
 }

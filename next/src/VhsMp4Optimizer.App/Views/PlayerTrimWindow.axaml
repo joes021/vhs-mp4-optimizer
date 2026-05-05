@@ -66,21 +66,21 @@
         </Style>
 
         <Style Selector="Button.transport:pointerover">
-            <Setter Property="Background" Value="#14532D" />
-            <Setter Property="BorderBrush" Value="#91E7AA" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="#1E3326" />
+            <Setter Property="BorderBrush" Value="#6CB987" />
+            <Setter Property="Foreground" Value="#F5FFF7" />
         </Style>
 
         <Style Selector="Button.transport:pressed">
-            <Setter Property="Background" Value="#0E3B20" />
-            <Setter Property="BorderBrush" Value="#C9F8D7" />
+            <Setter Property="Background" Value="#16271D" />
+            <Setter Property="BorderBrush" Value="#95E0AF" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:disabled">
-            <Setter Property="Background" Value="#274533" />
-            <Setter Property="BorderBrush" Value="#5C7B68" />
-            <Setter Property="Foreground" Value="#F1FFF4" />
+            <Setter Property="Background" Value="#365445" />
+            <Setter Property="BorderBrush" Value="#80AA8D" />
+            <Setter Property="Foreground" Value="#F3FFF6" />
             <Setter Property="Opacity" Value="1" />
         </Style>
 
@@ -97,14 +97,14 @@
         </Style>
 
         <Style Selector="Button.transport.functional:pointerover">
-            <Setter Property="Background" Value="#14532D" />
-            <Setter Property="BorderBrush" Value="#B7F2C9" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="#1E3326" />
+            <Setter Property="BorderBrush" Value="#AEE7BF" />
+            <Setter Property="Foreground" Value="#F5FFF7" />
         </Style>
 
         <Style Selector="Button.transport.functional:pressed">
-            <Setter Property="Background" Value="#0E3B20" />
-            <Setter Property="BorderBrush" Value="#D8FAE2" />
+            <Setter Property="Background" Value="#16271D" />
+            <Setter Property="BorderBrush" Value="#D0F6DB" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
@@ -115,9 +115,9 @@
         </Style>
 
         <Style Selector="Button.transport.functional:disabled">
-            <Setter Property="Background" Value="#274533" />
-            <Setter Property="BorderBrush" Value="#5C7B68" />
-            <Setter Property="Foreground" Value="#F1FFF4" />
+            <Setter Property="Background" Value="#365445" />
+            <Setter Property="BorderBrush" Value="#80AA8D" />
+            <Setter Property="Foreground" Value="#F3FFF6" />
             <Setter Property="Opacity" Value="1" />
         </Style>
 
@@ -324,7 +324,7 @@
         </StackPanel>
 
         <Grid x:Name="EditorMainContentGrid" Grid.Row="1" ColumnDefinitions="240,*,320" ColumnSpacing="14">
-            <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+            <Grid RowDefinitions="*,Auto" RowSpacing="12">
                 <Border Grid.Row="0" Classes="panel">
                     <StackPanel Spacing="10">
                         <StackPanel Spacing="2">
@@ -337,9 +337,7 @@
                                        VerticalAlignment="Center"
                                        Text="Browser" />
                             <WrapPanel Grid.Column="1"
-                                       Orientation="Horizontal"
-                                       ItemWidth="60"
-                                       ItemHeight="30">
+                                       Orientation="Horizontal">
                                 <Button Classes="transport active-chip" Content="Clips" />
                                 <Button Classes="transport" Content="Timelines" />
                                 <Button Classes="transport" Content="Smart Bins" />
@@ -447,6 +445,7 @@
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsSelectToolActive}"
                                     Grid.Row="0"
+                                    MinHeight="56"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Select">
@@ -459,6 +458,7 @@
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsBladeToolActive}"
                                     Grid.Row="1"
+                                    MinHeight="56"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Blade">
@@ -471,6 +471,7 @@
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsSlipToolActive}"
                                     Grid.Row="2"
+                                    MinHeight="56"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Slip">
@@ -483,6 +484,7 @@
                             <Button Classes="transport functional"
                                     Classes.active-chip="{Binding IsRollToolActive}"
                                     Grid.Row="3"
+                                    MinHeight="56"
                                     Padding="8"
                                     Command="{Binding SelectToolCommand}"
                                     CommandParameter="Roll">
@@ -536,13 +538,16 @@
                                        Text="Playback i precizan trim kadar" />
                         </StackPanel>
                         <Border Grid.Column="2" Classes="panel-muted" Padding="10,6">
-                            <TextBlock Text="{Binding PreviewDurationText}" FontWeight="SemiBold" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Classes="field-label" Margin="0" Text="Duration" />
+                                <TextBlock Text="{Binding PreviewDurationText}" FontWeight="SemiBold" />
+                            </StackPanel>
                         </Border>
                     </Grid>
 
                     <Border x:Name="PrimaryProgramMonitor"
                             Grid.Row="1"
-                            Height="240"
+                            Height="216"
                             Background="#05080D"
                             BorderBrush="#293445"
                             BorderThickness="1"
@@ -552,10 +557,10 @@
                             <Border x:Name="ProgramMonitorViewport"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    MaxWidth="1120"
-                                    MaxHeight="208"
-                                    Width="1120"
-                                    Height="208"
+                                    MaxWidth="1040"
+                                    MaxHeight="184"
+                                    Width="1040"
+                                    Height="184"
                                     Background="#05080D"
                                     BorderBrush="#293445"
                                     BorderThickness="1"
@@ -948,8 +953,8 @@
                             <Border x:Name="TimelinePlayheadBadge"
                                     Grid.Column="1"
                                     HorizontalAlignment="Center"
-                                    Background="#0E7490"
-                                    BorderBrush="#22D3EE"
+                                    Background="#F97316"
+                                    BorderBrush="#FDBA74"
                                     BorderThickness="1"
                                     CornerRadius="8"
                                     Padding="8,2"
@@ -963,7 +968,7 @@
                                     HorizontalAlignment="Center"
                                     Width="1"
                                     Margin="-26,0,0,0"
-                                    Background="#4DD0E1"
+                                    Background="#FDBA74"
                                     Opacity="0.75"
                                     IsVisible="False" />
                             <Border x:Name="SnapGuideRight"
@@ -971,7 +976,7 @@
                                     HorizontalAlignment="Center"
                                     Width="1"
                                     Margin="26,0,0,0"
-                                    Background="#4DD0E1"
+                                    Background="#FDBA74"
                                     Opacity="0.75"
                                     IsVisible="False" />
                             <Border Grid.Row="1" Background="#0C131D" BorderBrush="#314055" BorderThickness="0,0,0,1" Padding="8,1">
@@ -1000,11 +1005,26 @@
                             </StackPanel>
                         </Border>
 
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <Button Classes="transport functional" Content="Mark In" Command="{Binding SetInPointCommand}" />
-                            <Button Classes="transport functional" Content="Mark Out" Command="{Binding SetOutPointCommand}" />
-                            <Button Classes="transport functional" Content="Prev Cut" Command="{Binding PreviousCutCommand}" />
-                            <Button Classes="transport functional" Content="Next Cut" Command="{Binding NextCutCommand}" />
+                        <StackPanel Grid.Column="1" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Classes="transport functional" Content="Mark In" Command="{Binding SetInPointCommand}" />
+                                <Button Classes="transport functional" Content="Mark Out" Command="{Binding SetOutPointCommand}" />
+                                <Button Classes="transport functional" Content="Prev Cut" Command="{Binding PreviousCutCommand}" />
+                                <Button Classes="transport functional" Content="Next Cut" Command="{Binding NextCutCommand}" />
+                            </StackPanel>
+                            <Border Classes="panel-muted"
+                                    Padding="10,6"
+                                    IsHitTestVisible="False">
+                                <StackPanel Orientation="Horizontal" Spacing="14">
+                                    <TextBlock Classes="field-label" Text="Hotkeys" />
+                                    <TextBlock Classes="section-meta" Text="V Select" />
+                                    <TextBlock Classes="section-meta" Text="B Razor" />
+                                    <TextBlock Classes="section-meta" Text="I Mark In" />
+                                    <TextBlock Classes="section-meta" Text="O Mark Out" />
+                                    <TextBlock Classes="section-meta" Text="Ctrl+Z Undo" />
+                                    <TextBlock Classes="section-meta" Text="Ctrl+Y Redo" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -1040,6 +1060,40 @@
                                             Command="{Binding ToggleTrackSoloCommand}"
                                             Content="Solo" />
                                 </StackPanel>
+                                <TextBlock Classes="section-meta"
+                                           Margin="0,4,0,0"
+                                           HorizontalAlignment="Center"
+                                           Text="V1 Quick Edit" />
+                                <WrapPanel Orientation="Horizontal"
+                                           HorizontalAlignment="Center"
+                                           ItemWidth="72"
+                                           ItemHeight="28">
+                                    <Button Classes="transport functional"
+                                            MinWidth="0"
+                                            Padding="6,3"
+                                            Content="Razor at Playhead"
+                                            Command="{Binding SplitAtPlayheadCommand}" />
+                                    <Button Classes="transport functional"
+                                            MinWidth="0"
+                                            Padding="6,3"
+                                            Content="Delete Clip"
+                                            Command="{Binding DeleteSegmentCommand}" />
+                                    <Button Classes="transport functional"
+                                            MinWidth="0"
+                                            Padding="6,3"
+                                            Content="Ripple"
+                                            Command="{Binding RippleDeleteCommand}" />
+                                    <Button Classes="transport functional"
+                                            MinWidth="0"
+                                            Padding="6,3"
+                                            Content="&lt;-"
+                                            Command="{Binding MoveLeftCommand}" />
+                                    <Button Classes="transport functional"
+                                            MinWidth="0"
+                                            Padding="6,3"
+                                            Content="-&gt;"
+                                            Command="{Binding MoveRightCommand}" />
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
 
@@ -1144,7 +1198,7 @@
 
                             <Border x:Name="TimelinePlayheadIndicator"
                                     Width="2"
-                                    Background="#22D3EE"
+                                    Background="#F97316"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Stretch"
                                     IsVisible="False"

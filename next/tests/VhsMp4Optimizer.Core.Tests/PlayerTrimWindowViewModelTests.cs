@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using VhsMp4Optimizer.App;
+using Avalonia.Input;
 
 namespace VhsMp4Optimizer.Core.Tests;
 
@@ -564,6 +565,51 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleEditorHotkeyAsync_should_switch_tools_and_update_in_out_points()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 42;
+        await viewModel.HandleEditorHotkeyAsync(Key.B);
+        Assert.True(viewModel.IsBladeToolActive);
+        await viewModel.HandleEditorHotkeyAsync(Key.I);
+        viewModel.PreviewVirtualSeconds = 84;
+        await viewModel.HandleEditorHotkeyAsync(Key.V);
+        await viewModel.HandleEditorHotkeyAsync(Key.O);
+
+        Assert.True(viewModel.IsSelectToolActive);
+        Assert.False(viewModel.IsBladeToolActive);
+        Assert.Equal("00:00:42.00", viewModel.InPointText);
+        Assert.Equal("00:01:24.00", viewModel.OutPointText);
+    }
+
+    [Fact]
+    public async Task HandleEditorHotkeyAsync_should_support_undo_and_redo()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 150;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        Assert.Equal(2, viewModel.Timeline.Segments.Count);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.Z, controlModifier: true);
+        Assert.Single(viewModel.Timeline.Segments);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.Y, controlModifier: true);
+        Assert.Equal(2, viewModel.Timeline.Segments.Count);
+    }
+
+    [Fact]
     public async Task PreviousCutCommand_and_NextCutCommand_should_jump_between_timeline_boundaries()
     {
         var queueItem = BuildQueueItem();
@@ -583,6 +629,29 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.Equal(120d, viewModel.PreviewVirtualSeconds, 3);
 
         await viewModel.NextCutCommand.ExecuteAsync(null);
+        Assert.Equal(240d, viewModel.PreviewVirtualSeconds, 3);
+    }
+
+    [Fact]
+    public async Task HandleEditorHotkeyAsync_should_support_previous_and_next_cut_navigation()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 240d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 200d;
+
+        await viewModel.HandleEditorHotkeyAsync(Key.Q);
+        Assert.Equal(120d, viewModel.PreviewVirtualSeconds, 3);
+
+        await viewModel.HandleEditorHotkeyAsync(Key.W);
         Assert.Equal(240d, viewModel.PreviewVirtualSeconds, 3);
     }
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -1224,6 +1225,71 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         await CommitPreviewSliderAsync();
+    }
+
+    public async Task<bool> HandleEditorHotkeyAsync(Key key, bool controlModifier = false)
+    {
+        if (controlModifier)
+        {
+            if (key == Key.Z)
+            {
+                if (UndoCommand.CanExecute(null))
+                {
+                    await UndoCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            }
+
+            if (key == Key.Y)
+            {
+                if (RedoCommand.CanExecute(null))
+                {
+                    await RedoCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            }
+        }
+
+        switch (key)
+        {
+            case Key.B:
+                SelectTool("Blade");
+                return true;
+            case Key.V:
+                SelectTool("Select");
+                return true;
+            case Key.I:
+                SetInPointFromCurrent();
+                return true;
+            case Key.O:
+                SetOutPointFromCurrent();
+                return true;
+            case Key.Q:
+                if (PreviousCutCommand.CanExecute(null))
+                {
+                    await PreviousCutCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            case Key.W:
+                if (NextCutCommand.CanExecute(null))
+                {
+                    await NextCutCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            case Key.Delete:
+                if (DeleteSegmentCommand.CanExecute(null))
+                {
+                    await DeleteSegmentCommand.ExecuteAsync(null);
+                }
+
+                return true;
+            default:
+                return false;
+        }
     }
 
     private double GetTimelineRulerCenterSeconds() => ActiveZoomPreset switch
