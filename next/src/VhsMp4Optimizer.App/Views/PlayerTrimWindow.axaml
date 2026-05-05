@@ -442,6 +442,17 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10">
+                                    <TextBlock FontWeight="SemiBold" Text="Monitor Timecode" />
+                                    <TextBlock Grid.Column="1" Text="Source TC" />
+                                    <TextBlock Grid.Column="2"
+                                               HorizontalAlignment="Center"
+                                               Text="Record TC" />
+                                    <TextBlock Grid.Column="3" Text="Safe Area On" />
+                                    <TextBlock Grid.Column="4" Text="Proxy: Off" />
+                                </Grid>
+                            </Border>
                             <StackPanel Spacing="2">
                                 <TextBlock Classes="section-title" Text="Program Monitor" />
                                 <TextBlock Classes="section-meta" Text="Playback i precizan trim kadar" />

@@ -360,6 +360,18 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_monitor_timecode_status_bar()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Monitor Timecode\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Source TC\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Record TC\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Safe Area On\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Proxy: Off\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();
