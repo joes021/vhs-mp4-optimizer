@@ -23,7 +23,7 @@ public sealed class PreviewFrameService : IPreviewFrameService
         var safeSeconds = Math.Max(0, Math.Min(mediaInfo.DurationSeconds, sourceSeconds));
         var previewPath = Path.Combine(
             previewDirectory,
-            $"frame-{safeSeconds.ToString("0000000.000", CultureInfo.InvariantCulture).Replace('.', '_')}-{BuildTransformCacheSuffix(transformSettings)}.png");
+            $"frame-{safeSeconds.ToString("0000000.000", CultureInfo.InvariantCulture).Replace('.', '_')}-{BuildTransformCacheSuffix(transformSettings, mediaInfo)}.png");
         if (File.Exists(previewPath))
         {
             return previewPath;
@@ -115,11 +115,15 @@ public sealed class PreviewFrameService : IPreviewFrameService
         return string.IsNullOrWhiteSpace(sanitized) ? "preview-source" : sanitized;
     }
 
-    internal static string BuildTransformCacheSuffix(ItemTransformSettings? transformSettings)
+    internal static string BuildTransformCacheSuffix(ItemTransformSettings? transformSettings, MediaInfo? mediaInfo)
     {
+        var previewProfile = mediaInfo is not null && ShouldUsePreviewDeinterlace(mediaInfo)
+            ? "preview-dv-yadif"
+            : "preview-base";
+
         if (transformSettings is null)
         {
-            return "base";
+            return $"{previewProfile}-base";
         }
 
         var crop = transformSettings.Crop;
@@ -129,7 +133,7 @@ public sealed class PreviewFrameService : IPreviewFrameService
         var aspectSuffix = string.IsNullOrWhiteSpace(transformSettings.AspectMode)
             ? "aspect-auto"
             : "aspect-" + SanitizePreviewCacheComponent(transformSettings.AspectMode);
-        return $"{cropSuffix}-{aspectSuffix}";
+        return $"{previewProfile}-{cropSuffix}-{aspectSuffix}";
     }
 
     internal static bool ShouldUsePreviewDeinterlace(MediaInfo mediaInfo)

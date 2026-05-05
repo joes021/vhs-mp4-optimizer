@@ -66,21 +66,21 @@
         </Style>
 
         <Style Selector="Button.transport:pointerover">
-            <Setter Property="Background" Value="#1E3D29" />
-            <Setter Property="BorderBrush" Value="#67B77D" />
-            <Setter Property="Foreground" Value="#F4FFF7" />
+            <Setter Property="Background" Value="#214E2E" />
+            <Setter Property="BorderBrush" Value="#7FD497" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:pressed">
-            <Setter Property="Background" Value="#173021" />
-            <Setter Property="BorderBrush" Value="#8FD6A3" />
+            <Setter Property="Background" Value="#163721" />
+            <Setter Property="BorderBrush" Value="#A4F0BE" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:disabled">
-            <Setter Property="Background" Value="#203428" />
-            <Setter Property="BorderBrush" Value="#496A56" />
-            <Setter Property="Foreground" Value="#DAF6E2" />
+            <Setter Property="Background" Value="#284233" />
+            <Setter Property="BorderBrush" Value="#5C7B68" />
+            <Setter Property="Foreground" Value="#F1FFF4" />
             <Setter Property="Opacity" Value="1" />
         </Style>
 
@@ -91,38 +91,38 @@
         </Style>
 
         <Style Selector="Button.transport.functional">
-            <Setter Property="Background" Value="#205B37" />
-            <Setter Property="BorderBrush" Value="#66D28A" />
-            <Setter Property="Foreground" Value="#F5FFF7" />
+            <Setter Property="Background" Value="#1D6B36" />
+            <Setter Property="BorderBrush" Value="#73DA93" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional:pointerover">
-            <Setter Property="Background" Value="#2B6A41" />
-            <Setter Property="BorderBrush" Value="#9AE4B2" />
+            <Setter Property="Background" Value="#214E2E" />
+            <Setter Property="BorderBrush" Value="#B1F1C4" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional:pressed">
-            <Setter Property="Background" Value="#1A412A" />
-            <Setter Property="BorderBrush" Value="#B9F3CB" />
+            <Setter Property="Background" Value="#163721" />
+            <Setter Property="BorderBrush" Value="#D1F9DD" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional.active-chip">
-            <Setter Property="Background" Value="#2F7B49" />
-            <Setter Property="BorderBrush" Value="#C3F5D3" />
+            <Setter Property="Background" Value="#205B37" />
+            <Setter Property="BorderBrush" Value="#C8F5D7" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional:disabled">
-            <Setter Property="Background" Value="#234533" />
-            <Setter Property="BorderBrush" Value="#4F7F61" />
-            <Setter Property="Foreground" Value="#EBFFF0" />
+            <Setter Property="Background" Value="#284233" />
+            <Setter Property="BorderBrush" Value="#5C7B68" />
+            <Setter Property="Foreground" Value="#F1FFF4" />
             <Setter Property="Opacity" Value="1" />
         </Style>
 
         <Style Selector="Button.transport:pointerover /template/ ContentPresenter">
-            <Setter Property="TextElement.Foreground" Value="#F4FFF7" />
+            <Setter Property="TextElement.Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:pressed /template/ ContentPresenter">
@@ -130,7 +130,7 @@
         </Style>
 
         <Style Selector="Button.transport:disabled /template/ ContentPresenter">
-            <Setter Property="TextElement.Foreground" Value="#DAF6E2" />
+            <Setter Property="TextElement.Foreground" Value="#F1FFF4" />
         </Style>
 
         <Style Selector="Button.transport.functional:pointerover /template/ ContentPresenter">
@@ -142,7 +142,7 @@
         </Style>
 
         <Style Selector="Button.transport.functional:disabled /template/ ContentPresenter">
-            <Setter Property="TextElement.Foreground" Value="#EBFFF0" />
+            <Setter Property="TextElement.Foreground" Value="#F1FFF4" />
         </Style>
 
         <Style Selector="Button.primary">
@@ -159,7 +159,7 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*,330,Auto" Margin="14">
+    <Grid RowDefinitions="Auto,*,360,Auto" Margin="14">
         <StackPanel Spacing="10" Margin="0,0,0,12">
             <Border Classes="panel-muted" Padding="10,8">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -323,9 +323,9 @@
             </Border>
         </StackPanel>
 
-        <Grid x:Name="EditorMainContentGrid" Grid.Row="1" ColumnDefinitions="220,*,320" ColumnSpacing="14">
-            <Grid RowDefinitions="190,*" RowSpacing="12">
-                <Border Grid.Row="1" Classes="panel">
+        <Grid x:Name="EditorMainContentGrid" Grid.Row="1" ColumnDefinitions="240,*,320" ColumnSpacing="14">
+            <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+                <Border Grid.Row="0" Classes="panel">
                     <StackPanel Spacing="10">
                         <StackPanel Spacing="2">
                             <TextBlock Classes="section-title" Text="Media Pool" />
@@ -338,7 +338,7 @@
                                        Text="Browser" />
                             <WrapPanel Grid.Column="1"
                                        Orientation="Horizontal"
-                                       ItemWidth="74"
+                                       ItemWidth="60"
                                        ItemHeight="30">
                                 <Button Classes="transport active-chip" Content="Clips" />
                                 <Button Classes="transport" Content="Timelines" />
@@ -375,7 +375,7 @@
 
                             <StackPanel Grid.Column="1" Spacing="8">
                                 <TextBlock Classes="field-label" Text="Clips" />
-                                <WrapPanel Orientation="Horizontal" ItemWidth="72" ItemHeight="30">
+                                <WrapPanel Orientation="Horizontal" ItemWidth="64" ItemHeight="30">
                                     <Button Classes="transport" Content="Sort" />
                                     <Button Classes="transport" Content="View" />
                                     <Button Classes="transport" Content="Metadata" />
@@ -433,7 +433,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="0" Classes="panel">
+                <Border Grid.Row="1" Classes="panel">
                     <StackPanel Spacing="10">
                         <TextBlock Classes="section-title"
                                    FontSize="12"
@@ -501,7 +501,7 @@
             </Grid>
 
             <Border Grid.Column="1" Classes="panel">
-                <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="12">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="12">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Classes="transport functional"
@@ -514,6 +514,12 @@
                                     Content="Program"
                                     Command="{Binding SelectMonitorTabCommand}"
                                     CommandParameter="Program" />
+                            <Border Classes="panel-muted" Padding="10,6">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock FontWeight="SemiBold" Text="Monitor HUD" />
+                                    <TextBlock Classes="section-meta" Text="Program" />
+                                </StackPanel>
+                            </Border>
                             <Border Classes="panel-muted" Padding="10,6">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="Fit" />
@@ -552,7 +558,7 @@
 
                     <Border x:Name="PrimaryProgramMonitor"
                             Grid.Row="2"
-                            MinHeight="300"
+                            Height="248"
                             Background="#05080D"
                             BorderBrush="#293445"
                             BorderThickness="1"
@@ -563,9 +569,9 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     MaxWidth="1120"
-                                    MaxHeight="260"
+                                    MaxHeight="220"
                                     Width="1120"
-                                    Height="260"
+                                    Height="220"
                                     Background="#05080D"
                                     BorderBrush="#293445"
                                     BorderThickness="1"
@@ -583,19 +589,6 @@
                                            HorizontalAlignment="Stretch"
                                            VerticalAlignment="Stretch"
                                            Stretch="Uniform" />
-                                    <Border HorizontalAlignment="Left"
-                                            VerticalAlignment="Top"
-                                            Margin="12"
-                                            Background="#8C0B1220"
-                                            BorderBrush="#395170"
-                                            BorderThickness="1"
-                                            CornerRadius="6"
-                                            Padding="8,5">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock FontWeight="SemiBold" Text="Monitor HUD" />
-                                            <TextBlock Classes="section-meta" Text="Program" />
-                                        </StackPanel>
-                                    </Border>
                                     <Border HorizontalAlignment="Right"
                                             VerticalAlignment="Top"
                                             Margin="12"
@@ -628,7 +621,7 @@
                     </Grid>
                     </Border>
 
-                    <Border x:Name="MonitorTransportBand" Grid.Row="4" Classes="panel-muted" Margin="0,12,0,0">
+                    <Border x:Name="MonitorTransportBand" Grid.Row="4" Classes="panel-muted" Margin="0,8,0,0" Padding="12,10">
                         <StackPanel Spacing="10">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Classes="field-label" VerticalAlignment="Center" Text="Monitor Transport" />
@@ -970,7 +963,7 @@
                     </StackPanel>
                 </Grid>
 
-                <Border x:Name="CompactTimeRuler" Grid.Row="1" Classes="panel-muted" Padding="4,1">
+                <Border x:Name="CompactTimeRuler" Grid.Row="1" Classes="panel-muted" Padding="2,1">
                     <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="4,2"
@@ -1093,10 +1086,9 @@
                                         <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
                                             <Button Width="{Binding WidthPixels}"
                                                     MinWidth="96"
-                                                    Height="64"
+                                                    Height="72"
                                                     Padding="0"
-                                                    Command="{Binding DataContext.TimelineBlockActionCommand, ElementName=RootWindow}"
-                                                    CommandParameter="{Binding .}"
+                                                    PointerPressed="TimelineBlockPointerPressed"
                                                     Background="{Binding BackgroundBrush}"
                                                     Foreground="{Binding ForegroundBrush}"
                                                     BorderBrush="{Binding BorderBrush}"
@@ -1251,7 +1243,7 @@
                                Text="Track Separator" />
                 </Border>
 
-                <Border x:Name="A1LaneRow" Grid.Row="6" Classes="panel-muted">
+                <Border x:Name="A1LaneRow" Grid.Row="6" Classes="panel-muted" IsVisible="False">
                     <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                         <Border Classes="panel"
                                 Padding="8"

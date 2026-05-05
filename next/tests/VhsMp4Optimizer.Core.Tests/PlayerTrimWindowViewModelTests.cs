@@ -525,6 +525,26 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleTimelineBlockPointerAsync_should_scrub_to_clicked_position_and_split_when_razor_is_active()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        var firstBlock = viewModel.TimelineBlocks[0];
+        viewModel.SelectToolCommand.Execute("Blade");
+
+        await viewModel.HandleTimelineBlockPointerAsync(firstBlock, 0.5d);
+
+        Assert.Equal(2, viewModel.Timeline.Segments.Count);
+        Assert.Equal(150d, viewModel.PreviewVirtualSeconds, 3);
+        Assert.Equal(150d, viewModel.Timeline.Segments[1].TimelineStartSeconds, 3);
+    }
+
+    [Fact]
     public async Task PreviousCutCommand_and_NextCutCommand_should_jump_between_timeline_boundaries()
     {
         var queueItem = BuildQueueItem();

@@ -30,6 +30,22 @@ public partial class PlayerTrimWindow : Window
         }
     }
 
+    private async void TimelineBlockPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not PlayerTrimWindowViewModel viewModel
+            || sender is not Control control
+            || control.DataContext is not TimelineBlockItemViewModel block)
+        {
+            return;
+        }
+
+        var position = e.GetPosition(control);
+        var width = Math.Max(1d, control.Bounds.Width);
+        var relativePosition = Math.Clamp(position.X / width, 0d, 1d);
+        await viewModel.HandleTimelineBlockPointerAsync(block, relativePosition);
+        e.Handled = true;
+    }
+
     private void ClosePlayerTrimClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)

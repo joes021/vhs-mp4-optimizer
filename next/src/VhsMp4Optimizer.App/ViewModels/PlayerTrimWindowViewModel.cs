@@ -110,8 +110,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         SetOutPointCommand = new RelayCommand(SetOutPointFromCurrent);
         PreviousCutCommand = new AsyncRelayCommand(GoToPreviousCutAsync, CanJumpToPreviousCut);
         NextCutCommand = new AsyncRelayCommand(GoToNextCutAsync, CanJumpToNextCut);
-        PlayCommand = new RelayCommand(StartPlayback, CanStartPlayback);
-        PauseCommand = new RelayCommand(PausePlayback, CanPausePlayback);
+        PlayCommand = new RelayCommand(StartPlayback);
+        PauseCommand = new RelayCommand(PausePlayback);
         SelectModeCommand = new RelayCommand<string?>(SelectMode);
         SelectWorkspaceDockCommand = new RelayCommand<string?>(SelectWorkspaceDock);
         SelectMonitorTabCommand = new RelayCommand<string?>(SelectMonitorTab);
@@ -1099,6 +1099,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
                 SegmentId = block.SegmentId,
                 Kind = block.Kind,
                 TimelineStartSeconds = block.TimelineStartSeconds,
+                DurationSeconds = block.DurationSeconds,
                 WidthPixels = block.WidthPixels,
                 Label = block.Label,
                 Summary = block.Summary,
@@ -1197,6 +1198,32 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         SelectTimelineBlock(block);
+    }
+
+    public async Task HandleTimelineBlockPointerAsync(TimelineBlockItemViewModel? block, double relativePosition)
+    {
+        if (block is null)
+        {
+            return;
+        }
+
+        var clampedFraction = Math.Clamp(relativePosition, 0d, 1d);
+        var clickedVirtualSeconds = Math.Clamp(
+            block.TimelineStartSeconds + (block.DurationSeconds * clampedFraction),
+            0d,
+            PreviewVirtualMaximum);
+
+        SelectTimelineBlock(block, syncPlayhead: false);
+        SetPreviewVirtualSecondsSilently(clickedVirtualSeconds);
+        UpdatePreviewTimeTexts();
+
+        if (string.Equals(ActiveTool, "Blade", StringComparison.Ordinal))
+        {
+            await SplitAtPlayheadAsync();
+            return;
+        }
+
+        await CommitPreviewSliderAsync();
     }
 
     private double GetTimelineRulerCenterSeconds() => ActiveZoomPreset switch
