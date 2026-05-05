@@ -671,6 +671,20 @@
                                         Command="{Binding SelectLaneTargetCommand}"
                                         CommandParameter="A2"
                                         Content="A2 Target" />
+                                <Border Classes="panel-muted" Padding="8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock FontWeight="SemiBold" Text="Timeline Mini Toolbar" />
+                                        <Button Classes="transport"
+                                                Classes.active-chip="{Binding IsSelectToolActive}"
+                                                Command="{Binding SelectToolCommand}"
+                                                CommandParameter="Select"
+                                                Content="Selection" />
+                                        <Button Classes="transport"
+                                                Classes.active-chip="{Binding IsLinkedSelectionEnabled}"
+                                                Command="{Binding ToggleLinkedSelectionCommand}"
+                                                Content="Linked" />
+                                    </StackPanel>
+                                </Border>
                                 <TextBlock Text="Link" />
                                 <TextBlock Text="Zoom -" />
                                 <TextBlock Text="Zoom +" />
