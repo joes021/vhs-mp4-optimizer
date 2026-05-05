@@ -211,6 +211,60 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
+    public void PlayerTrimWindow_should_render_clip_filmstrip_ticks()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("x:Name=\"ClipFilmstripTicks\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"00:00\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"00:05\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"00:10\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_monitor_transport_strip()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Monitor Transport\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Shuttle -\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Stop\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Loop\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ToggleLoopPlaybackCommand}\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_timeline_navigator_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Timeline Navigator\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelineNavigatorThumb\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Full Timeline\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_inspector_keyframe_and_reset_chrome()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Reset\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Keyframe\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Transform Reset\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_render_media_pool_toolbar_chips()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("Text=\"Bins\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Sort\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"View\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Metadata\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_should_reset_trim_window_reference_when_editor_closes()
     {
         var projectRoot = FindProjectRoot();

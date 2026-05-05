@@ -244,6 +244,11 @@
                             <StackPanel Grid.Column="1" Spacing="8">
                                 <TextBlock Classes="field-label" Text="Clips" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="transport" Content="Sort" />
+                                    <Button Classes="transport" Content="View" />
+                                    <Button Classes="transport" Content="Metadata" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Border Classes="panel-muted"
                                             Width="104"
                                             Padding="8"
