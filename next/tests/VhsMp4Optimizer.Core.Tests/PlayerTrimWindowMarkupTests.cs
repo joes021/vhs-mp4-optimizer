@@ -21,12 +21,12 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.DoesNotContain("<vlc:VideoView", markup, StringComparison.Ordinal);
         Assert.Contains("Background=\"#14181F\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport:pressed\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Inspector\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"TOOLS ZA POJEDINACNE VIDEO KLIPOVE\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Video\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Audio\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Effects\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Timeline\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Tool Rail\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"VIDEO &amp; AUDIO TRACKS\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"TOOLS ZA VIDEO TRACKS\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Project\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Sequence 01\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Media Pool\"", markup, StringComparison.Ordinal);
@@ -271,7 +271,7 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
-        Assert.Contains("Text=\"DaVinci-like Menu\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"FILE MENU\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"File\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Edit\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Trim\"", markup, StringComparison.Ordinal);
@@ -334,12 +334,12 @@ public sealed class PlayerTrimWindowMarkupTests
 
         Assert.Contains("RowDefinitions=\"Auto,*\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"EditorMockupGrid\"", markup, StringComparison.Ordinal);
-        Assert.Contains("RowDefinitions=\"*,Auto,Auto,*\"", markup, StringComparison.Ordinal);
+        Assert.Contains("RowDefinitions=\"Auto,Auto,Auto,*\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"250,*,320\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PrimaryProgramMonitor\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ProgramMonitorViewport\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Height=\"420\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Height=\"360\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Height=\"540\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Height=\"500\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Monitor Timecode\"", markup, StringComparison.Ordinal);
     }
 
@@ -358,8 +358,8 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Value=\"#1E6F3D\"", markup, StringComparison.Ordinal);
         Assert.Contains("Value=\"#8BE0A6\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional:disabled\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#2B3A4D\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#A7BDD4\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#37485D\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#D5E2F3\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport:disabled /template/ ContentPresenter\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional:disabled /template/ ContentPresenter\"", markup, StringComparison.Ordinal);
     }
@@ -386,7 +386,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("x:Name=\"TimelineNavigatorRow\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"V2LaneRow\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"A2LaneRow\"", markup, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"120\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"180\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PreviewScrubBar\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"MonitorTransportBand\"", markup, StringComparison.Ordinal);
     }
@@ -470,7 +470,7 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
-        Assert.Equal(4, CountOccurrences(markup, "Text=\"{Binding PreviewVirtualTimeText}\""));
+        Assert.Equal(3, CountOccurrences(markup, "Text=\"{Binding PreviewVirtualTimeText}\""));
     }
 
     [Fact]
@@ -478,7 +478,7 @@ public sealed class PlayerTrimWindowMarkupTests
     {
         var markup = ReadPlayerTrimMarkup();
 
-        Assert.Contains("Text=\"Tool Rail\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"TOOLS ZA VIDEO TRACKS\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TrackToolsBar\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("x:Name=\"ToolRailGrid\"", markup, StringComparison.Ordinal);
         Assert.Contains("CommandParameter=\"Select\"", markup, StringComparison.Ordinal);
@@ -590,6 +590,28 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"Src A1\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Dst V1\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Dst A1\"", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlayerTrimWindow_should_define_mockup_based_primary_layout_zones()
+    {
+        var markup = ReadPlayerTrimMarkup();
+
+        Assert.Contains("x:Name=\"MockupMenuBar\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LegacyTrimChrome\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MockupMediaFilesPanel\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MockupPreviewPanel\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MockupClipToolsPanel\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MonitorTransportBand\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TrackToolsBar\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TracksWorkspacePanel\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"MEDIA FILES\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"VIDEO\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"TOOLS ZA POJEDINACNE VIDEO KLIPOVE\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"TOOLS ZA VIDEO TRACKS\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Text=\"VIDEO &amp; AUDIO TRACKS\"", markup, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LegacyTrimChrome\"", markup, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"False\"", markup, StringComparison.Ordinal);
     }
 
     [Fact]
