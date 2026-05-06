@@ -37,7 +37,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private bool _previewRefreshQueued;
     private bool _unmuteWhenPlaybackFrameArrives;
     private bool _pauseWhenPlaybackFrameArrives;
-    private bool _isManualPreviewNavigation;
     private double _lastRequestedSourceSeconds;
     private readonly Stack<TimelineProject> _undoStack = new();
     private readonly Stack<TimelineProject> _redoStack = new();
@@ -457,7 +456,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
         OnPropertyChanged(nameof(TimelinePlayheadMargin));
 
-        if (_isManualPreviewNavigation && !IsPlaying)
+        if (!IsPlaying)
         {
             TryStartPlaybackPreview(resumePlaybackAfterSeek: false);
         }
@@ -1007,13 +1006,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public void BeginManualPreviewNavigation()
     {
-        _isManualPreviewNavigation = true;
         PausePlaybackCore(loadPreviewAfterPause: false, "Pomeraj timeline za precizan trim frame.");
     }
 
     public async Task EndManualPreviewNavigationAsync()
     {
-        _isManualPreviewNavigation = false;
         await CommitPreviewSliderAsync();
     }
 
@@ -1793,8 +1790,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         IsVideoPlaybackVisible = true;
 
         var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
-        _lastRequestedSourceSeconds = sourceSeconds;
-        _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
+        var safeSourceSeconds = GetSafePreviewSourceSeconds(sourceSeconds);
+        _lastRequestedSourceSeconds = safeSourceSeconds;
+        _pendingPlaybackSeekMilliseconds = (long)Math.Round(safeSourceSeconds * 1000d);
         _awaitingPlaybackFrame = true;
         _pauseWhenPlaybackFrameArrives = !resumePlaybackAfterSeek;
         _unmuteWhenPlaybackFrameArrives = resumePlaybackAfterSeek;
@@ -1807,6 +1805,19 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         _playbackTimer.Start();
         return true;
+    }
+
+    private double GetSafePreviewSourceSeconds(double sourceSeconds)
+    {
+        if (Item.MediaInfo is null)
+        {
+            return Math.Max(0d, sourceSeconds);
+        }
+
+        var fps = Item.MediaInfo.FrameRate > 0 ? Item.MediaInfo.FrameRate : 25d;
+        var frameStep = 1d / fps;
+        var safeMax = Math.Max(0d, Item.MediaInfo.DurationSeconds - frameStep);
+        return Math.Clamp(sourceSeconds, 0d, safeMax);
     }
 
     public void Dispose()

@@ -610,6 +610,27 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleTimelineBlockPointerAsync_should_support_second_razor_cut_on_later_segment()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectToolCommand.Execute("Blade");
+        await viewModel.HandleTimelineBlockPointerAsync(viewModel.TimelineBlocks[0], 0.5d);
+        var laterBlock = viewModel.TimelineBlocks[1];
+
+        await viewModel.HandleTimelineBlockPointerAsync(laterBlock, 0.5d);
+
+        Assert.Equal(3, viewModel.Timeline.Segments.Count);
+        Assert.Equal(150d, viewModel.Timeline.Segments[1].TimelineStartSeconds, 3);
+        Assert.Equal(225d, viewModel.Timeline.Segments[2].TimelineStartSeconds, 3);
+    }
+
+    [Fact]
     public async Task HandleTimelineBlockPointerAsync_should_scrub_without_split_when_select_tool_is_active()
     {
         var queueItem = BuildQueueItem();
@@ -1100,9 +1121,26 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         var source = File.ReadAllText(sourcePath);
 
-        Assert.Contains("private bool _isManualPreviewNavigation;", source, StringComparison.Ordinal);
-        Assert.Contains("if (_isManualPreviewNavigation && !IsPlaying)", source, StringComparison.Ordinal);
+        Assert.Contains("if (!IsPlaying)", source, StringComparison.Ordinal);
         Assert.Contains("TryStartPlaybackPreview(resumePlaybackAfterSeek: false)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TryStartPlaybackPreview_should_clamp_end_seek_to_last_safe_frame()
+    {
+        var projectRoot = FindProjectRoot();
+        var sourcePath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "ViewModels",
+            "PlayerTrimWindowViewModel.cs");
+
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("GetSafePreviewSourceSeconds(sourceSeconds)", source, StringComparison.Ordinal);
+        Assert.Contains("DurationSeconds - frameStep", source, StringComparison.Ordinal);
     }
 
     public void Dispose()

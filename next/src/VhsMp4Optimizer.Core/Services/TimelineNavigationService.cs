@@ -11,11 +11,13 @@ public static class TimelineNavigationService
             return Math.Max(0, sourceDurationSeconds);
         }
 
-        var keepDuration = project.Segments
-            .Where(segment => segment.Kind == TimelineSegmentKind.Keep)
-            .Sum(segment => segment.DurationSeconds);
+        var timelineDuration = project.Segments
+            .Where(segment => segment.Kind != TimelineSegmentKind.Gap)
+            .Select(segment => segment.TimelineStartSeconds + segment.DurationSeconds)
+            .DefaultIfEmpty(0d)
+            .Max();
 
-        return Math.Max(0, keepDuration);
+        return Math.Max(0, timelineDuration);
     }
 
     public static double MapVirtualToSource(TimelineProject? project, double virtualSeconds, double sourceDurationSeconds)
@@ -25,34 +27,36 @@ public static class TimelineNavigationService
             return Clamp(virtualSeconds, 0, sourceDurationSeconds);
         }
 
-        var keepSegments = project.Segments
-            .Where(segment => segment.Kind == TimelineSegmentKind.Keep)
+        var timelineSegments = project.Segments
+            .Where(segment => segment.Kind != TimelineSegmentKind.Gap)
             .OrderBy(segment => segment.TimelineStartSeconds)
             .ToList();
 
-        if (keepSegments.Count == 0)
+        if (timelineSegments.Count == 0)
         {
             return 0;
         }
 
         var clampedVirtual = Clamp(virtualSeconds, 0, GetVirtualDuration(project, sourceDurationSeconds));
-        double cursor = 0;
-
-        for (var index = 0; index < keepSegments.Count; index++)
+        for (var index = 0; index < timelineSegments.Count; index++)
         {
-            var segment = keepSegments[index];
-            var duration = segment.DurationSeconds;
-            var isLast = index == keepSegments.Count - 1;
-            if (clampedVirtual < cursor + duration || isLast)
+            var segment = timelineSegments[index];
+            var segmentStart = segment.TimelineStartSeconds;
+            var segmentEnd = segment.TimelineStartSeconds + segment.DurationSeconds;
+            if (clampedVirtual < segmentStart)
             {
-                var offset = Math.Min(duration, Math.Max(0, clampedVirtual - cursor));
-                return Clamp(segment.SourceStartSeconds + offset, 0, sourceDurationSeconds);
+                return Clamp(segment.SourceStartSeconds, 0, sourceDurationSeconds);
             }
 
-            cursor += duration;
+            var isLast = index == timelineSegments.Count - 1;
+            if (clampedVirtual <= segmentEnd || isLast)
+            {
+                var offset = Math.Min(segment.DurationSeconds, Math.Max(0, clampedVirtual - segmentStart));
+                return Clamp(segment.SourceStartSeconds + offset, 0, sourceDurationSeconds);
+            }
         }
 
-        return Clamp(keepSegments[^1].SourceEndSeconds, 0, sourceDurationSeconds);
+        return Clamp(timelineSegments[^1].SourceEndSeconds, 0, sourceDurationSeconds);
     }
 
     public static bool TryMapSourceToVirtual(TimelineProject? project, double sourceSeconds, double sourceDurationSeconds, out double virtualSeconds)
@@ -63,22 +67,19 @@ public static class TimelineNavigationService
             return true;
         }
 
-        var keepSegments = project.Segments
-            .Where(segment => segment.Kind == TimelineSegmentKind.Keep)
+        var timelineSegments = project.Segments
+            .Where(segment => segment.Kind != TimelineSegmentKind.Gap)
             .OrderBy(segment => segment.TimelineStartSeconds)
             .ToList();
 
         var clampedSource = Clamp(sourceSeconds, 0, sourceDurationSeconds);
-        double cursor = 0;
-        foreach (var segment in keepSegments)
+        foreach (var segment in timelineSegments)
         {
             if (clampedSource >= segment.SourceStartSeconds && clampedSource <= segment.SourceEndSeconds)
             {
-                virtualSeconds = cursor + Math.Max(0, clampedSource - segment.SourceStartSeconds);
+                virtualSeconds = segment.TimelineStartSeconds + Math.Max(0, clampedSource - segment.SourceStartSeconds);
                 return true;
             }
-
-            cursor += segment.DurationSeconds;
         }
 
         virtualSeconds = 0;
@@ -94,7 +95,7 @@ public static class TimelineNavigationService
 
         var clampedSource = Clamp(sourceSeconds, 0, sourceDurationSeconds);
         var keepSegments = project.Segments
-            .Where(segment => segment.Kind == TimelineSegmentKind.Keep)
+            .Where(segment => segment.Kind != TimelineSegmentKind.Gap)
             .OrderBy(segment => segment.TimelineStartSeconds)
             .ToList();
 
