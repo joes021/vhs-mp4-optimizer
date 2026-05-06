@@ -21,6 +21,7 @@ namespace VhsMp4Optimizer.App.ViewModels;
 
 public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 {
+    private const double TimelineBlockMinimumPixels = 8d;
     private readonly Action<TimelineProject, ItemTransformSettings?> _saveAction;
     private readonly IPreviewFrameService _previewFrameService;
     private readonly CropDetectService _cropDetectService = new();
@@ -1095,7 +1096,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         var selectedBlockId = TimelineBlocks.FirstOrDefault(block => block.IsSelected)?.SegmentId ?? selectedId;
         TimelineBlocks.Clear();
-        foreach (var block in TimelineStripService.BuildBlocks(Timeline, TimelinePreferredWidth))
+        foreach (var block in TimelineStripService.BuildBlocks(Timeline, TimelinePreferredWidth, TimelineBlockMinimumPixels))
         {
             TimelineBlocks.Add(new TimelineBlockItemViewModel
             {
@@ -1791,6 +1792,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
         var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
         var safeSourceSeconds = GetSafePreviewSourceSeconds(sourceSeconds);
+        ResetPlaybackSessionForPreviewSeek(safeSourceSeconds);
         _lastRequestedSourceSeconds = safeSourceSeconds;
         _pendingPlaybackSeekMilliseconds = (long)Math.Round(safeSourceSeconds * 1000d);
         _awaitingPlaybackFrame = true;
@@ -1818,6 +1820,43 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         var frameStep = 1d / fps;
         var safeMax = Math.Max(0d, Item.MediaInfo.DurationSeconds - frameStep);
         return Math.Clamp(sourceSeconds, 0d, safeMax);
+    }
+
+    private void ResetPlaybackSessionForPreviewSeek(double targetSourceSeconds)
+    {
+        if (_playbackMediaPlayer is null || Item.MediaInfo is null)
+        {
+            return;
+        }
+
+        var state = _playbackMediaPlayer.State;
+        var currentSeconds = Math.Max(0d, _playbackMediaPlayer.Time / 1000d);
+        if (!ShouldResetPlaybackSessionForPreviewSeek(
+                state,
+                currentSeconds,
+                targetSourceSeconds,
+                GetSafePreviewSourceSeconds(Item.MediaInfo.DurationSeconds)))
+        {
+            return;
+        }
+
+        _playbackMediaPlayer.Stop();
+        _playbackMedia?.Dispose();
+        _playbackMedia = null;
+        EnsurePlaybackMediaLoaded();
+    }
+
+    private static bool ShouldResetPlaybackSessionForPreviewSeek(
+        VLCState state,
+        double currentSeconds,
+        double targetSourceSeconds,
+        double safeEndSeconds)
+    {
+        var atOrNearEnd = currentSeconds >= safeEndSeconds - 0.1d;
+        var rewindingAwayFromCurrentPosition = targetSourceSeconds + 0.5d < currentSeconds;
+        return state == VLCState.Ended
+               || state == VLCState.Stopped
+               || (atOrNearEnd && rewindingAwayFromCurrentPosition);
     }
 
     public void Dispose()

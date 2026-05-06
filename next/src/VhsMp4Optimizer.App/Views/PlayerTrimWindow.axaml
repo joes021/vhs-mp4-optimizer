@@ -537,7 +537,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
                                                 <Button Width="{Binding WidthPixels}"
-                                                        MinWidth="24"
+                                                        MinWidth="8"
                                                         Height="140"
                                                         Canvas.Left="{Binding LeftPixels}"
                                                         Canvas.Top="0"
@@ -656,7 +656,7 @@
                                             <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
                                                 <Border Width="{Binding WidthPixels}"
                                                         Height="56"
-                                                        MinWidth="24"
+                                                        MinWidth="8"
                                                         Canvas.Left="{Binding LeftPixels}"
                                                         Canvas.Top="0"
                                                         Background="{Binding AudioBackgroundBrush}"

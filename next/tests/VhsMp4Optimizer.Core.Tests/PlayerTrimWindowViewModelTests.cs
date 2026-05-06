@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using VhsMp4Optimizer.App;
 using Avalonia.Input;
+using LibVLCSharp.Shared;
 
 namespace VhsMp4Optimizer.Core.Tests;
 
@@ -692,6 +693,64 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task SplitAtPlayheadCommand_should_keep_visual_blocks_non_overlapping_after_multiple_short_splits_on_long_media()
+    {
+        var queueItem = BuildQueueItem(durationSeconds: 13640.95, durationText: "03:47:20.95");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 240d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 360d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+
+        var orderedBlocks = viewModel.TimelineBlocks.OrderBy(block => block.LeftPixels).ToList();
+        Assert.Equal(4, orderedBlocks.Count);
+        for (var i = 0; i < orderedBlocks.Count - 1; i++)
+        {
+            var currentRight = orderedBlocks[i].LeftPixels + orderedBlocks[i].WidthPixels;
+            Assert.True(
+                currentRight <= orderedBlocks[i + 1].LeftPixels + 0.001d,
+                $"Block {i} overlaps block {i + 1}: right={currentRight:F2}, nextLeft={orderedBlocks[i + 1].LeftPixels:F2}");
+        }
+    }
+
+    [Fact]
+    public async Task HandleTimelineBlockDragAsync_should_move_segment_and_keep_blocks_separated_on_long_media()
+    {
+        var queueItem = BuildQueueItem(durationSeconds: 13640.95, durationText: "03:47:20.95");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 240d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        var secondBlock = viewModel.TimelineBlocks[1];
+        var originalStart = viewModel.Timeline.Segments.Single(segment => segment.Id == secondBlock.SegmentId).TimelineStartSeconds;
+
+        await viewModel.HandleTimelineBlockDragAsync(secondBlock, 180d);
+
+        var movedSegment = viewModel.Timeline.Segments.Single(segment => segment.Id == secondBlock.SegmentId);
+        Assert.True(movedSegment.TimelineStartSeconds > originalStart);
+
+        var orderedBlocks = viewModel.TimelineBlocks.OrderBy(block => block.LeftPixels).ToList();
+        for (var i = 0; i < orderedBlocks.Count - 1; i++)
+        {
+            var currentRight = orderedBlocks[i].LeftPixels + orderedBlocks[i].WidthPixels;
+            Assert.True(currentRight <= orderedBlocks[i + 1].LeftPixels + 0.001d);
+        }
+    }
+
+    [Fact]
     public async Task HandleEditorHotkeyAsync_should_switch_tools_and_update_in_out_points()
     {
         var queueItem = BuildQueueItem();
@@ -843,6 +902,19 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         await viewModel.HandleEditorHotkeyAsync(Key.Space);
         Assert.False(viewModel.IsPlaying);
+    }
+
+    [Fact]
+    public void ShouldResetPlaybackSessionForPreviewSeek_should_rearm_player_when_rewinding_from_end_state()
+    {
+        var method = typeof(PlayerTrimWindowViewModel)
+            .GetMethod("ShouldResetPlaybackSessionForPreviewSeek", BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        Assert.True((bool)method!.Invoke(null, [VLCState.Ended, 13640.90d, 0d, 13640.91d])!);
+        Assert.True((bool)method.Invoke(null, [VLCState.Stopped, 120d, 0d, 13640.91d])!);
+        Assert.True((bool)method.Invoke(null, [VLCState.Paused, 13640.88d, 0d, 13640.91d])!);
+        Assert.False((bool)method.Invoke(null, [VLCState.Paused, 120d, 119.8d, 13640.91d])!);
     }
 
     [Fact]
@@ -1227,15 +1299,18 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         return fullPath;
     }
 
-    private static QueueItemSummary BuildQueueItem(string sourcePath = @"C:\video\clip.avi")
+    private static QueueItemSummary BuildQueueItem(
+        string sourcePath = @"C:\video\clip.avi",
+        double durationSeconds = 300,
+        string durationText = "00:05:00")
     {
         var mediaInfo = new MediaInfo
         {
             SourceName = "clip.avi",
             SourcePath = sourcePath,
             Container = "avi",
-            DurationSeconds = 300,
-            DurationText = "00:05:00",
+            DurationSeconds = durationSeconds,
+            DurationText = durationText,
             SizeBytes = 10485760,
             SizeText = "10 MB",
             OverallBitrateKbps = 4500,

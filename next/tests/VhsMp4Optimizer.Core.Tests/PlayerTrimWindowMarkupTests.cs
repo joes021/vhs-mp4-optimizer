@@ -106,7 +106,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Background=\"{Binding AudioBackgroundBrush}\"", markup, StringComparison.Ordinal);
         Assert.True(sharedTimelineItemsControlCount >= 2);
         Assert.Contains("x:Name=\"TimelinePlayheadIndicator\"", markup, StringComparison.Ordinal);
-        Assert.Contains("MinWidth=\"24\"", markup, StringComparison.Ordinal);
+        Assert.Contains("MinWidth=\"8\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"V2\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"A2\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Timeline Mini Toolbar", markup, StringComparison.Ordinal);
