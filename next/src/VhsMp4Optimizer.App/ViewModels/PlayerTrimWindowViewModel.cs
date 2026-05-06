@@ -38,6 +38,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private bool _previewRefreshQueued;
     private bool _unmuteWhenPlaybackFrameArrives;
+    private bool _isPreviewSliderDragging;
     private double _lastRequestedSourceSeconds;
     private readonly Stack<TimelineProject> _undoStack = new();
     private readonly Stack<TimelineProject> _redoStack = new();
@@ -418,6 +419,10 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         "10s" => 1200,
         _ => 960
     };
+    public double TimelinePlayheadOffsetPixels => PreviewVirtualMaximum <= 0
+        ? 0d
+        : Math.Clamp(PreviewVirtualSeconds / PreviewVirtualMaximum, 0d, 1d) * Math.Max(0d, TimelinePreferredWidth);
+    public Thickness TimelinePlayheadMargin => new(Math.Max(0d, TimelinePlayheadOffsetPixels), 0, 0, 0);
 
     partial void OnSelectedSegmentChanged(TimelineSegment? value)
     {
@@ -446,7 +451,9 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     partial void OnPreviewVirtualSecondsChanged(double value)
     {
         UpdatePreviewTimeTexts();
-        if (_suppressPreviewAutoRefresh || IsPlaying || _disposed)
+        OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
+        OnPropertyChanged(nameof(TimelinePlayheadMargin));
+        if (_suppressPreviewAutoRefresh || IsPlaying || _disposed || _isPreviewSliderDragging)
         {
             return;
         }
@@ -1004,12 +1011,19 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     private void PausePlayback()
     {
-        PausePlaybackCore(loadPreviewAfterPause: true, $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}");
+        PausePlaybackCore(loadPreviewAfterPause: false, $"Playback pauziran | virtual {PreviewVirtualTimeText} | source {PreviewSourceTimeText}");
     }
 
     public void BeginManualPreviewNavigation()
     {
-        PausePlaybackCore(loadPreviewAfterPause: true, "Pomeraj timeline za precizan trim frame.");
+        _isPreviewSliderDragging = true;
+        PausePlaybackCore(loadPreviewAfterPause: false, "Pomeraj timeline za precizan trim frame.");
+    }
+
+    public async Task EndManualPreviewNavigationAsync()
+    {
+        _isPreviewSliderDragging = false;
+        await CommitPreviewSliderAsync();
     }
 
     private void SetInPointFromCurrent() => InPointText = PreviewSourceTimeText;
@@ -1113,6 +1127,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
         OnPropertyChanged(nameof(PreviewDurationText));
+        OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
+        OnPropertyChanged(nameof(TimelinePlayheadMargin));
         UpdatePreviewTimeTexts();
         UpdateSelectedClipSummary();
     }
@@ -1157,6 +1173,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(TimelineRulerCenterLabel));
         OnPropertyChanged(nameof(TimelineRulerRightLabel));
         OnPropertyChanged(nameof(TimelineZoomSummary));
+        OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
+        OnPropertyChanged(nameof(TimelinePlayheadMargin));
     }
 
     private void SelectTimelineBlock(TimelineBlockItemViewModel? block, bool syncPlayhead = true)
@@ -1225,6 +1243,35 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         await CommitPreviewSliderAsync();
+    }
+
+    public async Task HandleTimelineBlockDragAsync(TimelineBlockItemViewModel? block, double deltaX)
+    {
+        if (block is null)
+        {
+            return;
+        }
+
+        SelectTimelineBlock(block, syncPlayhead: false);
+        if (Math.Abs(deltaX) < 24d)
+        {
+            return;
+        }
+
+        if (deltaX < 0)
+        {
+            if (MoveLeftCommand.CanExecute(null))
+            {
+                await MoveLeftCommand.ExecuteAsync(null);
+            }
+
+            return;
+        }
+
+        if (MoveRightCommand.CanExecute(null))
+        {
+            await MoveRightCommand.ExecuteAsync(null);
+        }
     }
 
     public async Task<bool> HandleEditorHotkeyAsync(Key key, bool controlModifier = false)

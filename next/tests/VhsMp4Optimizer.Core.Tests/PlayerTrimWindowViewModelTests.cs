@@ -301,7 +301,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         var sourcePath = CreateRealVideo("playback-source.avi", ffmpegPath);
         var queueItem = BuildQueueItem(sourcePath);
-        var viewModel = new PlayerTrimWindowViewModel(
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
             ffmpegPath,
             (_, _) => { },
@@ -325,7 +325,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         var sourcePath = CreateRealVideo("playback-source-reuse.avi", ffmpegPath);
         var queueItem = BuildQueueItem(sourcePath);
-        var viewModel = new PlayerTrimWindowViewModel(
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
             ffmpegPath,
             (_, _) => { },
@@ -355,7 +355,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         var sourcePath = CreateRealVideo("playback-source-first-frame.avi", ffmpegPath);
         var queueItem = BuildQueueItem(sourcePath);
-        var viewModel = new PlayerTrimWindowViewModel(
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
             ffmpegPath,
             (_, _) => { },
@@ -368,7 +368,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public void PlaybackSurfaceBinding_should_attach_only_during_playback_and_detach_on_pause()
+    public void PlaybackSurfaceBinding_should_stay_attached_while_paused_in_same_monitor()
     {
         var ffmpegPath = FfmpegLocator.Resolve();
         if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
@@ -378,7 +378,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         var sourcePath = CreateRealVideo("playback-surface-binding.avi", ffmpegPath);
         var queueItem = BuildQueueItem(sourcePath);
-        var viewModel = new PlayerTrimWindowViewModel(
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
             ffmpegPath,
             (_, _) => { },
@@ -390,63 +390,71 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.NotNull(viewModel.PlaybackMediaPlayerBinding);
 
         viewModel.PauseCommand.Execute(null);
-        Assert.Null(viewModel.PlaybackMediaPlayerBinding);
+        Assert.NotNull(viewModel.PlaybackMediaPlayerBinding);
     }
 
     [Fact]
-    public void BeginManualPreviewNavigation_should_leave_playback_mode_and_return_to_trim_preview()
+    public void BeginManualPreviewNavigation_should_leave_playback_mode_without_forcing_new_preview()
     {
-        var ffmpegPath = FfmpegLocator.Resolve();
-        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
-        {
-            return;
-        }
-
-        var sourcePath = CreateRealVideo("playback-source-manual-nav.avi", ffmpegPath);
-        var queueItem = BuildQueueItem(sourcePath);
-        var viewModel = new PlayerTrimWindowViewModel(
+        var queueItem = BuildQueueItem();
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
-            ffmpegPath,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
             (_, _) => { },
             autoLoadPreview: false);
 
-        viewModel.PlayCommand.Execute(null);
+        DisablePlaybackEngine(viewModel);
+        viewModel.IsPlaying = true;
+        viewModel.IsVideoPlaybackVisible = true;
         viewModel.BeginManualPreviewNavigation();
 
         Assert.False(viewModel.IsPlaying);
-        Assert.False(viewModel.IsVideoPlaybackVisible);
-        Assert.True(viewModel.IsPreviewImageVisible);
     }
 
     [Fact]
-    public async Task BeginManualPreviewNavigation_should_request_fresh_preview_for_precise_trim()
+    public async Task BeginManualPreviewNavigation_should_wait_for_slider_release_before_requesting_preview()
     {
-        var ffmpegPath = FfmpegLocator.Resolve();
-        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
-        {
-            return;
-        }
-
-        var sourcePath = CreateRealVideo("playback-source-manual-refresh.avi", ffmpegPath);
-        var queueItem = BuildQueueItem(sourcePath);
-        var requestedSeconds = new List<double>();
-        var previewPath = CreateTinyPng("manual-refresh-preview.png");
-        var viewModel = new PlayerTrimWindowViewModel(
+        var queueItem = BuildQueueItem();
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
-            ffmpegPath,
+            ffmpegPath: null,
             (_, _) => { },
-            new FakePreviewFrameService((_, _, sourceSeconds, _, _) =>
-            {
-                requestedSeconds.Add(sourceSeconds);
-                return previewPath;
-            }),
             autoLoadPreview: false);
 
-        viewModel.PlayCommand.Execute(null);
+        DisablePlaybackEngine(viewModel);
+        viewModel.IsPlaying = true;
+        viewModel.IsVideoPlaybackVisible = true;
         viewModel.BeginManualPreviewNavigation();
-        await Task.Delay(250);
+        viewModel.PreviewVirtualSeconds = 0.5d;
 
-        Assert.Contains(requestedSeconds, value => value >= 0d);
+        Assert.True(IsPreviewSliderDragging(viewModel));
+
+        await viewModel.EndManualPreviewNavigationAsync();
+
+        Assert.False(IsPreviewSliderDragging(viewModel));
+    }
+
+    [Fact]
+    public async Task BeginManualPreviewNavigation_should_delay_ffmpeg_preview_until_slider_release()
+    {
+        var queueItem = BuildQueueItem();
+        using var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        DisablePlaybackEngine(viewModel);
+        viewModel.IsPlaying = true;
+        viewModel.IsVideoPlaybackVisible = true;
+        viewModel.BeginManualPreviewNavigation();
+        viewModel.PreviewVirtualSeconds = 36d;
+
+        Assert.True(IsPreviewSliderDragging(viewModel));
+
+        await viewModel.EndManualPreviewNavigationAsync();
+
+        Assert.False(IsPreviewSliderDragging(viewModel));
     }
 
     [Fact]
@@ -462,7 +470,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         var queueItem = BuildQueueItem(sourcePath);
         var requestedSeconds = new List<double>();
         var previewPath = CreateTinyPng("post-playback-preview.png");
-        var viewModel = new PlayerTrimWindowViewModel(
+        using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
             ffmpegPath,
             (_, _) => { },
@@ -482,6 +490,43 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.False(viewModel.IsVideoPlaybackVisible);
         Assert.True(viewModel.IsPreviewImageVisible);
         Assert.Contains(requestedSeconds, value => Math.Abs(value - 1.0d) < 0.05d);
+    }
+
+    [Fact]
+    public void PausePlayback_should_not_request_ffmpeg_preview_immediately()
+    {
+        var queueItem = BuildQueueItem();
+        using var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        DisablePlaybackEngine(viewModel);
+        viewModel.IsPlaying = true;
+        viewModel.IsVideoPlaybackVisible = true;
+        viewModel.PauseCommand.Execute(null);
+
+        Assert.False(viewModel.IsPlaying);
+        Assert.True(viewModel.IsVideoPlaybackVisible);
+    }
+
+    [Fact]
+    public void TimelinePlayheadMargin_should_follow_preview_virtual_position()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.SelectZoomPresetCommand.Execute("Full");
+        viewModel.PreviewVirtualSeconds = 75d;
+
+        var expectedLeft = viewModel.TimelinePreferredWidth * (75d / viewModel.PreviewVirtualMaximum);
+
+        Assert.Equal(expectedLeft, viewModel.TimelinePlayheadMargin.Left, 3);
     }
 
     [Fact]
@@ -562,6 +607,27 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         Assert.Single(viewModel.Timeline.Segments);
         Assert.Equal(150d, viewModel.PreviewVirtualSeconds, 3);
+    }
+
+    [Fact]
+    public async Task HandleTimelineBlockDragAsync_should_move_selected_segment_left_when_dragging_left()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 150d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        var secondBlock = viewModel.TimelineBlocks[1];
+
+        await viewModel.HandleTimelineBlockDragAsync(secondBlock, -60d);
+
+        Assert.Equal(0d, viewModel.Timeline.Segments[0].TimelineStartSeconds, 3);
+        Assert.Equal(150d, viewModel.Timeline.Segments[1].TimelineStartSeconds, 3);
+        Assert.Equal(secondBlock.SegmentId, viewModel.Timeline.Segments[0].Id);
     }
 
     [Fact]
@@ -1182,6 +1248,22 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             TimelineProject = null,
             TransformSettings = null
         };
+    }
+
+    private static void DisablePlaybackEngine(PlayerTrimWindowViewModel viewModel)
+    {
+        var type = typeof(PlayerTrimWindowViewModel);
+        type.GetField("_playbackMediaPlayer", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(viewModel, null);
+        type.GetField("_playbackMedia", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(viewModel, null);
+        type.GetField("_libVlc", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(viewModel, null);
+        viewModel.PlaybackMediaPlayerBinding = null;
+    }
+
+    private static bool IsPreviewSliderDragging(PlayerTrimWindowViewModel viewModel)
+    {
+        return (bool)(typeof(PlayerTrimWindowViewModel)
+            .GetField("_isPreviewSliderDragging", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.GetValue(viewModel) ?? false);
     }
 
     private sealed class FakePreviewFrameService : IPreviewFrameService
