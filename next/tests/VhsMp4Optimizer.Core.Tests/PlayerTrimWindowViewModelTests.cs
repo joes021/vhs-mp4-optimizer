@@ -721,6 +721,49 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task SplitAtPlayheadCommand_should_keep_visual_blocks_non_overlapping_after_thirty_second_splits_on_long_media()
+    {
+        var queueItem = BuildQueueItem(durationSeconds: 13640.95, durationText: "03:47:20.95");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 30d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 60d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 90d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        viewModel.PreviewVirtualSeconds = 120d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+
+        var orderedBlocks = viewModel.TimelineBlocks.OrderBy(block => block.LeftPixels).ToList();
+        Assert.Equal(5, orderedBlocks.Count);
+        for (var i = 0; i < orderedBlocks.Count - 1; i++)
+        {
+            var currentRight = orderedBlocks[i].LeftPixels + orderedBlocks[i].WidthPixels;
+            Assert.True(
+                currentRight <= orderedBlocks[i + 1].LeftPixels + 0.001d,
+                $"Block {i} overlaps block {i + 1}: right={currentRight:F2}, nextLeft={orderedBlocks[i + 1].LeftPixels:F2}");
+        }
+    }
+
+    [Fact]
+    public void TimelinePreferredWidth_should_expand_for_long_media_even_on_full_zoom()
+    {
+        var queueItem = BuildQueueItem(durationSeconds: 13640.95, durationText: "03:47:20.95");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        Assert.True(viewModel.TimelinePreferredWidth > 960d);
+    }
+
+    [Fact]
     public async Task HandleTimelineBlockDragAsync_should_move_segment_and_keep_blocks_separated_on_long_media()
     {
         var queueItem = BuildQueueItem(durationSeconds: 13640.95, durationText: "03:47:20.95");

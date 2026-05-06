@@ -415,13 +415,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     public string TimelineRulerRightLabel => FormatTimelineRulerSeconds(GetTimelineRulerRightSeconds());
     public string TimelineZoomSummary => $"View span {TimelineRulerLeftLabel} -> {TimelineRulerRightLabel}";
     public string PreviewDurationText => TimelineEditorService.FormatSeconds(Math.Max(0d, PreviewVirtualMaximum));
-    public double TimelinePreferredWidth => ActiveZoomPreset switch
+    public double TimelinePreferredWidth
     {
-        "1s" => 2200,
-        "5s" => 1600,
-        "10s" => 1200,
-        _ => 960
-    };
+        get
+        {
+            var durationSeconds = Math.Max(
+                PreviewVirtualMaximum,
+                Item.MediaInfo?.DurationSeconds ?? Timeline.SourceDurationSeconds);
+            var scaledWidth = durationSeconds * GetTimelinePixelsPerSecond();
+            return Math.Clamp(Math.Max(960d, scaledWidth), 960d, 50000d);
+        }
+    }
     public double TimelinePlayheadOffsetPixels => PreviewVirtualMaximum <= 0
         ? 0d
         : Math.Clamp(PreviewVirtualSeconds / PreviewVirtualMaximum, 0d, 1d) * Math.Max(0d, TimelinePreferredWidth);
@@ -970,6 +974,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         EditorHint = IsTrackSolo ? "V1 track je u solo rezimu." : "V1 track je izasao iz solo rezima.";
     }
 
+    private double GetTimelinePixelsPerSecond() => ActiveZoomPreset switch
+    {
+        "1s" => 16d,
+        "5s" => 10d,
+        "10s" => 6d,
+        _ => 3d
+    };
+
     private void StartPlayback()
     {
         if (IsPlaying || _previewBusy || !EnsurePlaybackReady())
@@ -1116,6 +1128,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         var keepDuration = TimelineEditorService.GetKeptDurationSeconds(Timeline);
         PreviewVirtualMaximum = Math.Max(0, TimelineNavigationService.GetVirtualDuration(Timeline, Item.MediaInfo?.DurationSeconds ?? 0));
         TimelineSummary = $"Keep duration: {TimelineEditorService.FormatSeconds(keepDuration)} | Segments: {Timeline.Segments.Count}";
+        OnPropertyChanged(nameof(TimelinePreferredWidth));
         OnPropertyChanged(nameof(PreviewDurationText));
         OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
         OnPropertyChanged(nameof(TimelinePlayheadMargin));
@@ -1159,6 +1172,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsTrackLockActive));
         OnPropertyChanged(nameof(IsTrackMuteActive));
         OnPropertyChanged(nameof(IsTrackSoloActive));
+        OnPropertyChanged(nameof(TimelinePreferredWidth));
         OnPropertyChanged(nameof(TimelineRulerLeftLabel));
         OnPropertyChanged(nameof(TimelineRulerCenterLabel));
         OnPropertyChanged(nameof(TimelineRulerRightLabel));

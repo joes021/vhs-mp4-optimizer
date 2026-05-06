@@ -527,96 +527,102 @@
                                           VerticalScrollBarVisibility="Disabled">
                                 <Grid Width="{Binding TimelinePreferredWidth}"
                                       MinHeight="180">
-                                    <ItemsControl ItemsSource="{Binding TimelineBlocks}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <Canvas Width="{Binding TimelinePreferredWidth}"
-                                                        Height="140" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
-                                                <Button Width="{Binding WidthPixels}"
-                                                        MinWidth="8"
-                                                        Height="140"
-                                                        Canvas.Left="{Binding LeftPixels}"
-                                                        Canvas.Top="0"
-                                                        Padding="0"
-                                                        Cursor="Hand"
-                                                        Focusable="False"
-                                                        ToolTip.Tip="Select: klik za preview. Razor: klik za rez na V1."
-                                                        PointerPressed="TimelineBlockPointerPressed"
-                                                        PointerReleased="TimelineBlockPointerReleased"
-                                                        Background="{Binding BackgroundBrush}"
-                                                        Foreground="{Binding ForegroundBrush}"
-                                                        BorderBrush="{Binding BorderBrush}"
-                                                        BorderThickness="{Binding BorderThickness}">
-                                                    <Grid RowDefinitions="Auto,*">
-                                                        <Border x:Name="SelectedClipTitleBar"
-                                                                Background="{Binding TitleBarBackgroundBrush}"
-                                                                BorderBrush="{Binding TitleBarBorderBrush}"
-                                                                BorderThickness="0,0,0,1"
-                                                                CornerRadius="6,6,0,0"
-                                                                Padding="8,5">
-                                                            <TextBlock FontSize="10"
-                                                                       FontWeight="Bold"
-                                                                       Text="{Binding SelectedTitleText}" />
-                                                        </Border>
+                                    <Canvas x:Name="TimelinePlayheadOverlayCanvas"
+                                            Width="{Binding TimelinePreferredWidth}"
+                                            Height="140">
+                                        <ItemsControl Width="{Binding TimelinePreferredWidth}"
+                                                      Height="140"
+                                                      ItemsSource="{Binding TimelineBlocks}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <Canvas Width="{Binding TimelinePreferredWidth}"
+                                                            Height="140" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
+                                                    <Button Width="{Binding WidthPixels}"
+                                                            MinWidth="8"
+                                                            Height="140"
+                                                            Canvas.Left="{Binding LeftPixels}"
+                                                            Canvas.Top="0"
+                                                            Padding="0"
+                                                            Cursor="Hand"
+                                                            Focusable="False"
+                                                            ToolTip.Tip="Select: klik za preview. Razor: klik za rez na V1."
+                                                            PointerPressed="TimelineBlockPointerPressed"
+                                                            PointerReleased="TimelineBlockPointerReleased"
+                                                            Background="{Binding BackgroundBrush}"
+                                                            Foreground="{Binding ForegroundBrush}"
+                                                            BorderBrush="{Binding BorderBrush}"
+                                                            BorderThickness="{Binding BorderThickness}">
+                                                        <Grid RowDefinitions="Auto,*">
+                                                            <Border x:Name="SelectedClipTitleBar"
+                                                                    Background="{Binding TitleBarBackgroundBrush}"
+                                                                    BorderBrush="{Binding TitleBarBorderBrush}"
+                                                                    BorderThickness="0,0,0,1"
+                                                                    CornerRadius="6,6,0,0"
+                                                                    Padding="8,5">
+                                                                <TextBlock FontSize="10"
+                                                                           FontWeight="Bold"
+                                                                           Text="{Binding SelectedTitleText}" />
+                                                            </Border>
 
-                                                        <Grid Grid.Row="1" ColumnDefinitions="10,*,10">
-                                                            <Border x:Name="ClipHandleGripLeft"
-                                                                    Width="6"
-                                                                    Margin="2,8,0,8"
-                                                                    Background="#9FB6CC"
-                                                                    CornerRadius="3" />
-                                                            <StackPanel Grid.Column="1" Margin="8" Spacing="6">
-                                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                                                                    <Border Background="{Binding AccentBrush}"
-                                                                            BorderBrush="#E2E8F0"
-                                                                            BorderThickness="1"
-                                                                            CornerRadius="4"
-                                                                            Padding="6,2">
-                                                                        <TextBlock FontSize="10"
+                                                            <Grid Grid.Row="1" ColumnDefinitions="10,*,10">
+                                                                <Border x:Name="ClipHandleGripLeft"
+                                                                        Width="6"
+                                                                        Margin="2,8,0,8"
+                                                                        Background="#9FB6CC"
+                                                                        CornerRadius="3" />
+                                                                <StackPanel Grid.Column="1" Margin="8" Spacing="6">
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                                                        <Border Background="{Binding AccentBrush}"
+                                                                                BorderBrush="#E2E8F0"
+                                                                                BorderThickness="1"
+                                                                                CornerRadius="4"
+                                                                                Padding="6,2">
+                                                                            <TextBlock FontSize="10"
+                                                                                       FontWeight="Bold"
+                                                                                       Text="{Binding SelectionBadgeText}" />
+                                                                        </Border>
+                                                                        <TextBlock Grid.Column="1"
                                                                                    FontWeight="Bold"
-                                                                                   Text="{Binding SelectionBadgeText}" />
-                                                                    </Border>
-                                                                    <TextBlock Grid.Column="1"
-                                                                               FontWeight="Bold"
-                                                                               VerticalAlignment="Center"
-                                                                               Text="{Binding Label}" />
-                                                                    <Border Grid.Column="2"
-                                                                            Background="#132334"
-                                                                            BorderBrush="#6A88A6"
-                                                                            BorderThickness="1"
-                                                                            CornerRadius="4"
-                                                                            Padding="5,2">
-                                                                        <TextBlock FontSize="10" FontWeight="Bold" Text="SRC" />
-                                                                    </Border>
-                                                                </Grid>
-                                                                <TextBlock FontSize="11"
-                                                                           Text="{Binding Summary}"
-                                                                           TextWrapping="Wrap" />
-                                                            </StackPanel>
-                                                            <Border x:Name="ClipHandleGripRight"
-                                                                    Grid.Column="2"
-                                                                    Width="6"
-                                                                    Margin="0,8,2,8"
-                                                                    Background="#9FB6CC"
-                                                                    CornerRadius="3" />
+                                                                                   VerticalAlignment="Center"
+                                                                                   Text="{Binding Label}" />
+                                                                        <Border Grid.Column="2"
+                                                                                Background="#132334"
+                                                                                BorderBrush="#6A88A6"
+                                                                                BorderThickness="1"
+                                                                                CornerRadius="4"
+                                                                                Padding="5,2">
+                                                                            <TextBlock FontSize="10" FontWeight="Bold" Text="SRC" />
+                                                                        </Border>
+                                                                    </Grid>
+                                                                    <TextBlock FontSize="11"
+                                                                               Text="{Binding Summary}"
+                                                                               TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                                <Border x:Name="ClipHandleGripRight"
+                                                                        Grid.Column="2"
+                                                                        Width="6"
+                                                                        Margin="0,8,2,8"
+                                                                        Background="#9FB6CC"
+                                                                        CornerRadius="3" />
+                                                            </Grid>
                                                         </Grid>
-                                                    </Grid>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
 
-                                    <Border x:Name="TimelinePlayheadIndicator"
-                                            Width="2"
-                                            Canvas.Left="{Binding TimelinePlayheadOffsetPixels}"
-                                            Background="#F97316"
-                                            Height="140"
-                                            VerticalAlignment="Top"
-                                            IsHitTestVisible="False" />
+                                        <Border x:Name="TimelinePlayheadIndicator"
+                                                Width="2"
+                                                Canvas.Left="{Binding TimelinePlayheadOffsetPixels}"
+                                                Canvas.Top="0"
+                                                Background="#F97316"
+                                                Height="140"
+                                                IsHitTestVisible="False" />
+                                    </Canvas>
                                 </Grid>
                             </ScrollViewer>
                         </Grid>
@@ -645,38 +651,43 @@
                                           VerticalScrollBarVisibility="Disabled">
                                 <Grid Width="{Binding TimelinePreferredWidth}"
                                       MinHeight="72">
-                                    <ItemsControl ItemsSource="{Binding TimelineBlocks}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <Canvas Width="{Binding TimelinePreferredWidth}"
-                                                        Height="56" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
-                                                <Border Width="{Binding WidthPixels}"
-                                                        Height="56"
-                                                        MinWidth="8"
-                                                        Canvas.Left="{Binding LeftPixels}"
-                                                        Canvas.Top="0"
-                                                        Background="{Binding AudioBackgroundBrush}"
-                                                        BorderBrush="{Binding AudioBorderBrush}"
-                                                        BorderThickness="2"
-                                                        CornerRadius="8"
-                                                        Padding="12,8">
-                                                    <StackPanel Spacing="4">
-                                                        <TextBlock FontWeight="Bold"
-                                                                   Foreground="#F1FBF5"
-                                                                   Text="{Binding Label}" />
-                                                        <TextBlock FontSize="11"
-                                                                   Foreground="#D8F6E3"
-                                                                   Text="{Binding Summary}"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <Canvas Width="{Binding TimelinePreferredWidth}"
+                                            Height="56">
+                                        <ItemsControl Width="{Binding TimelinePreferredWidth}"
+                                                      Height="56"
+                                                      ItemsSource="{Binding TimelineBlocks}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <Canvas Width="{Binding TimelinePreferredWidth}"
+                                                            Height="56" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
+                                                    <Border Width="{Binding WidthPixels}"
+                                                            Height="56"
+                                                            MinWidth="8"
+                                                            Canvas.Left="{Binding LeftPixels}"
+                                                            Canvas.Top="0"
+                                                            Background="{Binding AudioBackgroundBrush}"
+                                                            BorderBrush="{Binding AudioBorderBrush}"
+                                                            BorderThickness="2"
+                                                            CornerRadius="8"
+                                                            Padding="12,8">
+                                                        <StackPanel Spacing="4">
+                                                            <TextBlock FontWeight="Bold"
+                                                                       Foreground="#F1FBF5"
+                                                                       Text="{Binding Label}" />
+                                                            <TextBlock FontSize="11"
+                                                                       Foreground="#D8F6E3"
+                                                                       Text="{Binding Summary}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Canvas>
                                 </Grid>
                             </ScrollViewer>
                         </Grid>

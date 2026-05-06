@@ -93,7 +93,7 @@ public sealed class PlayerTrimWindowMarkupTests
         var markup = ReadPlayerTrimMarkup();
         var sharedTimelineItemsControlCount = Regex.Matches(
             markup,
-            "ItemsControl ItemsSource=\"\\{Binding TimelineBlocks\\}\"",
+            "ItemsSource=\"\\{Binding TimelineBlocks\\}\"",
             RegexOptions.CultureInvariant).Count;
 
         Assert.Contains("x:Name=\"V1LaneRow\"", markup, StringComparison.Ordinal);
@@ -105,6 +105,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Canvas.Left=\"{Binding LeftPixels}\"", markup, StringComparison.Ordinal);
         Assert.Contains("Background=\"{Binding AudioBackgroundBrush}\"", markup, StringComparison.Ordinal);
         Assert.True(sharedTimelineItemsControlCount >= 2);
+        Assert.Contains("x:Name=\"TimelinePlayheadOverlayCanvas\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TimelinePlayheadIndicator\"", markup, StringComparison.Ordinal);
         Assert.Contains("MinWidth=\"8\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"V2\"", markup, StringComparison.Ordinal);
