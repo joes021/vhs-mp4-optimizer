@@ -172,6 +172,35 @@ public static class TimelineEditorService
         return Normalize(project, ordered, preserveSequence: true);
     }
 
+    public static TimelineProject MoveSegmentToTime(TimelineProject project, Guid segmentId, double targetTimelineStart)
+    {
+        var ordered = project.Segments.OrderBy(segment => segment.TimelineStartSeconds).ToList();
+        var movingIndex = ordered.FindIndex(segment => segment.Id == segmentId);
+        if (movingIndex < 0)
+        {
+            return project;
+        }
+
+        var movingSegment = ordered[movingIndex];
+        var clampedTarget = Math.Max(0, targetTimelineStart);
+        var rebuilt = ordered
+            .Select(segment => segment.Id == segmentId
+                ? new TimelineSegment
+                {
+                    Id = segment.Id,
+                    Kind = segment.Kind,
+                    TimelineStartSeconds = clampedTarget,
+                    SourceStartSeconds = segment.SourceStartSeconds,
+                    SourceEndSeconds = segment.SourceEndSeconds
+                }
+                : segment)
+            .OrderBy(segment => segment.TimelineStartSeconds)
+            .ToList();
+
+        var normalized = Normalize(project, rebuilt, preserveGaps: true);
+        return AreEquivalent(project, normalized) ? project : normalized;
+    }
+
     public static TimelineProject ToggleSegmentKind(TimelineProject project, Guid segmentId)
     {
         var rebuilt = project.Segments
@@ -564,5 +593,30 @@ public static class TimelineEditorService
             SourceDurationSeconds = project.SourceDurationSeconds,
             Segments = normalized
         };
+    }
+
+    private static bool AreEquivalent(TimelineProject left, TimelineProject right)
+    {
+        if (!string.Equals(left.SourcePath, right.SourcePath, StringComparison.OrdinalIgnoreCase)
+            || left.Segments.Count != right.Segments.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Segments.Count; i++)
+        {
+            var a = left.Segments[i];
+            var b = right.Segments[i];
+            if (a.Id != b.Id
+                || a.Kind != b.Kind
+                || Math.Abs(a.TimelineStartSeconds - b.TimelineStartSeconds) > 0.0001d
+                || Math.Abs(a.SourceStartSeconds - b.SourceStartSeconds) > 0.0001d
+                || Math.Abs(a.SourceEndSeconds - b.SourceEndSeconds) > 0.0001d)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

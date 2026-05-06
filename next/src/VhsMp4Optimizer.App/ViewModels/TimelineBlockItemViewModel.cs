@@ -12,6 +12,7 @@ public partial class TimelineBlockItemViewModel : ObservableObject
     public required TimelineSegmentKind Kind { get; init; }
     public required double TimelineStartSeconds { get; init; }
     public required double DurationSeconds { get; init; }
+    public required double LeftPixels { get; init; }
     public required double WidthPixels { get; init; }
     public required string Label { get; init; }
     public required string Summary { get; init; }
@@ -28,6 +29,18 @@ public partial class TimelineBlockItemViewModel : ObservableObject
     };
 
     public IBrush ForegroundBrush => Brush.Parse("#F8FAFC");
+
+    public IBrush AudioBackgroundBrush => Kind switch
+    {
+        TimelineSegmentKind.Keep => Brush.Parse("#1E6A43"),
+        TimelineSegmentKind.Cut => Brush.Parse("#7A2E2E"),
+        TimelineSegmentKind.Gap => Brush.Parse("#374151"),
+        _ => Brush.Parse("#1F2937")
+    };
+
+    public IBrush AudioBorderBrush => IsSelected
+        ? Brush.Parse("#86EFAC")
+        : Brush.Parse("#0F172A");
 
     public IBrush BorderBrush => IsSelected
         ? Brush.Parse("#FBBF24")
@@ -56,6 +69,7 @@ public partial class TimelineBlockItemViewModel : ObservableObject
     partial void OnIsSelectedChanged(bool value)
     {
         OnPropertyChanged(nameof(BorderBrush));
+        OnPropertyChanged(nameof(AudioBorderBrush));
         OnPropertyChanged(nameof(AccentBrush));
         OnPropertyChanged(nameof(TitleBarBackgroundBrush));
         OnPropertyChanged(nameof(TitleBarBorderBrush));

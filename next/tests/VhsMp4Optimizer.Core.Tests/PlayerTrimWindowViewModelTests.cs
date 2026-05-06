@@ -646,7 +646,28 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
 
         Assert.Equal(0d, viewModel.Timeline.Segments[0].TimelineStartSeconds, 3);
         Assert.Equal(150d, viewModel.Timeline.Segments[1].TimelineStartSeconds, 3);
-        Assert.Equal(secondBlock.SegmentId, viewModel.Timeline.Segments[0].Id);
+        Assert.Equal(secondBlock.SegmentId, viewModel.Timeline.Segments[1].Id);
+    }
+
+    [Fact]
+    public async Task HandleTimelineBlockDragAsync_should_move_selected_segment_later_on_timeline_when_dragging_right()
+    {
+        var queueItem = BuildQueueItem();
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: null,
+            (_, _) => { },
+            autoLoadPreview: false);
+
+        viewModel.PreviewVirtualSeconds = 150d;
+        await viewModel.SplitAtPlayheadCommand.ExecuteAsync(null);
+        var secondBlock = viewModel.TimelineBlocks[1];
+
+        await viewModel.HandleTimelineBlockDragAsync(secondBlock, 160d);
+
+        Assert.Equal(2, viewModel.Timeline.Segments.Count);
+        Assert.Equal(secondBlock.SegmentId, viewModel.Timeline.Segments[1].Id);
+        Assert.True(viewModel.Timeline.Segments[1].TimelineStartSeconds > 150d);
     }
 
     [Fact]
@@ -1063,6 +1084,25 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         Assert.True(methodIndex >= 0);
         Assert.True(commitIndex > methodIndex);
         Assert.True(directFfmpegIndex == -1 || directFfmpegIndex > commitIndex);
+    }
+
+    [Fact]
+    public void OnPreviewVirtualSecondsChanged_should_drive_playback_preview_during_manual_navigation()
+    {
+        var projectRoot = FindProjectRoot();
+        var sourcePath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "ViewModels",
+            "PlayerTrimWindowViewModel.cs");
+
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("private bool _isManualPreviewNavigation;", source, StringComparison.Ordinal);
+        Assert.Contains("if (_isManualPreviewNavigation && !IsPlaying)", source, StringComparison.Ordinal);
+        Assert.Contains("TryStartPlaybackPreview(resumePlaybackAfterSeek: false)", source, StringComparison.Ordinal);
     }
 
     public void Dispose()

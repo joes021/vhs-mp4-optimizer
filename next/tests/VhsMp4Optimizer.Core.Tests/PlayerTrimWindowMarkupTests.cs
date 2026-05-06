@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace VhsMp4Optimizer.Core.Tests;
 
 public sealed class PlayerTrimWindowMarkupTests
@@ -89,6 +91,10 @@ public sealed class PlayerTrimWindowMarkupTests
     public void PlayerTrimWindow_should_render_v1_and_a1_tracks_without_secondary_chrome_noise()
     {
         var markup = ReadPlayerTrimMarkup();
+        var sharedTimelineItemsControlCount = Regex.Matches(
+            markup,
+            "ItemsControl ItemsSource=\"\\{Binding TimelineBlocks\\}\"",
+            RegexOptions.CultureInvariant).Count;
 
         Assert.Contains("x:Name=\"V1LaneRow\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"V1\"", markup, StringComparison.Ordinal);
@@ -96,6 +102,9 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("x:Name=\"A1LaneRow\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"A1\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"Audio Lane\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Canvas.Left=\"{Binding LeftPixels}\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{Binding AudioBackgroundBrush}\"", markup, StringComparison.Ordinal);
+        Assert.True(sharedTimelineItemsControlCount >= 2);
         Assert.Contains("x:Name=\"TimelinePlayheadIndicator\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"V2\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"A2\"", markup, StringComparison.Ordinal);
@@ -120,9 +129,9 @@ public sealed class PlayerTrimWindowMarkupTests
         var markup = ReadPlayerTrimMarkup();
 
         Assert.Contains("Selector=\"Button.transport:pointerover\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#25543A\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#184D30\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport:pressed\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Value=\"#1A412C\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Value=\"#133F27\"", markup, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.transport.functional:disabled /template/ ContentPresenter\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Opacity\" Value=\"0.4", markup, StringComparison.Ordinal);
     }
@@ -165,6 +174,7 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("PreviewSliderPointerPressed", source, StringComparison.Ordinal);
         Assert.Contains("BeginManualPreviewNavigation", source, StringComparison.Ordinal);
         Assert.Contains("TimelineBlockPointerReleased", source, StringComparison.Ordinal);
+        Assert.Contains("IsLeftButtonPressed", source, StringComparison.Ordinal);
     }
 
     [Fact]

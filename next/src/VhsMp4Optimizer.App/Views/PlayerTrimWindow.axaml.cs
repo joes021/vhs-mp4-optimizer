@@ -37,6 +37,7 @@ public partial class PlayerTrimWindow : Window
     private void TimelineBlockPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control control
+            || !e.GetCurrentPoint(control).Properties.IsLeftButtonPressed
             || control.DataContext is not TimelineBlockItemViewModel block)
         {
             return;
@@ -52,6 +53,7 @@ public partial class PlayerTrimWindow : Window
     {
         if (DataContext is not PlayerTrimWindowViewModel viewModel
             || sender is not Control control
+            || _activeTimelinePointerBlock is null
             || control.DataContext is not TimelineBlockItemViewModel block
             || _activeTimelinePointerBlock?.SegmentId != block.SegmentId)
         {

@@ -37,6 +37,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private bool _previewRefreshQueued;
     private bool _unmuteWhenPlaybackFrameArrives;
     private bool _pauseWhenPlaybackFrameArrives;
+    private bool _isManualPreviewNavigation;
     private double _lastRequestedSourceSeconds;
     private readonly Stack<TimelineProject> _undoStack = new();
     private readonly Stack<TimelineProject> _redoStack = new();
@@ -455,6 +456,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         UpdatePreviewTimeTexts();
         OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
         OnPropertyChanged(nameof(TimelinePlayheadMargin));
+
+        if (_isManualPreviewNavigation && !IsPlaying)
+        {
+            TryStartPlaybackPreview(resumePlaybackAfterSeek: false);
+        }
     }
 
     partial void OnIsPlayingChanged(bool value)
@@ -1001,11 +1007,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public void BeginManualPreviewNavigation()
     {
+        _isManualPreviewNavigation = true;
         PausePlaybackCore(loadPreviewAfterPause: false, "Pomeraj timeline za precizan trim frame.");
     }
 
     public async Task EndManualPreviewNavigationAsync()
     {
+        _isManualPreviewNavigation = false;
         await CommitPreviewSliderAsync();
     }
 
@@ -1098,6 +1106,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
                 Kind = block.Kind,
                 TimelineStartSeconds = block.TimelineStartSeconds,
                 DurationSeconds = block.DurationSeconds,
+                LeftPixels = block.LeftPixels,
                 WidthPixels = block.WidthPixels,
                 Label = block.Label,
                 Summary = block.Summary,
@@ -1241,20 +1250,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (deltaX < 0)
-        {
-            if (MoveLeftCommand.CanExecute(null))
-            {
-                await MoveLeftCommand.ExecuteAsync(null);
-            }
+        var targetLeftPixels = Math.Max(0d, block.LeftPixels + deltaX);
+        var targetTimelineStart = PreviewVirtualMaximum <= 0
+            ? 0d
+            : (targetLeftPixels / Math.Max(1d, TimelinePreferredWidth)) * PreviewVirtualMaximum;
 
-            return;
-        }
-
-        if (MoveRightCommand.CanExecute(null))
-        {
-            await MoveRightCommand.ExecuteAsync(null);
-        }
+        await ApplyTimelineMutationAsync(
+            timeline => TimelineEditorService.MoveSegmentToTime(timeline, block.SegmentId, targetTimelineStart),
+            $"Segment pomeren na timeline poziciju {TimelineEditorService.FormatSeconds(targetTimelineStart)}");
     }
 
     public async Task<bool> HandleEditorHotkeyAsync(Key key, bool controlModifier = false)

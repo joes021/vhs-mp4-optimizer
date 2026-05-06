@@ -155,6 +155,45 @@ public sealed class TimelineEditorServiceTests
     }
 
     [Fact]
+    public void Move_segment_to_time_should_shift_selected_segment_later_and_preserve_gap_positioning()
+    {
+        var project = new TimelineProject
+        {
+            SourceName = "test.avi",
+            SourcePath = @"F:\test.avi",
+            SourceDurationSeconds = 60,
+            Segments =
+            [
+                new TimelineSegment
+                {
+                    Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                    Kind = TimelineSegmentKind.Keep,
+                    TimelineStartSeconds = 0,
+                    SourceStartSeconds = 0,
+                    SourceEndSeconds = 10
+                },
+                new TimelineSegment
+                {
+                    Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                    Kind = TimelineSegmentKind.Keep,
+                    TimelineStartSeconds = 10,
+                    SourceStartSeconds = 10,
+                    SourceEndSeconds = 20
+                }
+            ]
+        };
+
+        var moved = TimelineEditorService.MoveSegmentToTime(
+            project,
+            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            18);
+
+        Assert.Equal(2, moved.Segments.Count);
+        Assert.Equal(0, moved.Segments[0].TimelineStartSeconds);
+        Assert.Equal(18, moved.Segments[1].TimelineStartSeconds, 3);
+    }
+
+    [Fact]
     public void Split_at_playhead_should_split_keep_segment_into_two_keep_segments()
     {
         var mediaInfo = new MediaInfo

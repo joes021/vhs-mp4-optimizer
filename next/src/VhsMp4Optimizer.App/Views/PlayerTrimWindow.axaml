@@ -66,14 +66,14 @@
         </Style>
 
         <Style Selector="Button.transport:pointerover">
-            <Setter Property="Background" Value="#25543A" />
-            <Setter Property="BorderBrush" Value="#6DB087" />
+            <Setter Property="Background" Value="#184D30" />
+            <Setter Property="BorderBrush" Value="#6FC993" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport:pressed">
-            <Setter Property="Background" Value="#1A412C" />
-            <Setter Property="BorderBrush" Value="#98D6AF" />
+            <Setter Property="Background" Value="#133F27" />
+            <Setter Property="BorderBrush" Value="#A4E3BE" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
@@ -91,25 +91,25 @@
         </Style>
 
         <Style Selector="Button.transport.functional">
-            <Setter Property="Background" Value="#1E6F3D" />
+            <Setter Property="Background" Value="#1E6A39" />
             <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="#8BE0A6" />
         </Style>
 
         <Style Selector="Button.transport.functional:pointerover">
-            <Setter Property="Background" Value="#245E38" />
-            <Setter Property="BorderBrush" Value="#B1F2C4" />
+            <Setter Property="Background" Value="#184D30" />
+            <Setter Property="BorderBrush" Value="#B0ECC7" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional:pressed">
-            <Setter Property="Background" Value="#194A2B" />
-            <Setter Property="BorderBrush" Value="#D2FADB" />
+            <Setter Property="Background" Value="#133F27" />
+            <Setter Property="BorderBrush" Value="#D0F7DE" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
 
         <Style Selector="Button.transport.functional.active-chip">
-            <Setter Property="Background" Value="#227B44" />
+            <Setter Property="Background" Value="#1F7A43" />
             <Setter Property="BorderBrush" Value="#C8F5D7" />
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
@@ -530,16 +530,20 @@
                                     <ItemsControl ItemsSource="{Binding TimelineBlocks}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="8" />
+                                                <Canvas Width="{Binding TimelinePreferredWidth}"
+                                                        Height="140" />
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
                                                 <Button Width="{Binding WidthPixels}"
-                                                        MinWidth="260"
+                                                        MinWidth="180"
                                                         Height="140"
+                                                        Canvas.Left="{Binding LeftPixels}"
+                                                        Canvas.Top="0"
                                                         Padding="0"
                                                         Cursor="Hand"
+                                                        Focusable="False"
                                                         ToolTip.Tip="Select: klik za preview. Razor: klik za rez na V1."
                                                         PointerPressed="TimelineBlockPointerPressed"
                                                         PointerReleased="TimelineBlockPointerReleased"
@@ -608,10 +612,10 @@
 
                                     <Border x:Name="TimelinePlayheadIndicator"
                                             Width="2"
-                                            Margin="{Binding TimelinePlayheadMargin}"
+                                            Canvas.Left="{Binding TimelinePlayheadOffsetPixels}"
                                             Background="#F97316"
-                                            HorizontalAlignment="Left"
-                                            VerticalAlignment="Stretch"
+                                            Height="140"
+                                            VerticalAlignment="Top"
                                             IsHitTestVisible="False" />
                                 </Grid>
                             </ScrollViewer>
@@ -635,19 +639,45 @@
                                     <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Audio Lane" />
                                 </StackPanel>
                             </Border>
-                                    <Border Grid.Column="1"
-                                            Background="#204931"
-                                            BorderBrush="#3A8A5D"
-                                            BorderThickness="1"
-                                            CornerRadius="8"
-                                            MinHeight="56">
-                                <TextBlock Margin="16,0"
-                                           VerticalAlignment="Center"
-                                           FontWeight="SemiBold"
-                                           Foreground="#EAFBF1"
-                                           Text="{Binding Item.SourceFile}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </Border>
+
+                            <ScrollViewer Grid.Column="1"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <Grid Width="{Binding TimelinePreferredWidth}"
+                                      MinHeight="72">
+                                    <ItemsControl ItemsSource="{Binding TimelineBlocks}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas Width="{Binding TimelinePreferredWidth}"
+                                                        Height="56" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:TimelineBlockItemViewModel">
+                                                <Border Width="{Binding WidthPixels}"
+                                                        Height="56"
+                                                        Canvas.Left="{Binding LeftPixels}"
+                                                        Canvas.Top="0"
+                                                        Background="{Binding AudioBackgroundBrush}"
+                                                        BorderBrush="{Binding AudioBorderBrush}"
+                                                        BorderThickness="2"
+                                                        CornerRadius="8"
+                                                        Padding="12,8">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock FontWeight="Bold"
+                                                                   Foreground="#F1FBF5"
+                                                                   Text="{Binding Label}" />
+                                                        <TextBlock FontSize="11"
+                                                                   Foreground="#D8F6E3"
+                                                                   Text="{Binding Summary}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </ScrollViewer>
                         </Grid>
                     </Border>
                 </Grid>

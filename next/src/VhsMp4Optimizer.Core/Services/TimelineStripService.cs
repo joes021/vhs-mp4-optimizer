@@ -36,6 +36,7 @@ public static class TimelineStripService
 
         return ordered.Select(segment =>
         {
+            var leftPixels = (segment.TimelineStartSeconds / totalDuration) * safePreferredWidth;
             var proportionalWidth = (segment.DurationSeconds / totalDuration) * safePreferredWidth;
             var widthPixels = Math.Max(safeMinimumWidth, proportionalWidth);
             return new TimelineVisualBlock
@@ -46,6 +47,7 @@ public static class TimelineStripService
                 SourceStartSeconds = segment.SourceStartSeconds,
                 SourceEndSeconds = segment.SourceEndSeconds,
                 DurationSeconds = segment.DurationSeconds,
+                LeftPixels = Math.Max(0, leftPixels),
                 WidthPixels = widthPixels,
                 Label = segment.Kind.ToString().ToUpperInvariant(),
                 Summary = BuildSummary(segment)
