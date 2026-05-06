@@ -85,6 +85,20 @@ function Get-DotNetPath {
     return "dotnet"
 }
 
+function Clear-ReleaseArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectDirectory
+    )
+
+    foreach ($relativePath in @("bin\Release", "obj\Release")) {
+        $target = Join-Path $ProjectDirectory $relativePath
+        if (Test-Path -LiteralPath $target) {
+            Remove-Item -LiteralPath $target -Recurse -Force
+        }
+    }
+}
+
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $nextRoot = Join-Path $projectRoot "next"
 $appProject = Join-Path $nextRoot "src\VhsMp4Optimizer.App\VhsMp4Optimizer.App.csproj"
@@ -114,6 +128,14 @@ $guideDir = Join-Path $releaseRootFull "docs"
 $guideMediaDir = Join-Path $guideDir "media"
 $null = New-Item -ItemType Directory -Path $publishDir -Force
 $null = New-Item -ItemType Directory -Path $guideMediaDir -Force
+
+foreach ($projectDir in @(
+        (Join-Path $nextRoot "src\VhsMp4Optimizer.App"),
+        (Join-Path $nextRoot "src\VhsMp4Optimizer.Core"),
+        (Join-Path $nextRoot "src\VhsMp4Optimizer.Infrastructure")
+    )) {
+    Clear-ReleaseArtifacts -ProjectDirectory $projectDir
+}
 
 $numericVersion = Get-NumericVersionInfo -Version $Version
 $assemblyVersion = $numericVersion.AssemblyVersion

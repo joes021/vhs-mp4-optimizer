@@ -16,6 +16,29 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def read_assembly_version(path: Path) -> str:
+    run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            (
+                "[System.Reflection.AssemblyName]::GetAssemblyName("
+                f"'{path.as_posix()}').Version.ToString()"
+            ),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+
+    assert run.returncode == 0, run.stderr
+    return run.stdout.strip()
+
+
 def test_vhs_next_packaging_tokens_exist() -> None:
     release_builder = read(ROOT / "scripts" / "build-vhs-mp4-next-release.ps1")
     installer_builder = read(ROOT / "scripts" / "build-vhs-mp4-next-installer.ps1")
@@ -90,6 +113,65 @@ def test_vhs_next_release_builder_creates_manifest_and_docs(tmp_path: Path) -> N
     assert manifest["GitRef"] == git_ref
     assert (release_root / "app" / "VhsMp4Optimizer.App.exe").exists()
     assert (release_root / "docs" / "VHS_MP4_OPTIMIZER_UPUTSTVO.html").exists()
+
+
+def test_vhs_next_release_builder_rebuilds_project_references_after_smoke_version(tmp_path: Path) -> None:
+    smoke_release_root = tmp_path / "smoke-release" / "VHS MP4 Optimizer Next"
+    release_root = tmp_path / "real-release" / "VHS MP4 Optimizer Next"
+
+    smoke_run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "build-vhs-mp4-next-release.ps1"),
+            "-ReleaseRoot",
+            str(smoke_release_root),
+            "-Version",
+            "1.1.0-smoke",
+            "-GitRef",
+            "nextsmoke",
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+    assert smoke_run.returncode == 0, smoke_run.stderr
+
+    release_version = "1.2.99"
+    release_run = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "build-vhs-mp4-next-release.ps1"),
+            "-ReleaseRoot",
+            str(release_root),
+            "-Version",
+            release_version,
+            "-GitRef",
+            "real123",
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+    assert release_run.returncode == 0, release_run.stderr
+    assert read_assembly_version(release_root / "app" / "VhsMp4Optimizer.App.dll") == "1.2.99.0"
+    assert read_assembly_version(release_root / "app" / "VhsMp4Optimizer.Core.dll") == "1.2.99.0"
+    assert read_assembly_version(release_root / "app" / "VhsMp4Optimizer.Infrastructure.dll") == "1.2.99.0"
 
 
 def test_vhs_next_installer_builder_creates_portable_zip_and_manifest(tmp_path: Path) -> None:
