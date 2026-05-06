@@ -52,7 +52,7 @@ public partial class MainWindow : Window
         var editorViewModel = new PlayerTrimWindowViewModel(selectedItem, viewModel.ResolvedFfmpegPath, (timeline, transformSettings) =>
         {
             viewModel.ApplyEditorState(selectedItem.SourcePath, timeline, transformSettings);
-        });
+        }, enablePlaybackEngine: true);
 
         if (_playerTrimWindow is { IsVisible: true })
         {

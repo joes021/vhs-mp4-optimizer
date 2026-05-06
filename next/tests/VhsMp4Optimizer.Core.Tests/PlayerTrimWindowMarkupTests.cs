@@ -22,7 +22,6 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Text=\"MEDIA FILES\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"VIDEO\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"TOOLS ZA POJEDINACNE VIDEO KLIPOVE\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Text=\"PLAYBACK KONTROLE\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"TOOLS ZA VIDEO TRACKS\"", markup, StringComparison.Ordinal);
         Assert.Contains("Text=\"VIDEO &amp; AUDIO TRACKS\"", markup, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"250,*,320\"", markup, StringComparison.Ordinal);
@@ -35,7 +34,7 @@ public sealed class PlayerTrimWindowMarkupTests
         var markup = ReadPlayerTrimMarkup();
 
         Assert.Contains("x:Name=\"PrimaryProgramMonitor\"", markup, StringComparison.Ordinal);
-        Assert.Contains("Height=\"500\"", markup, StringComparison.Ordinal);
+        Assert.Contains("Height=\"360\"", markup, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ProgramMonitorViewport\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Monitor HUD\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Program Monitor\"", markup, StringComparison.Ordinal);
@@ -43,7 +42,7 @@ public sealed class PlayerTrimWindowMarkupTests
     }
 
     [Fact]
-    public void PlayerTrimWindow_should_place_preview_scrub_bar_and_playback_controls_below_video()
+    public void PlayerTrimWindow_should_place_compact_preview_scrub_and_transport_bands_below_video()
     {
         var markup = ReadPlayerTrimMarkup();
 
@@ -57,6 +56,14 @@ public sealed class PlayerTrimWindowMarkupTests
         Assert.Contains("Content=\"END\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mark In\"", markup, StringComparison.Ordinal);
         Assert.Contains("Content=\"Mark Out\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"PLAYBACK KONTROLE\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Navigate\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Playback\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Marks\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"IN Point\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"OUT Point\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding InPointText}\"", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding OutPointText}\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"Shuttle -\"", markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"Shuttle +\"", markup, StringComparison.Ordinal);
     }

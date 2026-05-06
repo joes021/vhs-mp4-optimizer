@@ -54,10 +54,10 @@
         </Style>
 
         <Style Selector="Button.transport">
-            <Setter Property="MinWidth" Value="58" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="MinWidth" Value="54" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="7,3" />
+            <Setter Property="FontSize" Value="10.5" />
             <Setter Property="Background" Value="#283240" />
             <Setter Property="Foreground" Value="#EEF4FB" />
             <Setter Property="BorderBrush" Value="#314055" />
@@ -220,8 +220,8 @@
                     Grid.Column="1"
                     Classes="panel">
                 <Grid x:Name="CenterMonitorGrid"
-                      RowDefinitions="Auto,500,Auto,Auto,Auto"
-                      RowSpacing="10">
+                      RowDefinitions="Auto,360,Auto,Auto"
+                      RowSpacing="8">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                         <TextBlock Classes="section-title"
                                    VerticalAlignment="Center"
@@ -240,14 +240,14 @@
 
                     <Border x:Name="PrimaryProgramMonitor"
                             Grid.Row="1"
-                            Height="500"
+                            Height="360"
                             Background="#05080D"
                             BorderBrush="#2C3745"
                             BorderThickness="1"
                             CornerRadius="10"
                             ClipToBounds="True">
                         <Border x:Name="ProgramMonitorViewport"
-                                Margin="12"
+                                Margin="8"
                                 Background="#05080D"
                                 BorderBrush="#293445"
                                 BorderThickness="1"
@@ -272,8 +272,8 @@
                     <Border x:Name="PreviewScrubBar"
                             Grid.Row="2"
                             Classes="panel-muted"
-                            Padding="12,8">
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            Padding="8,4">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                             <TextBlock VerticalAlignment="Center"
                                        FontWeight="SemiBold"
                                        Text="{Binding PreviewVirtualTimeText}" />
@@ -293,59 +293,38 @@
                     <Border x:Name="MonitorTransportBand"
                             Grid.Row="3"
                             Classes="panel-muted"
-                            Padding="12,10">
-                        <StackPanel Spacing="10">
-                            <TextBlock Classes="section-title" Text="PLAYBACK KONTROLE" />
-
-                            <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="18">
-                                <TextBlock Classes="field-label" Grid.Column="0" Text="Navigate" />
-                                <TextBlock Classes="field-label" Grid.Column="1" Text="Playback" />
-                                <TextBlock Classes="field-label" Grid.Column="2" Text="Marks" />
-                            </Grid>
-
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Disabled">
-                                <StackPanel Orientation="Horizontal" Spacing="18">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="transport functional" Content="START" Command="{Binding GoToStartCommand}" />
-                                        <Button Classes="transport functional" Content="&lt;&lt;&lt;" Command="{Binding Back250FramesCommand}" />
-                                        <Button Classes="transport functional" Content="&lt;&lt;" Command="{Binding Back25FramesCommand}" />
-                                        <Button Classes="transport functional" Content="&lt;" Command="{Binding BackFrameCommand}" />
-                                        <Button Classes="transport functional" Content="&gt;" Command="{Binding ForwardFrameCommand}" />
-                                        <Button Classes="transport functional" Content="&gt;&gt;" Command="{Binding Forward25FramesCommand}" />
-                                        <Button Classes="transport functional" Content="&gt;&gt;&gt;" Command="{Binding Forward250FramesCommand}" />
-                                        <Button Classes="transport functional" Content="END" Command="{Binding GoToEndCommand}" />
-                                    </StackPanel>
-
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="transport functional" Content="Play" Command="{Binding PlayCommand}" />
-                                        <Button Classes="transport functional" Content="Pause" Command="{Binding PauseCommand}" />
-                                        <Button Classes="transport functional"
-                                                Classes.active-chip="{Binding IsLoopPlaybackEnabled}"
-                                                Content="Loop"
-                                                Command="{Binding ToggleLoopPlaybackCommand}" />
-                                    </StackPanel>
-
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="transport functional" Content="In" Command="{Binding SetInPointCommand}" />
-                                        <Button Classes="transport functional" Content="Out" Command="{Binding SetOutPointCommand}" />
-                                        <Button Classes="transport functional" Content="Prev Cut" Command="{Binding PreviousCutCommand}" />
-                                        <Button Classes="transport functional" Content="Next Cut" Command="{Binding NextCutCommand}" />
-                                    </StackPanel>
+                            Padding="8,6">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <StackPanel Orientation="Horizontal" Spacing="18">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="transport functional" Content="START" Command="{Binding GoToStartCommand}" />
+                                    <Button Classes="transport functional" Content="&lt;&lt;&lt;" Command="{Binding Back250FramesCommand}" />
+                                    <Button Classes="transport functional" Content="&lt;&lt;" Command="{Binding Back25FramesCommand}" />
+                                    <Button Classes="transport functional" Content="&lt;" Command="{Binding BackFrameCommand}" />
+                                    <Button Classes="transport functional" Content="&gt;" Command="{Binding ForwardFrameCommand}" />
+                                    <Button Classes="transport functional" Content="&gt;&gt;" Command="{Binding Forward25FramesCommand}" />
+                                    <Button Classes="transport functional" Content="&gt;&gt;&gt;" Command="{Binding Forward250FramesCommand}" />
+                                    <Button Classes="transport functional" Content="END" Command="{Binding GoToEndCommand}" />
                                 </StackPanel>
-                            </ScrollViewer>
-                        </StackPanel>
-                    </Border>
 
-                    <Border Grid.Row="4"
-                            Classes="panel-muted"
-                            Padding="10,8">
-                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="10">
-                            <TextBlock VerticalAlignment="Center" Text="IN Point" />
-                            <TextBox Grid.Column="1" Text="{Binding InPointText}" />
-                            <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="OUT Point" />
-                            <TextBox Grid.Column="3" Text="{Binding OutPointText}" />
-                        </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="transport functional" Content="Play" Command="{Binding PlayCommand}" />
+                                    <Button Classes="transport functional" Content="Pause" Command="{Binding PauseCommand}" />
+                                    <Button Classes="transport functional"
+                                            Classes.active-chip="{Binding IsLoopPlaybackEnabled}"
+                                            Content="Loop"
+                                            Command="{Binding ToggleLoopPlaybackCommand}" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="transport functional" Content="Mark In" Command="{Binding SetInPointCommand}" />
+                                    <Button Classes="transport functional" Content="Mark Out" Command="{Binding SetOutPointCommand}" />
+                                    <Button Classes="transport functional" Content="Prev Cut" Command="{Binding PreviousCutCommand}" />
+                                    <Button Classes="transport functional" Content="Next Cut" Command="{Binding NextCutCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
             </Border>
@@ -416,7 +395,7 @@
                     Grid.Row="1"
                     Grid.ColumnSpan="3"
                     Classes="panel-muted"
-                    Padding="12,10">
+                    Padding="10,8">
                 <ScrollViewer HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -464,14 +443,14 @@
                     Grid.Row="2"
                     Grid.ColumnSpan="3"
                     Classes="panel">
-                <Grid RowDefinitions="Auto,Auto,Auto,*,92"
-                      RowSpacing="10">
+                <Grid RowDefinitions="Auto,Auto,*,56"
+                      RowSpacing="8">
                     <TextBlock Classes="section-title" Text="VIDEO &amp; AUDIO TRACKS" />
 
                     <Border x:Name="CompactTimeRuler"
                             Grid.Row="1"
                             Classes="panel-muted"
-                            Padding="6,4">
+                            Padding="4,2">
                         <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
                             <Border Background="#0D131A"
                                     BorderBrush="#314055"
@@ -484,50 +463,27 @@
                                            Text="Time Ruler" />
                             </Border>
 
-                            <Grid Grid.Column="1" Height="20" ColumnDefinitions="*,*,*">
+                            <Grid Grid.Column="1" Height="16" ColumnDefinitions="*,*,*">
                                 <TextBlock VerticalAlignment="Bottom"
-                                           FontSize="10"
+                                           FontSize="9"
                                            HorizontalAlignment="Left"
                                            Text="{Binding TimelineRulerLeftLabel}" />
                                 <TextBlock Grid.Column="1"
                                            VerticalAlignment="Bottom"
-                                           FontSize="10"
+                                           FontSize="9"
                                            HorizontalAlignment="Center"
                                            Text="{Binding TimelineRulerCenterLabel}" />
                                 <TextBlock Grid.Column="2"
                                            VerticalAlignment="Bottom"
-                                           FontSize="10"
+                                           FontSize="9"
                                            HorizontalAlignment="Right"
                                            Text="{Binding TimelineRulerRightLabel}" />
                             </Grid>
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2"
-                            Classes="panel-muted"
-                            Padding="8,6">
-                        <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
-                            <Border Background="#0D131A"
-                                    BorderBrush="#314055"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="6,4">
-                                <StackPanel HorizontalAlignment="Center" Spacing="2">
-                                    <TextBlock FontWeight="Bold" HorizontalAlignment="Center" Text="MARKERI / REZOVI" />
-                                    <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="IN, OUT i skok na rez" />
-                                </StackPanel>
-                            </Border>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                <Button Classes="transport functional" Content="Mark In" Command="{Binding SetInPointCommand}" />
-                                <Button Classes="transport functional" Content="Mark Out" Command="{Binding SetOutPointCommand}" />
-                                <Button Classes="transport functional" Content="Prev Cut" Command="{Binding PreviousCutCommand}" />
-                                <Button Classes="transport functional" Content="Next Cut" Command="{Binding NextCutCommand}" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
                     <Border x:Name="V1LaneRow"
-                            Grid.Row="3"
+                            Grid.Row="2"
                             Classes="panel-muted"
                             Padding="10">
                         <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
@@ -663,7 +619,7 @@
                     </Border>
 
                     <Border x:Name="A1LaneRow"
-                            Grid.Row="4"
+                            Grid.Row="3"
                             Classes="panel-muted"
                             Padding="10">
                         <Grid ColumnDefinitions="112,*" ColumnSpacing="10">
@@ -679,12 +635,12 @@
                                     <TextBlock Classes="section-meta" HorizontalAlignment="Center" Text="Audio Lane" />
                                 </StackPanel>
                             </Border>
-                            <Border Grid.Column="1"
-                                    Background="#204931"
-                                    BorderBrush="#3A8A5D"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    MinHeight="72">
+                                    <Border Grid.Column="1"
+                                            Background="#204931"
+                                            BorderBrush="#3A8A5D"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            MinHeight="56">
                                 <TextBlock Margin="16,0"
                                            VerticalAlignment="Center"
                                            FontWeight="SemiBold"

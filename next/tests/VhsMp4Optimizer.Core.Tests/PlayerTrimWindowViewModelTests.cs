@@ -22,7 +22,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task RefreshPreviewCommand_should_surface_preview_errors()
+    public async Task RefreshPreviewCommand_should_report_that_ffmpeg_preview_is_disabled_for_display()
     {
         var queueItem = BuildQueueItem();
         var viewModel = new PlayerTrimWindowViewModel(
@@ -31,10 +31,11 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             (_, _) => { },
             new FakePreviewFrameService((_, _, _, _, _) => throw new InvalidOperationException("preview fail")),
             autoLoadPreview: false);
+        DisablePlaybackEngine(viewModel);
 
         await viewModel.RefreshPreviewCommand.ExecuteAsync(null);
 
-        Assert.Contains("preview fail", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FFmpeg preview je ugasen", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Changing_preview_virtual_position_while_paused_should_request_new_preview_frame()
+    public void Changing_preview_virtual_position_while_paused_should_not_request_ffmpeg_until_commit()
     {
         var queueItem = BuildQueueItem();
         var requestedSeconds = new List<double>();
@@ -69,15 +70,40 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
                 return previewPath;
             }),
             autoLoadPreview: false);
+        DisablePlaybackEngine(viewModel);
 
         viewModel.PreviewVirtualSeconds = 12;
-        await Task.Delay(250);
 
-        Assert.Contains(requestedSeconds, value => Math.Abs(value - 12d) < 0.01d);
+        Assert.Empty(requestedSeconds);
     }
 
     [Fact]
-    public async Task PrepareForDisplayAsync_should_render_initial_preview_before_window_shows()
+    public async Task CommitPreviewSliderAsync_should_not_request_ffmpeg_when_playback_engine_is_unavailable()
+    {
+        var queueItem = BuildQueueItem();
+        var requestedSeconds = new List<double>();
+        var previewPath = CreateTinyPng("commit-preview.png");
+        var viewModel = new PlayerTrimWindowViewModel(
+            queueItem,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
+            (_, _) => { },
+            new FakePreviewFrameService((_, _, sourceSeconds, _, _) =>
+            {
+                requestedSeconds.Add(sourceSeconds);
+                return previewPath;
+            }),
+            autoLoadPreview: false);
+        DisablePlaybackEngine(viewModel);
+
+        viewModel.PreviewVirtualSeconds = 18d;
+        await viewModel.CommitPreviewSliderAsync();
+
+        Assert.Empty(requestedSeconds);
+        Assert.Contains("FFmpeg preview je ugasen", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PrepareForDisplayAsync_should_not_render_ffmpeg_preview_before_window_shows()
     {
         var queueItem = BuildQueueItem();
         var previewPath = CreateTinyPng("initial-preview.png");
@@ -92,11 +118,12 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
                 return previewPath;
             }),
             autoLoadPreview: false);
+        DisablePlaybackEngine(viewModel);
 
         await viewModel.PrepareForDisplayAsync();
 
-        Assert.Equal(1, previewRequests);
-        Assert.DoesNotContain("nije dostupan", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, previewRequests);
+        Assert.Contains("FFmpeg preview je ugasen", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -305,7 +332,8 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             queueItem,
             ffmpegPath,
             (_, _) => { },
-            autoLoadPreview: false);
+            autoLoadPreview: false,
+            enablePlaybackEngine: true);
 
         viewModel.PlayCommand.Execute(null);
 
@@ -329,7 +357,8 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             queueItem,
             ffmpegPath,
             (_, _) => { },
-            autoLoadPreview: false);
+            autoLoadPreview: false,
+            enablePlaybackEngine: true);
 
         viewModel.PlayCommand.Execute(null);
         viewModel.PauseCommand.Execute(null);
@@ -359,7 +388,8 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             queueItem,
             ffmpegPath,
             (_, _) => { },
-            autoLoadPreview: false);
+            autoLoadPreview: false,
+            enablePlaybackEngine: true);
 
         viewModel.PlayCommand.Execute(null);
 
@@ -382,7 +412,8 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             queueItem,
             ffmpegPath,
             (_, _) => { },
-            autoLoadPreview: false);
+            autoLoadPreview: false,
+            enablePlaybackEngine: true);
 
         Assert.Null(viewModel.PlaybackMediaPlayerBinding);
 
@@ -427,52 +458,18 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         viewModel.BeginManualPreviewNavigation();
         viewModel.PreviewVirtualSeconds = 0.5d;
 
-        Assert.True(IsPreviewSliderDragging(viewModel));
-
         await viewModel.EndManualPreviewNavigationAsync();
-
-        Assert.False(IsPreviewSliderDragging(viewModel));
     }
 
     [Fact]
-    public async Task BeginManualPreviewNavigation_should_delay_ffmpeg_preview_until_slider_release()
+    public async Task BeginManualPreviewNavigation_should_not_request_ffmpeg_preview_after_slider_release()
     {
         var queueItem = BuildQueueItem();
-        using var viewModel = new PlayerTrimWindowViewModel(
-            queueItem,
-            ffmpegPath: null,
-            (_, _) => { },
-            autoLoadPreview: false);
-
-        DisablePlaybackEngine(viewModel);
-        viewModel.IsPlaying = true;
-        viewModel.IsVideoPlaybackVisible = true;
-        viewModel.BeginManualPreviewNavigation();
-        viewModel.PreviewVirtualSeconds = 36d;
-
-        Assert.True(IsPreviewSliderDragging(viewModel));
-
-        await viewModel.EndManualPreviewNavigationAsync();
-
-        Assert.False(IsPreviewSliderDragging(viewModel));
-    }
-
-    [Fact]
-    public async Task CommitPreviewSliderAsync_should_render_exact_preview_frame_after_playback_navigation()
-    {
-        var ffmpegPath = FfmpegLocator.Resolve();
-        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
-        {
-            return;
-        }
-
-        var sourcePath = CreateRealVideo("playback-source-preview-frame.avi", ffmpegPath);
-        var queueItem = BuildQueueItem(sourcePath);
         var requestedSeconds = new List<double>();
-        var previewPath = CreateTinyPng("post-playback-preview.png");
+        var previewPath = CreateTinyPng("manual-navigation-preview.png");
         using var viewModel = new PlayerTrimWindowViewModel(
             queueItem,
-            ffmpegPath,
+            ffmpegPath: @"C:\ffmpeg\bin\ffmpeg.exe",
             (_, _) => { },
             new FakePreviewFrameService((_, _, sourceSeconds, _, _) =>
             {
@@ -480,16 +477,38 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
                 return previewPath;
             }),
             autoLoadPreview: false);
+        DisablePlaybackEngine(viewModel);
 
-        viewModel.PlayCommand.Execute(null);
         viewModel.BeginManualPreviewNavigation();
-        viewModel.PreviewVirtualSeconds = 1.0d;
-        await viewModel.CommitPreviewSliderAsync();
+        viewModel.PreviewVirtualSeconds = 36d;
 
-        Assert.False(viewModel.IsPlaying);
-        Assert.False(viewModel.IsVideoPlaybackVisible);
-        Assert.True(viewModel.IsPreviewImageVisible);
-        Assert.Contains(requestedSeconds, value => Math.Abs(value - 1.0d) < 0.05d);
+        Assert.Empty(requestedSeconds);
+
+        await viewModel.EndManualPreviewNavigationAsync();
+
+        Assert.Empty(requestedSeconds);
+    }
+
+    [Fact]
+    public void CommitPreviewSliderAsync_should_not_fallback_to_ffmpeg_when_playback_engine_is_unavailable()
+    {
+        var projectRoot = FindProjectRoot();
+        var sourcePath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "ViewModels",
+            "PlayerTrimWindowViewModel.cs");
+
+        var source = File.ReadAllText(sourcePath);
+        var methodIndex = source.IndexOf("public async Task CommitPreviewSliderAsync()", StringComparison.Ordinal);
+        var playbackFirstIndex = source.IndexOf("if (TryStartPlaybackPreview(resumePlaybackAfterSeek: IsPlaying))", methodIndex, StringComparison.Ordinal);
+        var ffmpegFallbackIndex = source.IndexOf("await LoadPreviewAsync();", methodIndex, StringComparison.Ordinal);
+
+        Assert.True(methodIndex >= 0);
+        Assert.True(playbackFirstIndex >= methodIndex);
+        Assert.True(ffmpegFallbackIndex == -1 || ffmpegFallbackIndex < methodIndex);
     }
 
     [Fact]
@@ -774,7 +793,8 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
             queueItem,
             ffmpegPath,
             (_, _) => { },
-            autoLoadPreview: false);
+            autoLoadPreview: false,
+            enablePlaybackEngine: true);
 
         await viewModel.HandleEditorHotkeyAsync(Key.Space);
         Assert.True(viewModel.IsPlaying);
@@ -1024,90 +1044,25 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task PrepareForDisplayAsync_should_render_preview_for_large_dv_avi_when_file_is_available()
+    public void PrepareForDisplayAsync_should_route_startup_preview_through_commit_pipeline()
     {
-        const string sourcePath = @"F:\Veliki avi\1996 -1 -6 - .avi";
-        var ffmpegPath = FfmpegLocator.Resolve();
-        if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath) || !File.Exists(sourcePath))
-        {
-            return;
-        }
+        var projectRoot = FindProjectRoot();
+        var sourcePath = Path.Combine(
+            projectRoot,
+            "next",
+            "src",
+            "VhsMp4Optimizer.App",
+            "ViewModels",
+            "PlayerTrimWindowViewModel.cs");
 
-        var queueItem = new QueueItemSummary
-        {
-            SourceFile = Path.GetFileName(sourcePath),
-            SourcePath = sourcePath,
-            OutputFile = "1996 -1 -6 - .mp4",
-            OutputPath = Path.Combine(_rootPath, "1996 -1 -6 - .mp4"),
-            OutputPattern = Path.Combine(_rootPath, "1996 -1 -6 - .mp4"),
-            Container = "avi",
-            Resolution = "720x576",
-            Duration = "01:49:23",
-            Video = "dvvideo | 720x576 | 25 fps",
-            Audio = "pcm_s16le | 2 ch",
-            Status = "queued",
-            PlannedOutput = new OutputPlanSummary
-            {
-                DisplayOutputName = "1996 -1 -6 - .mp4",
-                Container = "mp4",
-                Resolution = "768x576",
-                DurationText = "01:49:23",
-                VideoCodecLabel = "h264",
-                VideoBitrateComparisonText = "5000k",
-                AudioCodecText = "aac",
-                AudioBitrateText = "160k",
-                BitrateText = "5160 kbps",
-                EncodeEngineText = "CPU",
-                EstimatedSizeText = "4.0 GB",
-                UsbNoteText = "split 2 dela",
-                SplitModeText = "split",
-                CropText = "--",
-                AspectText = "4:3",
-                OutputWidth = 768,
-                OutputHeight = 576
-            },
-            MediaInfo = new MediaInfo
-            {
-                SourceName = Path.GetFileName(sourcePath),
-                SourcePath = sourcePath,
-                Container = "avi",
-                DurationSeconds = 6563.16,
-                DurationText = "01:49:23",
-                SizeBytes = 24955441664,
-                SizeText = "24 GB",
-                OverallBitrateKbps = 30419,
-                OverallBitrateText = "30419 kbps",
-                VideoCodec = "dvvideo",
-                Width = 720,
-                Height = 576,
-                Resolution = "720x576",
-                DisplayAspectRatio = "4:3",
-                SampleAspectRatio = "16:15",
-                FrameRate = 25,
-                FrameRateText = "25 fps",
-                FrameCount = 164079,
-                VideoBitrateKbps = 28800,
-                VideoBitrateText = "28800 kbps",
-                AudioCodec = "pcm_s16le",
-                AudioChannels = 2,
-                AudioSampleRateHz = 48000,
-                AudioBitrateKbps = 1536,
-                AudioBitrateText = "1536 kbps",
-                VideoSummary = "dvvideo | 720x576 | 25 fps",
-                AudioSummary = "pcm_s16le | 2 ch"
-            }
-        };
+        var source = File.ReadAllText(sourcePath);
+        var methodIndex = source.IndexOf("public async Task PrepareForDisplayAsync()", StringComparison.Ordinal);
+        var commitIndex = source.IndexOf("await CommitPreviewSliderAsync();", methodIndex, StringComparison.Ordinal);
+        var directFfmpegIndex = source.IndexOf("await LoadPreviewAsync();", methodIndex, StringComparison.Ordinal);
 
-        var viewModel = new PlayerTrimWindowViewModel(
-            queueItem,
-            ffmpegPath,
-            (_, _) => { },
-            autoLoadPreview: false);
-
-        await viewModel.PrepareForDisplayAsync();
-
-        Assert.NotNull(viewModel.PreviewBitmap);
-        Assert.DoesNotContain("Preview nije uspeo", viewModel.EditorHint, StringComparison.OrdinalIgnoreCase);
+        Assert.True(methodIndex >= 0);
+        Assert.True(commitIndex > methodIndex);
+        Assert.True(directFfmpegIndex == -1 || directFfmpegIndex > commitIndex);
     }
 
     public void Dispose()
@@ -1116,6 +1071,22 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
         {
             Directory.Delete(_rootPath, true);
         }
+    }
+
+    private static string FindProjectRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "next", "src", "VhsMp4Optimizer.App")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Project root for Avalonia app nije pronadjen.");
     }
 
     private static void EnsureAvaloniaInitialized()
@@ -1253,17 +1224,13 @@ public sealed class PlayerTrimWindowViewModelTests : IDisposable
     private static void DisablePlaybackEngine(PlayerTrimWindowViewModel viewModel)
     {
         var type = typeof(PlayerTrimWindowViewModel);
+        (type.GetField("_playbackMediaPlayer", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(viewModel) as IDisposable)?.Dispose();
+        (type.GetField("_playbackMedia", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(viewModel) as IDisposable)?.Dispose();
+        (type.GetField("_libVlc", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(viewModel) as IDisposable)?.Dispose();
         type.GetField("_playbackMediaPlayer", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(viewModel, null);
         type.GetField("_playbackMedia", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(viewModel, null);
         type.GetField("_libVlc", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(viewModel, null);
         viewModel.PlaybackMediaPlayerBinding = null;
-    }
-
-    private static bool IsPreviewSliderDragging(PlayerTrimWindowViewModel viewModel)
-    {
-        return (bool)(typeof(PlayerTrimWindowViewModel)
-            .GetField("_isPreviewSliderDragging", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?.GetValue(viewModel) ?? false);
     }
 
     private sealed class FakePreviewFrameService : IPreviewFrameService

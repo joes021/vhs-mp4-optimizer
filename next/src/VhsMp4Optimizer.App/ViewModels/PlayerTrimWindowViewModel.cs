@@ -26,19 +26,17 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     private readonly CropDetectService _cropDetectService = new();
     private readonly string? _ffmpegPath;
     private CancellationTokenSource? _previewCts;
-    private CancellationTokenSource? _previewDebounceCts;
     private readonly DispatcherTimer _playbackTimer;
     private LibVLC? _libVlc;
     private MediaPlayer? _playbackMediaPlayer;
     private Media? _playbackMedia;
     private long? _pendingPlaybackSeekMilliseconds;
     private bool _previewBusy;
-    private bool _suppressPreviewAutoRefresh;
     private bool _awaitingPlaybackFrame;
     private bool _disposed;
     private bool _previewRefreshQueued;
     private bool _unmuteWhenPlaybackFrameArrives;
-    private bool _isPreviewSliderDragging;
+    private bool _pauseWhenPlaybackFrameArrives;
     private double _lastRequestedSourceSeconds;
     private readonly Stack<TimelineProject> _undoStack = new();
     private readonly Stack<TimelineProject> _redoStack = new();
@@ -48,7 +46,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         string? ffmpegPath,
         Action<TimelineProject, ItemTransformSettings?> saveAction,
         IPreviewFrameService? previewFrameService = null,
-        bool autoLoadPreview = true)
+        bool autoLoadPreview = true,
+        bool enablePlaybackEngine = false)
     {
         ArgumentNullException.ThrowIfNull(item.MediaInfo);
 
@@ -104,7 +103,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         Forward25FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(25));
         Back250FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(-250));
         Forward250FramesCommand = new AsyncRelayCommand(() => StepFramesAsync(250));
-        RefreshPreviewCommand = new AsyncRelayCommand(LoadPreviewAsync);
+        RefreshPreviewCommand = new AsyncRelayCommand(CommitPreviewSliderAsync);
         DetectCropCommand = new AsyncRelayCommand(DetectCropAsync);
         AutoCropCommand = new AsyncRelayCommand(DetectCropAsync);
         ClearCropCommand = new AsyncRelayCommand(ClearCropAsync);
@@ -135,11 +134,14 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         };
         _playbackTimer.Tick += PlaybackTimerOnTick;
 
-        InitializePlaybackEngine();
+        if (enablePlaybackEngine)
+        {
+            InitializePlaybackEngine();
+        }
         RefreshState();
         if (autoLoadPreview)
         {
-            _ = LoadPreviewAsync();
+            _ = PrepareForDisplayAsync();
         }
     }
 
@@ -453,12 +455,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         UpdatePreviewTimeTexts();
         OnPropertyChanged(nameof(TimelinePlayheadOffsetPixels));
         OnPropertyChanged(nameof(TimelinePlayheadMargin));
-        if (_suppressPreviewAutoRefresh || IsPlaying || _disposed || _isPreviewSliderDragging)
-        {
-            return;
-        }
-
-        SchedulePreviewRefresh();
     }
 
     partial void OnIsPlayingChanged(bool value)
@@ -761,13 +757,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     private async Task GoToStartAsync()
     {
-        SetPreviewVirtualSecondsSilently(0);
+        PreviewVirtualSeconds = 0;
         await CommitPreviewSliderAsync();
     }
 
     private async Task GoToEndAsync()
     {
-        SetPreviewVirtualSecondsSilently(PreviewVirtualMaximum);
+        PreviewVirtualSeconds = PreviewVirtualMaximum;
         await CommitPreviewSliderAsync();
     }
 
@@ -783,7 +779,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        SetPreviewVirtualSecondsSilently(previousCut.Value);
+        PreviewVirtualSeconds = previousCut.Value;
         await CommitPreviewSliderAsync();
         EditorHint = $"Skok na prethodni rez | virtual {PreviewVirtualTimeText}";
     }
@@ -796,7 +792,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        SetPreviewVirtualSecondsSilently(nextCut.Value);
+        PreviewVirtualSeconds = nextCut.Value;
         await CommitPreviewSliderAsync();
         EditorHint = $"Skok na sledeci rez | virtual {PreviewVirtualTimeText}";
     }
@@ -805,7 +801,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
     {
         var frameRate = Math.Max(1d, Item.MediaInfo?.FrameRate ?? 25d);
         var stepSeconds = frameDelta / frameRate;
-        SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum));
+        PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds + stepSeconds, 0, PreviewVirtualMaximum);
         await CommitPreviewSliderAsync();
     }
 
@@ -988,24 +984,13 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        AttachPlaybackSurface();
-        var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
-        _lastRequestedSourceSeconds = sourceSeconds;
-        _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
-        _awaitingPlaybackFrame = true;
-        _unmuteWhenPlaybackFrameArrives = true;
-        _playbackMediaPlayer.Mute = true;
-        _playbackMediaPlayer.Play();
-        if (_pendingPlaybackSeekMilliseconds is { } playbackStartMs)
+        if (!TryStartPlaybackPreview(resumePlaybackAfterSeek: true))
         {
-            _playbackMediaPlayer.Time = playbackStartMs;
-            _pendingPlaybackSeekMilliseconds = null;
+            EditorHint = "Playback nije mogao da krene iz trazene pozicije.";
+            return;
         }
 
         IsPlaying = true;
-        IsVideoPlaybackVisible = false;
-        IsPreviewImageVisible = true;
-        _playbackTimer.Start();
         EditorHint = "Pokrecem reprodukciju iz trenutno izabranog mesta...";
     }
 
@@ -1016,13 +1001,11 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public void BeginManualPreviewNavigation()
     {
-        _isPreviewSliderDragging = true;
         PausePlaybackCore(loadPreviewAfterPause: false, "Pomeraj timeline za precizan trim frame.");
     }
 
     public async Task EndManualPreviewNavigationAsync()
     {
-        _isPreviewSliderDragging = false;
         await CommitPreviewSliderAsync();
     }
 
@@ -1038,8 +1021,8 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         RefreshState();
-        SetPreviewVirtualSecondsSilently(Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum));
-        await LoadPreviewAsync();
+        PreviewVirtualSeconds = Math.Clamp(PreviewVirtualSeconds, 0, PreviewVirtualMaximum);
+        await CommitPreviewSliderAsync();
     }
 
     private async Task ApplyTimelineMutationAsync(Func<TimelineProject, TimelineProject> mutation, string? refreshHint)
@@ -1088,12 +1071,12 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public async Task PrepareForDisplayAsync()
     {
-        if (_disposed || IsPlaying || PreviewBitmap is not null)
+        if (_disposed || IsPlaying)
         {
             return;
         }
 
-        await LoadPreviewAsync();
+        await CommitPreviewSliderAsync();
     }
 
     private void RefreshState()
@@ -1198,7 +1181,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        SetPreviewVirtualSecondsSilently(Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum));
+        PreviewVirtualSeconds = Math.Clamp(segment.TimelineStartSeconds, 0, PreviewVirtualMaximum);
         _ = CommitPreviewSliderAsync();
     }
 
@@ -1233,7 +1216,7 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             PreviewVirtualMaximum);
 
         SelectTimelineBlock(block, syncPlayhead: false);
-        SetPreviewVirtualSecondsSilently(clickedVirtualSeconds);
+        PreviewVirtualSeconds = clickedVirtualSeconds;
         UpdatePreviewTimeTexts();
 
         if (string.Equals(ActiveTool, "Blade", StringComparison.Ordinal))
@@ -1550,24 +1533,25 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
 
     public async Task CommitPreviewSliderAsync()
     {
-        if (IsPlaying && _playbackMediaPlayer is not null && Item.MediaInfo is not null)
+        if (TryStartPlaybackPreview(resumePlaybackAfterSeek: IsPlaying))
         {
-            var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
-            _lastRequestedSourceSeconds = sourceSeconds;
-            _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
-            _awaitingPlaybackFrame = true;
-            _playbackMediaPlayer.Time = _pendingPlaybackSeekMilliseconds.Value;
-            _pendingPlaybackSeekMilliseconds = null;
             UpdatePreviewTimeTexts();
             return;
         }
 
-        await LoadPreviewAsync();
+        UpdatePreviewTimeTexts();
+        EditorHint = "Preview koristi playback engine. FFmpeg preview je ugasen za prikaz i scrub.";
+        await Task.CompletedTask;
     }
 
     private void PlaybackTimerOnTick(object? sender, EventArgs e)
     {
-        if (!IsPlaying || _playbackMediaPlayer is null || Item.MediaInfo is null)
+        if (_playbackMediaPlayer is null || Item.MediaInfo is null)
+        {
+            return;
+        }
+
+        if (!IsPlaying && !_awaitingPlaybackFrame && _pendingPlaybackSeekMilliseconds is null)
         {
             return;
         }
@@ -1591,9 +1575,19 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             _awaitingPlaybackFrame = false;
             IsVideoPlaybackVisible = true;
             IsPreviewImageVisible = false;
+            if (_pauseWhenPlaybackFrameArrives)
+            {
+                _pauseWhenPlaybackFrameArrives = false;
+                _unmuteWhenPlaybackFrameArrives = false;
+                _playbackMediaPlayer.SetPause(true);
+                _playbackMediaPlayer.Mute = IsTrackMuted;
+                _playbackTimer.Stop();
+                return;
+            }
+
             if (_unmuteWhenPlaybackFrameArrives)
             {
-                _playbackMediaPlayer.Mute = false;
+                _playbackMediaPlayer.Mute = IsTrackMuted;
                 _unmuteWhenPlaybackFrameArrives = false;
             }
         }
@@ -1689,32 +1683,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         return string.Equals(mediaInfo.VideoCodec, "dvvideo", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void SchedulePreviewRefresh()
-    {
-        _previewDebounceCts?.Cancel();
-        _previewDebounceCts?.Dispose();
-        _previewDebounceCts = new CancellationTokenSource();
-        var token = _previewDebounceCts.Token;
-        _ = DebouncedPreviewRefreshAsync(token);
-    }
-
-    private async Task DebouncedPreviewRefreshAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(60, cancellationToken);
-            if (cancellationToken.IsCancellationRequested || IsPlaying || _disposed)
-            {
-                return;
-            }
-
-            await LoadPreviewAsync();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
-
     private ItemTransformSettings BuildTransformSettings()
     {
         return new ItemTransformSettings
@@ -1778,19 +1746,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
             $"{TimelineEditorService.FormatSeconds(SelectedSegment.SourceEndSeconds)}";
     }
 
-    private void SetPreviewVirtualSecondsSilently(double value)
-    {
-        _suppressPreviewAutoRefresh = true;
-        try
-        {
-            PreviewVirtualSeconds = value;
-        }
-        finally
-        {
-            _suppressPreviewAutoRefresh = false;
-        }
-    }
-
     private void PausePlaybackCore(bool loadPreviewAfterPause, string hint)
     {
         if (!IsPlaying && !IsVideoPlaybackVisible)
@@ -1800,21 +1755,55 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         }
 
         _playbackTimer.Stop();
-        _playbackMediaPlayer?.Pause();
+        _playbackMediaPlayer?.SetPause(true);
         IsPlaying = false;
         _awaitingPlaybackFrame = false;
         _unmuteWhenPlaybackFrameArrives = false;
+        _pauseWhenPlaybackFrameArrives = false;
         _pendingPlaybackSeekMilliseconds = null;
         if (_playbackMediaPlayer is not null)
         {
-            _playbackMediaPlayer.Mute = false;
+            _playbackMediaPlayer.Mute = IsTrackMuted;
         }
 
         EditorHint = hint;
         if (loadPreviewAfterPause)
         {
-            _ = LoadPreviewAsync();
+            _ = CommitPreviewSliderAsync();
         }
+    }
+
+    private bool TryStartPlaybackPreview(bool resumePlaybackAfterSeek)
+    {
+        if (Item.MediaInfo is null || !EnsurePlaybackReady())
+        {
+            return false;
+        }
+
+        EnsurePlaybackMediaLoaded();
+        if (_playbackMediaPlayer?.Media is null)
+        {
+            return false;
+        }
+
+        AttachPlaybackSurface();
+        IsVideoPlaybackVisible = true;
+
+        var sourceSeconds = TimelineNavigationService.MapVirtualToSource(Timeline, PreviewVirtualSeconds, Item.MediaInfo.DurationSeconds);
+        _lastRequestedSourceSeconds = sourceSeconds;
+        _pendingPlaybackSeekMilliseconds = (long)Math.Round(sourceSeconds * 1000d);
+        _awaitingPlaybackFrame = true;
+        _pauseWhenPlaybackFrameArrives = !resumePlaybackAfterSeek;
+        _unmuteWhenPlaybackFrameArrives = resumePlaybackAfterSeek;
+        _playbackMediaPlayer.Mute = true;
+
+        if (!_playbackMediaPlayer.IsPlaying)
+        {
+            _playbackMediaPlayer.Play();
+        }
+
+        _playbackTimer.Start();
+        return true;
     }
 
     public void Dispose()
@@ -1827,8 +1816,6 @@ public partial class PlayerTrimWindowViewModel : ViewModelBase, IDisposable
         _disposed = true;
         _previewCts?.Cancel();
         _previewCts?.Dispose();
-        _previewDebounceCts?.Cancel();
-        _previewDebounceCts?.Dispose();
         _playbackTimer.Stop();
         _playbackTimer.Tick -= PlaybackTimerOnTick;
         DetachPlaybackSurface();
